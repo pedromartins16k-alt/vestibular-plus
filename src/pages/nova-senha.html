@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nova senha · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; padding: 24px; }
+  .auth-page::before { content: ''; position: absolute; inset: 0; background: var(--gradient-glow); pointer-events: none; }
+  .auth-card { width: 100%; max-width: 420px; padding: 40px; position: relative; z-index: 1; }
+  .auth-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+  .auth-logo .dot { width: 34px; height: 34px; border-radius: 10px; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; box-shadow: var(--shadow-glow); }
+  .auth-title { font-size: 1.6rem; margin-bottom: 4px; }
+  .auth-subtitle { color: var(--text-secondary); margin-bottom: 28px; font-size: 0.95rem; }
+  form { display: flex; flex-direction: column; gap: 14px; }
+  label { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block; }
+  .field { display: flex; flex-direction: column; }
+  .error-msg { color: var(--color-danger); font-size: 0.85rem; min-height: 18px; }
+  .btn-full { width: 100%; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-card glass fade-up" id="auth-card">
+      <div class="auth-logo"><div class="dot">V+</div><strong>Vestibular+</strong></div>
+      <h1 class="auth-title">Defina sua nova senha</h1>
+      <p class="auth-subtitle">Escolha uma senha forte para sua conta.</p>
+      <form id="nova-senha-form">
+        <div class="field">
+          <label for="senha">Nova senha</label>
+          <input class="input-field" type="password" id="senha" required minlength="6" placeholder="Mínimo 6 caracteres" />
+        </div>
+        <p class="error-msg" id="error-msg"></p>
+        <button type="submit" class="btn btn-primary btn-full" id="submit-btn">Salvar nova senha</button>
+      </form>
+    </div>
+  </div>
+  <script type="module" src="../scripts/nova-senha.js"></script>
+</body>
+</html>

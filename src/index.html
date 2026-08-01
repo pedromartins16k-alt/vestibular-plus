@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vestibular+ · Sua aprovação começa aqui</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles/base.css" />
+<style>
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 6%; position: sticky; top: 0; z-index: 20;
+    backdrop-filter: blur(12px); background: color-mix(in srgb, var(--bg-base) 75%, transparent);
+    border-bottom: 1px solid var(--border-color);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.1rem; }
+  .logo .dot { width: 32px; height: 32px; border-radius: 9px; background: var(--gradient-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; box-shadow: var(--shadow-glow); }
+  nav a { margin: 0 14px; font-weight: 500; color: var(--text-secondary); transition: color var(--transition-fast); }
+  nav a:hover { color: var(--text-primary); }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  #theme-toggle { background: var(--glass-bg); border: 1px solid var(--border-color); border-radius: var(--radius-full); width: 40px; height: 40px; cursor: pointer; font-size: 1.1rem; }
+
+  .hero { position: relative; padding: 90px 6% 60px; text-align: center; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; inset: -20% -10%; background: var(--gradient-glow); z-index: -1; }
+  .hero h1 { font-size: clamp(2.2rem, 5vw, 3.6rem); line-height: 1.1; max-width: 900px; margin: 0 auto 18px; }
+  .hero p { color: var(--text-secondary); font-size: 1.1rem; max-width: 600px; margin: 0 auto 32px; }
+  .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  .stats-strip { display: flex; justify-content: center; gap: 48px; margin-top: 60px; flex-wrap: wrap; }
+  .stat { text-align: center; }
+  .stat strong { font-size: 1.8rem; font-family: var(--font-display); }
+  .stat span { display:block; color: var(--text-secondary); font-size: .85rem; }
+
+  section.features { padding: 80px 6%; }
+  .section-title { text-align: center; max-width: 600px; margin: 0 auto 48px; }
+  .section-title h2 { font-size: 2rem; margin-bottom: 10px; }
+  .section-title p { color: var(--text-secondary); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; max-width: 1100px; margin: 0 auto; }
+  .feature-icon { width: 46px; height: 46px; border-radius: 12px; background: var(--gradient-neon); display:flex; align-items:center; justify-content:center; font-size: 1.3rem; margin-bottom: 14px; }
+  .feature-card h3 { font-size: 1.05rem; margin-bottom: 6px; }
+  .feature-card p { color: var(--text-secondary); font-size: .9rem; line-height: 1.5; }
+
+  footer { text-align: center; padding: 40px 6%; color: var(--text-secondary); font-size: .85rem; border-top: 1px solid var(--border-color); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo"><div class="dot">V+</div> Vestibular+</div>
+    <nav class="desktop-only">
+      <a href="#recursos">Recursos</a>
+      <a href="#materias">Matérias</a>
+      <a href="#planos">Planos</a>
+    </nav>
+    <div class="header-actions">
+      <button id="theme-toggle" aria-label="Alternar tema">🌙</button>
+      <a class="btn btn-ghost" href="./pages/login.html">Entrar</a>
+      <a class="btn btn-primary" href="./pages/cadastro.html">Criar conta grátis</a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <h1 class="fade-up">Estude de forma <span class="text-gradient">inteligente</span> para o ENEM e vestibulares</h1>
+    <p class="fade-up">Resumos, questões comentadas, simulados, flashcards e um cronograma que se adapta a você. Tudo em uma plataforma feita para o seu ritmo.</p>
+    <div class="hero-actions fade-up">
+      <a class="btn btn-primary" href="./pages/cadastro.html">Começar agora — é grátis</a>
+      <a class="btn btn-ghost" href="#recursos">Ver recursos</a>
+    </div>
+    <div class="stats-strip fade-up">
+      <div class="stat"><strong>+12k</strong><span>questões comentadas</span></div>
+      <div class="stat"><strong>+300</strong><span>resumos por matéria</span></div>
+      <div class="stat"><strong>100%</strong><span>gratuito para começar</span></div>
+    </div>
+  </section>
+
+  <section class="features" id="recursos">
+    <div class="section-title">
+      <h2>Tudo que você precisa, em um só lugar</h2>
+      <p>Uma experiência completa de estudo, do resumo à correção do simulado.</p>
+    </div>
+    <div class="grid" id="features-grid"></div>
+  </section>
+
+  <footer>© 2026 Vestibular+. Feito para quem quer passar.</footer>
+
+  <script type="module" src="./scripts/theme.js"></script>
+  <script type="module" src="./scripts/landing.js"></script>
+</body>
+</html>

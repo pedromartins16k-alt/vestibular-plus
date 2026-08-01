@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .app-layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  @media (max-width: 900px) { .app-layout { grid-template-columns: 1fr; } .sidebar { display: none; } }
+
+  .sidebar { border-right: 1px solid var(--border-color); padding: 24px 18px; display: flex; flex-direction: column; gap: 6px; }
+  .sidebar .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; margin-bottom: 28px; padding: 0 8px; }
+  .sidebar .logo .dot { width: 32px; height: 32px; border-radius: 9px; background: var(--gradient-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--radius-md); color: var(--text-secondary); font-weight: 500; font-size: .92rem; transition: background var(--transition-fast), color var(--transition-fast); cursor: pointer; }
+  .nav-item:hover, .nav-item.active { background: var(--glass-bg); color: var(--text-primary); }
+  .nav-item.active { background: linear-gradient(135deg, rgba(124,58,237,.15), rgba(59,130,246,.15)); }
+
+  .main { padding: 24px 4%; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+  .search-box { flex: 1; max-width: 380px; position: relative; }
+  .search-box input { padding-left: 40px; }
+  .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; }
+  .topbar-actions { display: flex; align-items: center; gap: 14px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
+
+  .welcome-card { padding: 28px; border-radius: var(--radius-lg); background: var(--gradient-primary); color: #fff; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .welcome-card h2 { font-size: 1.4rem; margin-bottom: 6px; }
+  .welcome-card p { opacity: .9; font-size: .92rem; }
+  .xp-bar-track { background: rgba(255,255,255,.25); border-radius: var(--radius-full); height: 10px; margin-top: 16px; overflow: hidden; }
+  .xp-bar-fill { height: 100%; background: #fff; border-radius: var(--radius-full); transition: width .6s ease; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card { text-align: center; }
+  .stat-card strong { font-size: 1.6rem; font-family: var(--font-display); display: block; }
+  .stat-card span { color: var(--text-secondary); font-size: .82rem; }
+
+  .section-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .section-row { grid-template-columns: 1fr; } }
+  .panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .panel-title h3 { font-size: 1.05rem; }
+  .see-all { font-size: .82rem; color: var(--color-primary-500); font-weight: 600; }
+
+  .materia-list { display: flex; flex-direction: column; gap: 10px; }
+  .materia-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .materia-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .materia-item .prog-track { flex: 1; height: 6px; border-radius: var(--radius-full); background: var(--border-color); overflow: hidden; }
+  .materia-item .prog-fill { height: 100%; border-radius: var(--radius-full); background: var(--gradient-neon); }
+
+  .ranking-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-color); font-size: .9rem; }
+  .ranking-item:last-child { border-bottom: none; }
+  .ranking-pos { width: 22px; text-align: center; font-weight: 700; color: var(--text-secondary); }
+
+  .empty-state { text-align: center; padding: 30px 10px; color: var(--text-secondary); font-size: .88rem; }
+</style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar glass">
+      <div class="logo"><div class="dot">V+</div>Vestibular+</div>
+      <div class="nav-item active">🏠 Dashboard</div>
+      <div class="nav-item">📚 Resumos</div>
+      <div class="nav-item">✅ Questões</div>
+      <div class="nav-item">⏱️ Simulados</div>
+      <div class="nav-item">🧠 Flashcards</div>
+      <div class="nav-item">📅 Cronograma</div>
+      <div class="nav-item">🏆 Ranking</div>
+      <div class="nav-item">⭐ Favoritos</div>
+      <div class="nav-item">📊 Estatísticas</div>
+      <div class="nav-item" style="margin-top:auto;" id="logout-btn">🚪 Sair</div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="search-box">
+          <input class="input-field" type="text" placeholder="Pesquisar resumos, questões..." />
+        </div>
+        <div class="topbar-actions">
+          <button id="theme-toggle" class="icon-btn">🌙</button>
+          <button class="icon-btn">🔔</button>
+          <div class="avatar" id="avatar-inicial">A</div>
+        </div>
+      </div>
+
+      <div class="welcome-card fade-up">
+        <h2 id="saudacao">Olá! 👋</h2>
+        <p id="nivel-info">Carregando seu progresso...</p>
+        <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar" style="width:0%"></div></div>
+      </div>
+
+      <div class="stats-grid fade-up">
+        <div class="card stat-card"><strong id="stat-horas">0h</strong><span>Horas estudadas</span></div>
+        <div class="card stat-card"><strong id="stat-questoes">0</strong><span>Questões resolvidas</span></div>
+        <div class="card stat-card"><strong id="stat-simulados">0</strong><span>Simulados feitos</span></div>
+        <div class="card stat-card"><strong id="stat-sequencia">0</strong><span>Dias seguidos</span></div>
+      </div>
+
+      <div class="section-row">
+        <div class="card fade-up">
+          <div class="panel-title"><h3>Progresso por matéria</h3><a class="see-all" href="#">ver tudo</a></div>
+          <div class="materia-list" id="materia-list">
+            <div class="empty-state">Assim que houver matérias cadastradas, seu progresso aparece aqui.</div>
+          </div>
+        </div>
+
+        <div class="card fade-up">
+          <div class="panel-title"><h3>Ranking</h3><a class="see-all" href="#">ver tudo</a></div>
+          <div id="ranking-list">
+            <div class="empty-state">O ranking aparece assim que outros alunos começarem a estudar 🚀</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/dashboard.js"></script>
+</body>
+</html>
