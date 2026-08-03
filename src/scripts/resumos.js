@@ -82,7 +82,9 @@ function abrirModal(resumo) {
   document.getElementById('modal-tag').style.background = `${cor}22`;
   document.getElementById('modal-tag').style.color = cor;
   document.getElementById('modal-titulo').textContent = resumo.titulo;
-  document.getElementById('modal-conteudo').textContent = resumo.conteudo.replace(/[#*]/g, '');
+ document.getElementById('modal-conteudo').textContent = resumo.conteudo
+    .replace(/\\n/g, '\n')   // converte "\n" literal em quebra de linha real
+    .replace(/[#*]/g, '');    // remove símbolos de markdown (#, *)
   document.getElementById('modal-fonte').textContent = resumo.fonte ? `Fonte: ${resumo.fonte}` : '';
   modalOverlay.classList.add('open');
 
