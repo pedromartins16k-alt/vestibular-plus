@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Questões · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .page-wrap { padding: 32px 5%; max-width: 800px; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .back-link:hover { color: var(--text-primary); }
+  .page-title { font-size: 1.8rem; margin-top: 6px; }
+
+  .filtro-materias { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+  .chip {
+    padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
+    background: var(--bg-elevated); font-size: .85rem; font-weight: 600; cursor: pointer;
+  }
+  .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
+
+  .progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: .85rem; color: var(--text-secondary); }
+  .questao-card { padding: 28px; }
+  .questao-tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); margin-bottom: 14px; }
+  .questao-enunciado { font-size: 1.05rem; line-height: 1.6; margin-bottom: 22px; }
+
+  .alternativa {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-color); margin-bottom: 10px; cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .alternativa:hover { border-color: var(--color-primary-500); }
+  .alternativa.selecionada { border-color: var(--color-primary-500); background: rgba(124,58,237,.08); }
+  .alternativa.correta { border-color: var(--color-success); background: rgba(34,197,94,.1); }
+  .alternativa.errada { border-color: var(--color-danger); background: rgba(239,68,68,.1); }
+  .alt-letra {
+    width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-color);
+    display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; flex-shrink: 0;
+  }
+  .alternativa.correta .alt-letra { background: var(--color-success); border-color: var(--color-success); color: #fff; }
+  .alternativa.errada .alt-letra { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+
+  .feedback-box { margin-top: 18px; padding: 16px; border-radius: var(--radius-md); font-size: .9rem; line-height: 1.6; display: none; }
+  .feedback-box.acerto { background: rgba(34,197,94,.1); border: 1px solid var(--color-success); display: block; }
+  .feedback-box.erro { background: rgba(239,68,68,.1); border: 1px solid var(--color-danger); display: block; }
+  .feedback-box strong { display: block; margin-bottom: 6px; }
+
+  .actions-row { display: flex; justify-content: space-between; margin-top: 22px; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-header">
+      <div>
+        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
+        <h1 class="page-title">✅ Questões comentadas</h1>
+      </div>
+      <button id="theme-toggle" class="icon-btn" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;">🌙</button>
+    </div>
+
+    <div class="filtro-materias" id="filtro-materias">
+      <div class="chip active" data-materia="todas">Todas</div>
+    </div>
+
+    <div class="progress-info" id="progress-info"></div>
+
+    <div id="questao-container">
+      <p class="empty-state">Carregando questões...</p>
+    </div>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/questoes.js"></script>
+</body>
+</html>
