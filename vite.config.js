@@ -14,7 +14,9 @@ export default defineConfig({
         login: resolve(__dirname, 'src/pages/login.html'),
         cadastro: resolve(__dirname, 'src/pages/cadastro.html'),
         recuperarSenha: resolve(__dirname, 'src/pages/recuperar-senha.html'),
-        dashboard: resolve(__dirname, 'src/pages/dashboard.html'),
+dashboard: resolve(__dirname, 'src/pages/dashboard.html'),
+        resumos: resolve(__dirname, 'src/pages/resumos.html'),
+      }
       }
     }
   },
