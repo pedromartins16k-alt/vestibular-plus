@@ -6,6 +6,7 @@ const filtroContainer = document.getElementById('filtro-materias');
 const modoTabsContainer = document.getElementById('modo-tabs');
 const statRestantes = document.getElementById('stat-restantes');
 const statRevisados = document.getElementById('stat-revisados');
+const progressoFill = document.getElementById('progresso-fill');
 
 const INTERVALOS_DIAS = [1, 1, 3, 7, 15, 30]; // índice = nível de memorização após avaliar
 
@@ -14,6 +15,7 @@ let todosFlashcards = [];
 let materiaAtiva = 'todas';
 let modoAtivo = 'revisar'; // 'revisar' = pendentes | 'sei' = já lembrados antes
 let fila = [];
+let totalSessao = 0;
 let cardAtual = null;
 let virado = false;
 let revisadosHoje = 0;
@@ -98,12 +100,16 @@ function montarFila() {
     ? base.filter(jaLembrado)
     : base.filter(estaPendente);
 
+  totalSessao = fila.length;
   atualizarStats();
 }
 
 function atualizarStats() {
   statRestantes.textContent = fila.length;
   statRevisados.textContent = revisadosHoje;
+
+  const progresso = totalSessao > 0 ? ((totalSessao - fila.length) / totalSessao) * 100 : 0;
+  progressoFill.style.width = `${progresso}%`;
 }
 
 function mostrarProximoCard() {
@@ -114,7 +120,7 @@ function mostrarProximoCard() {
 
     if (modoAtivo === 'sei') {
       studyArea.innerHTML = `
-        <div class="empty-state">
+        <div class="empty-state card-session">
           Você ainda não tem flashcards marcados como "lembrei" por aqui.<br>
           Estuda um pouco na aba "Para revisar" primeiro 🙂
         </div>
@@ -123,7 +129,7 @@ function mostrarProximoCard() {
     }
 
     studyArea.innerHTML = `
-      <div class="empty-state">
+      <div class="empty-state card-session">
         🎉 Você revisou todos os flashcards por aqui!<br>
         Volte mais tarde ou treine de novo sem esperar a data de revisão.
         <br><br>
@@ -135,6 +141,7 @@ function mostrarProximoCard() {
     document.getElementById('btn-revisar-tudo').addEventListener('click', () => {
       const base = materiaAtiva === 'todas' ? todosFlashcards : todosFlashcards.filter(c => c.materia_id === materiaAtiva);
       fila = [...base];
+      totalSessao = fila.length;
       atualizarStats();
       mostrarProximoCard();
     });
@@ -146,21 +153,23 @@ function mostrarProximoCard() {
   const nomeMateria = cardAtual.materias?.nome || 'Geral';
 
   studyArea.innerHTML = `
-    <div class="flashcard-container" id="flashcard-container">
-      <div class="flashcard" id="flashcard">
-        <div class="flashcard-face frente">
-          <span class="flashcard-tag" style="background:${cor}22; color:${cor};">${nomeMateria}</span>
-          ${cardAtual.frente}
-          <span class="flip-hint">👆 toque para virar</span>
-        </div>
-        <div class="flashcard-face verso">
-          ${cardAtual.verso}
+    <div class="card-session">
+      <div class="flashcard-container" id="flashcard-container">
+        <div class="flashcard" id="flashcard">
+          <div class="flashcard-face frente">
+            <span class="flashcard-tag" style="background:${cor}22; color:${cor};">${nomeMateria}</span>
+            ${cardAtual.frente}
+            <span class="flip-hint">👆 toque para virar</span>
+          </div>
+          <div class="flashcard-face verso">
+            ${cardAtual.verso}
+          </div>
         </div>
       </div>
-    </div>
-    <div class="avaliar-botoes" id="avaliar-botoes" style="display:none;">
-      <button class="btn-avaliar errei" id="btn-errei">😵 Não lembrei</button>
-      <button class="btn-avaliar acertei" id="btn-acertei">🙂 Lembrei</button>
+      <div class="avaliar-botoes" id="avaliar-botoes" style="display:none;">
+        <button class="btn-avaliar errei" id="btn-errei">😵 Não lembrei</button>
+        <button class="btn-avaliar acertei" id="btn-acertei">🙂 Lembrei</button>
+      </div>
     </div>
   `;
 
