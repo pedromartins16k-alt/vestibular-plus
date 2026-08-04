@@ -6,9 +6,15 @@ const filtroContainer = document.getElementById('filtro-materias');
 const modalOverlay = document.getElementById('modal-overlay');
 const selectMateria = document.getElementById('input-materia');
 
-let cronogramaCache = [];
-let materiaAtiva = 'todas';
-let userId = null;
+let dataSelecionada = null;
+   let mesCalendario = new Date().getMonth();
+   let anoCalendario = new Date().getFullYear();
+
+   const inputDataDisplay = document.getElementById('input-data-display');
+   const inputDataHidden = document.getElementById('input-data');
+   const calendarioPopup = document.getElementById('calendario-popup');
+   const calMesAno = document.getElementById('cal-mes-ano');
+   const calGrid = document.getElementById('calendario-grid');
 
 async function iniciar() {
   const session = await exigirAutenticacao();
