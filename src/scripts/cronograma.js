@@ -222,7 +222,28 @@ function abrirModal() {
 function fecharModal() {
   modalOverlay.classList.remove('open');
 }
-
+inputDataDisplay.addEventListener('click', (e) => {
+  e.stopPropagation();
+  calendarioPopup.classList.toggle('open');
+  renderCalendario();
+});
+document.getElementById('cal-prev').addEventListener('click', (e) => {
+  e.stopPropagation();
+  mesCalendario--;
+  if (mesCalendario < 0) { mesCalendario = 11; anoCalendario--; }
+  renderCalendario();
+});
+document.getElementById('cal-next').addEventListener('click', (e) => {
+  e.stopPropagation();
+  mesCalendario++;
+  if (mesCalendario > 11) { mesCalendario = 0; anoCalendario++; }
+  renderCalendario();
+});
+document.addEventListener('click', (e) => {
+  if (!calendarioPopup.contains(e.target) && e.target !== inputDataDisplay) {
+    calendarioPopup.classList.remove('open');
+  }
+});
 document.getElementById('btn-add').addEventListener('click', abrirModal);
 document.getElementById('modal-close').addEventListener('click', fecharModal);
 document.getElementById('btn-salvar').addEventListener('click', salvarNovoItem);
