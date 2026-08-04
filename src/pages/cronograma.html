@@ -129,9 +129,23 @@
         <label>Matéria</label>
         <select id="input-materia"></select>
       </div>
-      <div class="form-group">
+   <div class="form-group">
         <label>Data</label>
-        <input type="date" id="input-data" />
+        <div class="date-input-wrapper">
+          <input type="text" id="input-data-display" placeholder="Selecione uma data" readonly />
+          <input type="hidden" id="input-data" />
+          <div class="calendario-popup" id="calendario-popup">
+            <div class="calendario-header">
+              <span class="cal-nav" id="cal-prev">‹</span>
+              <span id="cal-mes-ano"></span>
+              <span class="cal-nav" id="cal-next">›</span>
+            </div>
+            <div class="calendario-dias-semana">
+              <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
+            </div>
+            <div class="calendario-grid" id="calendario-grid"></div>
+          </div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
