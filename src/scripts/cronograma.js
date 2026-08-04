@@ -120,6 +120,49 @@ function formatarDia(dataStr, ehHoje) {
   return ehHoje ? `Hoje · ${texto}` : texto;
 }
 
+function renderCalendario() {
+  const hoje = new Date();
+  const primeiroDiaSemana = new Date(anoCalendario, mesCalendario, 1).getDay();
+  const totalDias = new Date(anoCalendario, mesCalendario + 1, 0).getDate();
+  const totalDiasMesAnterior = new Date(anoCalendario, mesCalendario, 0).getDate();
+
+  const nomeMes = new Date(anoCalendario, mesCalendario, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  calMesAno.textContent = nomeMes;
+
+  let celulas = '';
+
+  for (let i = primeiroDiaSemana - 1; i >= 0; i--) {
+    celulas += `<div class="cal-dia outro-mes">${totalDiasMesAnterior - i}</div>`;
+  }
+
+  for (let dia = 1; dia <= totalDias; dia++) {
+    const dataStr = `${anoCalendario}-${String(mesCalendario + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    const ehHoje = dataStr === hoje.toISOString().slice(0, 10);
+    const ehSelecionado = dataStr === dataSelecionada;
+    celulas += `<div class="cal-dia ${ehHoje ? 'hoje' : ''} ${ehSelecionado ? 'selecionado' : ''}" data-data="${dataStr}">${dia}</div>`;
+  }
+
+  const totalCelulas = primeiroDiaSemana + totalDias;
+  const restante = (7 - (totalCelulas % 7)) % 7;
+  for (let i = 1; i <= restante; i++) {
+    celulas += `<div class="cal-dia outro-mes">${i}</div>`;
+  }
+
+  calGrid.innerHTML = celulas;
+
+  calGrid.querySelectorAll('.cal-dia[data-data]').forEach(el => {
+    el.addEventListener('click', () => selecionarDia(el.dataset.data));
+  });
+}
+
+function selecionarDia(dataStr) {
+  dataSelecionada = dataStr;
+  inputDataHidden.value = dataStr;
+  const data = new Date(dataStr + 'T00:00:00');
+  inputDataDisplay.value = data.toLocaleDateString('pt-BR');
+  calendarioPopup.classList.remove('open');
+}
+
 async function alternarConcluido(id) {
   const item = cronogramaCache.find(c => c.id === id);
   if (!item) return;
