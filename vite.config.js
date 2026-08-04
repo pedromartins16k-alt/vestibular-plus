@@ -20,6 +20,7 @@ export default defineConfig({
         flashcards: resolve(__dirname, 'src/pages/flashcards.html'),
         novaSenha: resolve(__dirname, 'src/pages/nova-senha.html'),
         cronograma: resolve(__dirname, 'src/pages/cronograma.html'),
+        metas: resolve(__dirname, 'src/pages/metas.html'),
       }
     }
   },
