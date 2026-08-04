@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cronograma · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .page-wrap { padding: 32px 5%; max-width: 1100px; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .back-link:hover { color: var(--text-primary); }
+  .page-title { font-size: 1.8rem; margin-top: 6px; }
+  .header-actions { display: flex; align-items: center; gap: 10px; }
+  .btn-add {
+    padding: 10px 18px; border-radius: var(--radius-full); border: none;
+    background: var(--gradient-primary); color: #fff; font-weight: 700; font-size: .85rem;
+    cursor: pointer; box-shadow: var(--shadow-glow);
+  }
+  .filtro-materias { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px; }
+  .chip {
+    padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
+    background: var(--bg-elevated); font-size: .85rem; font-weight: 600; cursor: pointer;
+    transition: all var(--transition-fast); display: flex; align-items: center; gap: 6px;
+  }
+  .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
+  .dia-grupo { margin-bottom: 28px; }
+  .dia-titulo {
+    font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 700;
+    color: var(--text-secondary); margin-bottom: 12px; text-transform: capitalize;
+  }
+  .dia-titulo.hoje { color: var(--accent-color, #7c3aed); }
+  .item-lista { display: flex; flex-direction: column; gap: 10px; }
+  .item-card {
+    display: flex; align-items: center; gap: 14px; padding: 14px 18px;
+    cursor: default;
+  }
+  .item-card.concluido { opacity: .55; }
+  .item-card.concluido .item-titulo { text-decoration: line-through; }
+  .item-check {
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border-color);
+    background: var(--bg-elevated); cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: .75rem;
+    transition: all var(--transition-fast);
+  }
+  .item-check.checked { background: var(--gradient-primary); border-color: transparent; color: #fff; }
+  .item-info { flex: 1; min-width: 0; }
+  .item-titulo { font-weight: 600; font-size: .95rem; }
+  .item-meta { font-size: .78rem; color: var(--text-secondary); margin-top: 3px; }
+  .item-tag { font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-full); flex-shrink: 0; }
+  .item-del { color: var(--text-secondary); cursor: pointer; font-size: 1rem; flex-shrink: 0; padding: 4px; }
+  .item-del:hover { color: #ef4444; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    align-items: center; justify-content: center; z-index: 50; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-content { max-width: 440px; width: 100%; padding: 32px; }
+  .modal-close { float: right; cursor: pointer; font-size: 1.2rem; color: var(--text-secondary); }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: .82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary); }
+  .form-group input, .form-group select {
+    width: 100%; padding: 10px 12px; border-radius: var(--radius-md, 10px);
+    border: 1px solid var(--border-color); background: var(--bg-elevated);
+    color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: .9rem;
+  }
+  .form-row { display: flex; gap: 12px; }
+  .form-row .form-group { flex: 1; }
+  .btn-salvar {
+    width: 100%; padding: 12px; border-radius: var(--radius-full); border: none;
+    background: var(--gradient-primary); color: #fff; font-weight: 700; font-size: .9rem;
+    cursor: pointer; margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-header">
+      <div>
+        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
+        <h1 class="page-title">🗓️ Cronograma</h1>
+      </div>
+      <div class="header-actions">
+        <button id="theme-toggle" class="icon-btn" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;">🌙</button>
+        <button class="btn-add" id="btn-add">+ Novo compromisso</button>
+      </div>
+    </div>
+    <div class="filtro-materias" id="filtro-materias">
+      <div class="chip active" data-materia="todas">Todas</div>
+    </div>
+    <div id="cronograma-lista">
+      <p class="empty-state">Carregando cronograma...</p>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-content card">
+      <span class="modal-close" id="modal-close">✕</span>
+      <h2 id="modal-titulo-form">Novo compromisso</h2>
+      <div class="form-group">
+        <label>Título</label>
+        <input type="text" id="input-titulo" placeholder="Ex: Revisar Matemática" />
+      </div>
+      <div class="form-group">
+        <label>Matéria</label>
+        <select id="input-materia"></select>
+      </div>
+      <div class="form-group">
+        <label>Data</label>
+        <input type="date" id="input-data" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Início</label>
+          <input type="time" id="input-hora-inicio" />
+        </div>
+        <div class="form-group">
+          <label>Fim</label>
+          <input type="time" id="input-hora-fim" />
+        </div>
+      </div>
+      <button class="btn-salvar" id="btn-salvar">Salvar</button>
+    </div>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/cronograma.js"></script>
+</body>
+</html>
