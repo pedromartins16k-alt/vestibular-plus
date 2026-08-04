@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simulados · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .page-wrap { padding: 32px 5%; max-width: 800px; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .page-title { font-size: 1.8rem; margin-top: 6px; }
+
+  .simulado-card { padding: 24px; margin-bottom: 16px; }
+  .simulado-card h3 { font-size: 1.1rem; margin-bottom: 6px; }
+  .simulado-card p { color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px; }
+  .simulado-meta { display: flex; gap: 16px; font-size: .82rem; color: var(--text-secondary); margin-bottom: 16px; }
+
+  .timer-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-full);
+    background: rgba(239,68,68,.12); color: var(--color-danger); font-weight: 700; font-size: .9rem;
+  }
+  .progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: .85rem; color: var(--text-secondary); }
+
+  .questao-card { padding: 28px; }
+  .questao-enunciado { font-size: 1.05rem; line-height: 1.6; margin-bottom: 22px; }
+  .alternativa {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-color); margin-bottom: 10px; cursor: pointer; transition: all var(--transition-fast);
+  }
+  .alternativa:hover { border-color: var(--color-primary-500); }
+  .alternativa.selecionada { border-color: var(--color-primary-500); background: rgba(124,58,237,.1); }
+  .alt-letra {
+    width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-color);
+    display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; flex-shrink: 0;
+  }
+  .alternativa.selecionada .alt-letra { background: var(--color-primary-500); border-color: var(--color-primary-500); color: #fff; }
+
+  .actions-row { display: flex; justify-content: space-between; margin-top: 22px; }
+
+  .resultado-card { text-align: center; padding: 40px 28px; }
+  .resultado-nota { font-size: 3rem; font-family: var(--font-display); background: var(--gradient-neon); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-header">
+      <div>
+        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
+        <h1 class="page-title">⏱️ Simulados</h1>
+      </div>
+      <button id="theme-toggle" class="icon-btn" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;">🌙</button>
+    </div>
+
+    <div id="conteudo">
+      <p class="empty-state">Carregando simulados...</p>
+    </div>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/simulados.js"></script>
+</body>
+</html>
