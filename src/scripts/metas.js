@@ -6,6 +6,15 @@ const modalOverlay = document.getElementById('modal-overlay');
 
 let userId = null;
 let metasCache = [];
+let dataSelecionada = null;
+let mesCalendario = new Date().getMonth();
+let anoCalendario = new Date().getFullYear();
+
+const inputPrazoDisplay = document.getElementById('input-prazo-display');
+const inputPrazoHidden = document.getElementById('input-prazo');
+const calendarioPopup = document.getElementById('calendario-popup');
+const calMesAno = document.getElementById('cal-mes-ano');
+const calGrid = document.getElementById('calendario-grid');
 
 const TIPO_INFO = {
   horas_estudo: { label: 'Horas de estudo', icone: '⏰', unidade: 'h' },
@@ -39,8 +48,6 @@ async function carregarMetas() {
     valor_atual: progresso[m.tipo] ?? 0,
   }));
 
-  // Mantém o valor_atual salvo no banco em sincronia (não é obrigatório, mas evita
-  // que outras telas mostrem um número desatualizado).
   metasCache.forEach(m => {
     supabase.from('metas').update({ valor_atual: m.valor_atual }).eq('id', m.id);
   });
@@ -49,7 +56,6 @@ async function carregarMetas() {
 }
 
 function calcularProgresso(sessoes) {
-  const minutosPorTipo = { flashcards: 0, questoes: 0, simulado: 0, resumo: 0 };
   let totalMinutos = 0;
   let flashcardsRevisados = 0;
   let questoesResolvidas = 0;
@@ -123,11 +129,54 @@ async function excluirMeta(id) {
   renderMetas();
 }
 
+function renderCalendario() {
+  const hoje = new Date();
+  const primeiroDiaSemana = new Date(anoCalendario, mesCalendario, 1).getDay();
+  const totalDias = new Date(anoCalendario, mesCalendario + 1, 0).getDate();
+  const totalDiasMesAnterior = new Date(anoCalendario, mesCalendario, 0).getDate();
+
+  const nomeMes = new Date(anoCalendario, mesCalendario, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  calMesAno.textContent = nomeMes;
+
+  let celulas = '';
+
+  for (let i = primeiroDiaSemana - 1; i >= 0; i--) {
+    celulas += `<div class="cal-dia outro-mes">${totalDiasMesAnterior - i}</div>`;
+  }
+
+  for (let dia = 1; dia <= totalDias; dia++) {
+    const dataStr = `${anoCalendario}-${String(mesCalendario + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+    const ehHoje = dataStr === hoje.toISOString().slice(0, 10);
+    const ehSelecionado = dataStr === dataSelecionada;
+    celulas += `<div class="cal-dia ${ehHoje ? 'hoje' : ''} ${ehSelecionado ? 'selecionado' : ''}" data-data="${dataStr}">${dia}</div>`;
+  }
+
+  const totalCelulas = primeiroDiaSemana + totalDias;
+  const restante = (7 - (totalCelulas % 7)) % 7;
+  for (let i = 1; i <= restante; i++) {
+    celulas += `<div class="cal-dia outro-mes">${i}</div>`;
+  }
+
+  calGrid.innerHTML = celulas;
+
+  calGrid.querySelectorAll('.cal-dia[data-data]').forEach(el => {
+    el.addEventListener('click', () => selecionarDia(el.dataset.data));
+  });
+}
+
+function selecionarDia(dataStr) {
+  dataSelecionada = dataStr;
+  inputPrazoHidden.value = dataStr;
+  const data = new Date(dataStr + 'T00:00:00');
+  inputPrazoDisplay.value = data.toLocaleDateString('pt-BR');
+  calendarioPopup.classList.remove('open');
+}
+
 async function salvarNovaMeta() {
   const descricao = document.getElementById('input-descricao').value.trim();
   const tipo = document.getElementById('input-tipo').value;
   const valorAlvo = document.getElementById('input-valor-alvo').value;
-  const prazo = document.getElementById('input-prazo').value || null;
+  const prazo = inputPrazoHidden.value || null;
 
   if (!descricao || !valorAlvo || Number(valorAlvo) <= 0) {
     alert('Preenche a descrição e um valor alvo maior que zero.');
@@ -151,7 +200,9 @@ async function salvarNovaMeta() {
   fecharModal();
   document.getElementById('input-descricao').value = '';
   document.getElementById('input-valor-alvo').value = '';
-  document.getElementById('input-prazo').value = '';
+  inputPrazoDisplay.value = '';
+  inputPrazoHidden.value = '';
+  dataSelecionada = null;
   await carregarMetas();
 }
 
@@ -162,6 +213,28 @@ function fecharModal() {
   modalOverlay.classList.remove('open');
 }
 
+inputPrazoDisplay.addEventListener('click', (e) => {
+  e.stopPropagation();
+  calendarioPopup.classList.toggle('open');
+  renderCalendario();
+});
+document.getElementById('cal-prev').addEventListener('click', (e) => {
+  e.stopPropagation();
+  mesCalendario--;
+  if (mesCalendario < 0) { mesCalendario = 11; anoCalendario--; }
+  renderCalendario();
+});
+document.getElementById('cal-next').addEventListener('click', (e) => {
+  e.stopPropagation();
+  mesCalendario++;
+  if (mesCalendario > 11) { mesCalendario = 0; anoCalendario++; }
+  renderCalendario();
+});
+document.addEventListener('click', (e) => {
+  if (!calendarioPopup.contains(e.target) && e.target !== inputPrazoDisplay) {
+    calendarioPopup.classList.remove('open');
+  }
+});
 document.getElementById('btn-add').addEventListener('click', abrirModal);
 document.getElementById('modal-close').addEventListener('click', fecharModal);
 document.getElementById('btn-salvar').addEventListener('click', salvarNovaMeta);
