@@ -3,6 +3,7 @@ import { exigirAutenticacao } from '../lib/authGuard.js';
 
 const studyArea = document.getElementById('study-area');
 const filtroContainer = document.getElementById('filtro-materias');
+const modoTabsContainer = document.getElementById('modo-tabs');
 const statRestantes = document.getElementById('stat-restantes');
 const statRevisados = document.getElementById('stat-revisados');
 
@@ -11,6 +12,7 @@ const INTERVALOS_DIAS = [1, 1, 3, 7, 15, 30]; // índice = nível de memorizaç�
 let userId = null;
 let todosFlashcards = [];
 let materiaAtiva = 'todas';
+let modoAtivo = 'revisar'; // 'revisar' = pendentes | 'sei' = já lembrados antes
 let fila = [];
 let cardAtual = null;
 let virado = false;
@@ -44,8 +46,21 @@ async function iniciar() {
   }));
 
   renderFiltros(materias || []);
+  renderModos();
   montarFila();
   mostrarProximoCard();
+}
+
+function renderModos() {
+  modoTabsContainer.querySelectorAll('.modo-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      modoTabsContainer.querySelectorAll('.modo-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      modoAtivo = btn.dataset.modo;
+      montarFila();
+      mostrarProximoCard();
+    });
+  });
 }
 
 function renderFiltros(materias) {
@@ -70,12 +85,19 @@ function estaPendente(card) {
   return new Date(card.progresso.proxima_revisao) <= new Date();
 }
 
+function jaLembrado(card) {
+  return card.progresso && card.progresso.nivel_memorizacao > 0;
+}
+
 function montarFila() {
   const base = materiaAtiva === 'todas'
     ? todosFlashcards
     : todosFlashcards.filter(c => c.materia_id === materiaAtiva);
 
-  fila = base.filter(estaPendente);
+  fila = modoAtivo === 'sei'
+    ? base.filter(jaLembrado)
+    : base.filter(estaPendente);
+
   atualizarStats();
 }
 
@@ -89,6 +111,17 @@ function mostrarProximoCard() {
 
   if (!fila.length) {
     cardAtual = null;
+
+    if (modoAtivo === 'sei') {
+      studyArea.innerHTML = `
+        <div class="empty-state">
+          Você ainda não tem flashcards marcados como "lembrei" por aqui.<br>
+          Estuda um pouco na aba "Para revisar" primeiro 🙂
+        </div>
+      `;
+      return;
+    }
+
     studyArea.innerHTML = `
       <div class="empty-state">
         🎉 Você revisou todos os flashcards por aqui!<br>
@@ -100,9 +133,8 @@ function mostrarProximoCard() {
       </div>
     `;
     document.getElementById('btn-revisar-tudo').addEventListener('click', () => {
-      fila = materiaAtiva === 'todas'
-        ? [...todosFlashcards]
-        : todosFlashcards.filter(c => c.materia_id === materiaAtiva);
+      const base = materiaAtiva === 'todas' ? todosFlashcards : todosFlashcards.filter(c => c.materia_id === materiaAtiva);
+      fila = [...base];
       atualizarStats();
       mostrarProximoCard();
     });
@@ -171,8 +203,16 @@ async function avaliar(acertou) {
     nivel_memorizacao: novoNivel,
     proxima_revisao: proximaRevisao.toISOString(),
   };
-  revisadosHoje++;
-  fila.shift();
+
+  const cardResolvido = fila.shift();
+
+  if (acertou) {
+    revisadosHoje++;
+  } else {
+    // não lembrou: volta pro fim da fila e repete na mesma sessão até acertar
+    fila.push(cardResolvido);
+  }
+
   atualizarStats();
   mostrarProximoCard();
 }
