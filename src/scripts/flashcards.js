@@ -177,4 +177,4 @@ async function avaliar(acertou) {
   mostrarProximoCard();
 }
 
-iniciar();flashcards.js
+iniciar();
