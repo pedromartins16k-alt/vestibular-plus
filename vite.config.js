@@ -19,6 +19,7 @@ export default defineConfig({
         questoes: resolve(__dirname, 'src/pages/questoes.html'),
         simulados: resolve(__dirname, 'src/pages/simulados.html'),
         flashcards: resolve(__dirname, 'src/pages/flashcards.html'),
+          novaSenha: resolve(__dirname, 'src/pages/nova-senha.html'),
       }
     }
   },
