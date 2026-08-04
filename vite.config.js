@@ -16,7 +16,8 @@ export default defineConfig({
         recuperarSenha: resolve(__dirname, 'src/pages/recuperar-senha.html'),
         dashboard: resolve(__dirname, 'src/pages/dashboard.html'),
         resumos: resolve(__dirname, 'src/pages/resumos.html'),
-        questoes: resolve(__dirname, 'src/pages/questoes.html'),
+       questoes: resolve(__dirname, 'src/pages/questoes.html'),
+        simulados: resolve(__dirname, 'src/pages/simulados.html'),
       }
     }
   },
