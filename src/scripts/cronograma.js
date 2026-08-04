@@ -206,10 +206,13 @@ async function salvarNovoItem() {
     return;
   }
 
-  fecharModal();
+fecharModal();
   document.getElementById('input-titulo').value = '';
   document.getElementById('input-hora-inicio').value = '';
   document.getElementById('input-hora-fim').value = '';
+  inputDataDisplay.value = '';
+  inputDataHidden.value = '';
+  dataSelecionada = null;
   await carregarCronograma();
 }
 
