@@ -22,6 +22,7 @@ export default defineConfig({
         cronograma: resolve(__dirname, 'src/pages/cronograma.html'),
         metas: resolve(__dirname, 'src/pages/metas.html'),
         ranking: resolve(__dirname, 'src/pages/ranking.html'),
+        vestibulares: resolve(__dirname, 'src/pages/vestibulares.html'),
       }
     }
   },
