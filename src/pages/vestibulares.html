@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vestibulares · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .page-wrap { padding: 32px 5%; max-width: 1100px; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .back-link:hover { color: var(--text-primary); }
+  .page-title { font-size: 1.8rem; margin-top: 6px; }
+  .header-actions { display: flex; align-items: center; gap: 10px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; }
+
+  .tabs-switch { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); }
+  .tab-btn { padding: 10px 18px; cursor: pointer; font-weight: 700; font-size: .9rem; color: var(--text-secondary); border-bottom: 2px solid transparent; transition: all var(--transition-fast); }
+  .tab-btn.active { color: var(--text-primary); border-bottom-color: var(--color-primary-500); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .filtro-materias { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+  .chip { padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); font-size: .85rem; font-weight: 600; cursor: pointer; transition: all var(--transition-fast); }
+  .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
+
+  .vestibular-card { padding: 22px; margin-bottom: 16px; }
+  .vestibular-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .vestibular-nome { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; }
+  .vestibular-inst { font-size: .85rem; color: var(--text-secondary); margin-top: 2px; }
+  .badge-treineiro { font-size: .72rem; font-weight: 700; padding: 5px 12px; border-radius: var(--radius-full); background: rgba(34,197,94,.15); color: var(--color-success); white-space: nowrap; }
+  .status-pill { display: inline-block; font-size: .75rem; font-weight: 700; padding: 5px 12px; border-radius: var(--radius-full); margin: 12px 0 6px; }
+  .status-aberta { background: rgba(34,197,94,.15); color: var(--color-success); }
+  .status-em-breve { background: rgba(245,158,11,.15); color: var(--color-warning); }
+  .status-encerrada { background: rgba(239,68,68,.15); color: var(--color-danger); }
+  .vestibular-datas { display: flex; gap: 24px; flex-wrap: wrap; margin: 14px 0; }
+  .data-item strong { display: block; font-size: .88rem; color: var(--text-primary); }
+  .data-item span { font-size: .78rem; color: var(--text-secondary); }
+  .vestibular-desc { font-size: .85rem; color: var(--text-secondary); line-height: 1.5; margin: 10px 0; }
+  .vestibular-links { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .link-btn { padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color); font-size: .82rem; font-weight: 600; color: var(--text-primary); background: var(--bg-elevated); text-decoration: none; }
+  .link-btn:hover { background: var(--glass-bg); }
+  .link-btn.primary { background: var(--gradient-primary); color: #fff; border-color: transparent; }
+
+  .treineiro-intro { padding: 20px; margin-bottom: 24px; }
+  .treineiro-intro h3 { margin-bottom: 8px; }
+  .treineiro-intro p { font-size: .88rem; color: var(--text-secondary); line-height: 1.6; }
+
+  .aulas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .aula-card { padding: 18px; cursor: pointer; transition: transform var(--transition-fast); }
+  .aula-card:hover { transform: translateY(-3px); }
+  .aula-materia-tag { font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-full); display: inline-block; margin-bottom: 10px; }
+  .aula-card h4 { font-size: .96rem; margin-bottom: 4px; }
+  .aula-card p { font-size: .8rem; color: var(--text-secondary); }
+
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; overflow-y: auto; }
+  .modal-overlay.open { display: flex; }
+  .modal-content { max-width: 640px; width: 100%; padding: 32px; margin: 30px 0; max-height: 90vh; overflow-y: auto; }
+  .modal-close { float: right; cursor: pointer; font-size: 1.2rem; color: var(--text-secondary); }
+
+  .videos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 12px; margin-top: 12px; }
+  .video-card { text-decoration: none; color: var(--text-primary); display: block; }
+  .video-card img { width: 100%; border-radius: var(--radius-md); margin-bottom: 6px; display: block; }
+  .video-titulo { font-size: .8rem; font-weight: 600; line-height: 1.3; }
+  .video-canal { font-size: .74rem; color: var(--text-secondary); margin-top: 2px; }
+
+  .exercicio-item { margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border-color); }
+  .exercicio-item:last-child { border-bottom: none; }
+  .exercicio-enunciado { font-size: .9rem; margin-bottom: 10px; }
+  .alternativa-btn { display: block; width: 100%; text-align: left; padding: 10px 14px; margin-bottom: 8px; border-radius: var(--radius-md, 10px); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; font-size: .85rem; color: var(--text-primary); }
+  .alternativa-btn:hover { background: var(--glass-bg); }
+  .alternativa-btn.correta { background: rgba(34,197,94,.15); border-color: var(--color-success); }
+  .alternativa-btn.errada { background: rgba(239,68,68,.15); border-color: var(--color-danger); }
+  .exercicio-comentario { font-size: .82rem; color: var(--text-secondary); margin-top: 8px; padding: 10px; background: var(--glass-bg); border-radius: var(--radius-md, 10px); display: none; }
+  .exercicio-comentario.show { display: block; }
+
+  .empty-state { text-align: center; padding: 40px 10px; color: var(--text-secondary); font-size: .88rem; }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-header">
+      <div>
+        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
+        <h1 class="page-title">🎓 Vestibulares</h1>
+      </div>
+      <div class="header-actions">
+        <button id="theme-toggle" class="icon-btn">🌙</button>
+      </div>
+    </div>
+
+    <div class="tabs-switch" id="tabs-switch">
+      <div class="tab-btn active" data-tab="vestibulares">Vestibulares de SP</div>
+      <div class="tab-btn" data-tab="treineiro">🎓 Sou treineiro</div>
+    </div>
+
+    <div class="tab-panel active" id="tab-vestibulares">
+      <div id="vestibulares-lista">
+        <p class="empty-state">Carregando vestibulares...</p>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-treineiro">
+      <div class="card treineiro-intro">
+        <h3>O que é ser treineiro?</h3>
+        <p>Treineiro é quem faz o ENEM ou um vestibular ainda cursando o ensino médio (ou mesmo antes de terminar), só pra treinar em condições reais de prova, sem pressão de precisar passar. É uma das melhores formas de perder o medo da prova antes que ela realmente conte pra valer. Aqui embaixo tem aulas por assunto, com explicação, vídeos e exercícios pra você já ir se preparando.</p>
+      </div>
+      <div class="filtro-materias" id="filtro-materias-treineiro"></div>
+      <div class="aulas-grid" id="aulas-lista">
+        <p class="empty-state">Carregando aulas...</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-aula">
+    <div class="modal-content card">
+      <span class="modal-close" id="modal-aula-close">✕</span>
+      <span class="aula-materia-tag" id="aula-materia-tag"></span>
+      <h2 id="aula-titulo"></h2>
+      <p id="aula-explicacao" style="margin:16px 0; line-height:1.6; color:var(--text-secondary); font-size:.92rem;"></p>
+
+      <h3 style="margin-top:20px; font-size:1rem;">📺 Vídeos sobre esse assunto</h3>
+      <div class="videos-grid" id="aula-videos"></div>
+
+      <h3 style="margin-top:24px; font-size:1rem;">✍️ Exercícios pra treinar</h3>
+      <div id="aula-exercicios"></div>
+    </div>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/vestibulares.js"></script>
+</body>
+</html>
