@@ -246,9 +246,9 @@ async function renderExercicios(materiaId) {
   const embaralhadas = [...data].sort(() => Math.random() - 0.5).slice(0, 3);
 
   exerciciosEl.innerHTML = embaralhadas.map((q, i) => {
-    const alternativasHtml = Object.entries(q.alternativas || {}).map(([letra, texto]) => `
-      <button class="alternativa-btn" data-letra="${letra}" data-questao="${i}">
-        <strong>${letra})</strong> ${texto}
+  const alternativasHtml = (q.alternativas || []).map(alt => `
+      <button class="alternativa-btn" data-letra="${alt.letra}" data-questao="${i}">
+        <strong>${alt.letra})</strong> ${alt.texto}
       </button>
     `).join('');
 
