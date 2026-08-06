@@ -171,10 +171,10 @@ async function abrirAula(id) {
   videosEl.innerHTML = `<p class="empty-state" style="grid-column:1/-1;">Buscando vídeos...</p>`;
   const videos = await buscarVideosYoutube(aula.youtube_busca || aula.titulo);
   renderVideos(videos);
-  
-const exerciciosEl = document.getElementById('aula-exercicios');
+
+  const exerciciosEl = document.getElementById('aula-exercicios');
+  exerciciosEl.innerHTML = `<p class="empty-state">Carregando exercícios...</p>`;
   await renderExercicios(aula.id);
- 
 }
 
 function renderVideos(videos) {
@@ -229,6 +229,7 @@ async function buscarVideosYoutube(query) {
     return [];
   }
 }
+
 async function renderExercicios(aulaId) {
   const exerciciosEl = document.getElementById('aula-exercicios');
 
