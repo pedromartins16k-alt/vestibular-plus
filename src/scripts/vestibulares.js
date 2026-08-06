@@ -171,10 +171,10 @@ async function abrirAula(id) {
   videosEl.innerHTML = `<p class="empty-state" style="grid-column:1/-1;">Buscando vídeos...</p>`;
   const videos = await buscarVideosYoutube(aula.youtube_busca || aula.titulo);
   renderVideos(videos);
-
-  const exerciciosEl = document.getElementById('aula-exercicios');
-  exerciciosEl.innerHTML = `<p class="empty-state">Carregando exercícios...</p>`;
-  await renderExercicios(aula.materia_id);
+  
+const exerciciosEl = document.getElementById('aula-exercicios');
+  await renderExercicios(aula.id);
+ 
 }
 
 function renderVideos(videos) {
@@ -229,21 +229,20 @@ async function buscarVideosYoutube(query) {
     return [];
   }
 }
-
-async function renderExercicios(materiaId) {
+async function renderExercicios(aulaId) {
   const exerciciosEl = document.getElementById('aula-exercicios');
 
   const { data, error } = await supabase
     .from('questoes')
     .select('id, enunciado, alternativas, resposta_correta, comentario')
-    .eq('materia_id', materiaId);
+    .eq('aula_id', aulaId);
 
   if (error || !data || !data.length) {
-    exerciciosEl.innerHTML = `<p class="empty-state">Ainda não tem exercícios cadastrados pra essa matéria.</p>`;
+    exerciciosEl.innerHTML = `<p class="empty-state">Ainda não tem exercícios cadastrados pra esse assunto.</p>`;
     return;
   }
 
-  const embaralhadas = [...data].sort(() => Math.random() - 0.5).slice(0, 5);
+  const embaralhadas = [...data].sort(() => Math.random() - 0.5);
 
   exerciciosEl.innerHTML = embaralhadas.map((q, i) => {
   const alternativasHtml = (q.alternativas || []).map(alt => `
