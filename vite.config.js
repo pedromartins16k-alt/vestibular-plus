@@ -23,6 +23,7 @@ export default defineConfig({
         metas: resolve(__dirname, 'src/pages/metas.html'),
         ranking: resolve(__dirname, 'src/pages/ranking.html'),
         vestibulares: resolve(__dirname, 'src/pages/vestibulares.html'),
+        perfil: resolve(__dirname, 'src/pages/perfil.html'),
       }
     }
   },
