@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Perfil · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .page-wrap { padding: 32px 5%; max-width: 640px; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .back-link:hover { color: var(--text-primary); }
+  .page-title { font-size: 1.8rem; margin-top: 6px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; }
+
+  .perfil-card { padding: 28px; }
+  .perfil-avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 26px; }
+  .perfil-avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 1.5rem; flex-shrink: 0; }
+  .perfil-nome-real { font-weight: 700; font-size: 1.05rem; }
+  .perfil-email { font-size: .82rem; color: var(--text-secondary); margin-top: 2px; }
+
+  .form-group { margin-bottom: 8px; }
+  .form-group label { display: block; font-size: .82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary); }
+  .form-group input {
+    width: 100%; padding: 10px 12px; border-radius: var(--radius-md, 10px);
+    border: 1px solid var(--border-color); background: var(--bg-elevated);
+    color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: .9rem;
+  }
+  .form-hint { font-size: .78rem; color: var(--text-secondary); margin-top: 8px; margin-bottom: 22px; }
+
+  .btn-salvar {
+    width: 100%; padding: 12px; border-radius: var(--radius-full); border: none;
+    background: var(--gradient-primary); color: #fff; font-weight: 700; font-size: .9rem;
+    cursor: pointer;
+  }
+  .btn-salvar:disabled { opacity: .6; cursor: default; }
+
+  .mensagem-perfil { margin-top: 14px; font-size: .85rem; text-align: center; min-height: 1.2em; }
+  .mensagem-perfil.sucesso { color: #22c55e; }
+  .mensagem-perfil.erro { color: #ef4444; }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-header">
+      <div>
+        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
+        <h1 class="page-title">👤 Perfil</h1>
+      </div>
+      <button id="theme-toggle" class="icon-btn">🌙</button>
+    </div>
+
+    <div class="card perfil-card">
+      <div class="perfil-avatar-row">
+        <div class="perfil-avatar" id="perfil-avatar">A</div>
+        <div>
+          <div class="perfil-nome-real" id="perfil-nome-real">Carregando...</div>
+          <div class="perfil-email" id="perfil-email"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Nome de usuário (apelido)</label>
+        <input type="text" id="input-nome-usuario" placeholder="Ex: pedro_16k" maxlength="30" />
+      </div>
+      <p class="form-hint">
+        Esse apelido aparece no lugar do seu nome completo no Dashboard e no Ranking.
+        Deixe em branco para continuar usando seu nome completo.
+      </p>
+
+      <button class="btn-salvar" id="btn-salvar">Salvar</button>
+      <p class="mensagem-perfil" id="mensagem-perfil"></p>
+    </div>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/perfil.js"></script>
+</body>
+</html>
