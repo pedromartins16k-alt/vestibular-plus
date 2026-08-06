@@ -243,7 +243,7 @@ async function renderExercicios(materiaId) {
     return;
   }
 
-  const embaralhadas = [...data].sort(() => Math.random() - 0.5).slice(0, 3);
+  const embaralhadas = [...data].sort(() => Math.random() - 0.5).slice(0, 5);
 
   exerciciosEl.innerHTML = embaralhadas.map((q, i) => {
   const alternativasHtml = (q.alternativas || []).map(alt => `
