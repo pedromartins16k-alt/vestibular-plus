@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR" data-theme="dark">
 <head>
@@ -15,7 +16,7 @@
   .header-actions { display: flex; align-items: center; gap: 10px; }
   .icon-btn { width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; }
 
-  .tabs-switch { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); }
+  .tabs-switch { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); flex-wrap: wrap; }
   .tab-btn { padding: 10px 18px; cursor: pointer; font-weight: 700; font-size: .9rem; color: var(--text-secondary); border-bottom: 2px solid transparent; transition: all var(--transition-fast); }
   .tab-btn.active { color: var(--text-primary); border-bottom-color: var(--color-primary-500); }
   .tab-panel { display: none; }
@@ -53,6 +54,25 @@
   .aula-materia-tag { font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-full); display: inline-block; margin-bottom: 10px; }
   .aula-card h4 { font-size: .96rem; margin-bottom: 4px; }
   .aula-card p { font-size: .8rem; color: var(--text-secondary); }
+
+  .pesquisa-intro { padding: 20px; margin-bottom: 24px; }
+  .pesquisa-intro h3 { margin-bottom: 8px; }
+  .pesquisa-intro p { font-size: .88rem; color: var(--text-secondary); line-height: 1.6; }
+
+  .vestibular-accordion { padding: 0; margin-bottom: 14px; overflow: hidden; }
+  .vestibular-accordion-header { padding: 20px 22px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .vestibular-accordion-header .nome { font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; }
+  .vestibular-accordion-header .inst { font-size: .8rem; color: var(--text-secondary); margin-top: 2px; }
+  .vestibular-accordion-arrow { color: var(--text-secondary); transition: transform var(--transition-fast); flex-shrink: 0; }
+  .vestibular-accordion.open .vestibular-accordion-arrow { transform: rotate(180deg); }
+  .vestibular-accordion-body { display: none; padding: 0 22px 22px; }
+  .vestibular-accordion.open .vestibular-accordion-body { display: block; }
+  .assunto-materia-grupo { margin-bottom: 16px; }
+  .assunto-materia-grupo:last-child { margin-bottom: 0; }
+  .assunto-materia-titulo { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+  .assunto-chip-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .assunto-chip { padding: 7px 14px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); font-size: .8rem; font-weight: 600; cursor: pointer; transition: all var(--transition-fast); }
+  .assunto-chip:hover { background: var(--glass-bg); }
 
   .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; overflow-y: auto; }
   .modal-overlay.open { display: flex; }
@@ -93,6 +113,7 @@
     <div class="tabs-switch" id="tabs-switch">
       <div class="tab-btn active" data-tab="vestibulares">Vestibulares de SP</div>
       <div class="tab-btn" data-tab="treineiro">🎓 Sou treineiro</div>
+      <div class="tab-btn" data-tab="pesquisa">🔍 Por assunto</div>
     </div>
 
     <div class="tab-panel active" id="tab-vestibulares">
@@ -109,6 +130,16 @@
       <div class="filtro-materias" id="filtro-materias-treineiro"></div>
       <div class="aulas-grid" id="aulas-lista">
         <p class="empty-state">Carregando aulas...</p>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-pesquisa">
+      <div class="card pesquisa-intro">
+        <h3>O que cai em cada vestibular?</h3>
+        <p>Clica no nome de um vestibular pra ver os assuntos que mais caem nele, organizados por matéria. Clicando em qualquer assunto, você abre a aula correspondente do Treineiro, com explicação, vídeos e exercícios.</p>
+      </div>
+      <div id="pesquisa-lista">
+        <p class="empty-state">Carregando...</p>
       </div>
     </div>
   </div>
