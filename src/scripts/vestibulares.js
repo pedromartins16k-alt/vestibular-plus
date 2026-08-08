@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 
@@ -12,94 +11,140 @@ let aulasCache = [];
 let vestibularesCache = [];
 let materiaAtivaTreineiro = 'todas';
 
-// Mapeia o "nome" de cada vestibular (igual está no banco, tabela vestibulares)
-// para os ids das aulas do Treineiro que caem nele. Curadoria feita a partir
-// dos editais/conteúdo programático oficiais de cada vestibular.
+// Curadoria manual dos assuntos que mais caem em cada vestibular, com base no
+// perfil conhecido de cada prova (não é estatística oficial — pra ajustar,
+// basta editar os títulos nas listas abaixo). Cada vestibular mostra ~3
+// assuntos por matéria, os que essa prova historicamente mais cobra.
 const ASSUNTOS_POR_VESTIBULAR = {
   'ENEM 2026': [
-    '5f1d6d16-7434-4122-ab6d-c5a2809b4ab8', // Funções
-    '4328eb75-9ecd-4cdb-97bd-8ea93182e0db', // Porcentagem e juros
-    '8b3287b8-d97d-4ac5-9d3c-38cf58b1cd65', // Geometria plana
-    'a0000001-0000-4000-8000-000000000003', // Probabilidade e estatística
-    '59434946-96e0-439b-b107-573e5af22b56', // Interpretação de texto
-    'd4a208d0-b6ff-487b-a4e2-ad5ab92be503', // Figuras de linguagem
-    'a72e3df5-fa3f-43b4-a7b9-d88e93c0f031', // Estrutura da redação
-    'c7060d1c-4715-4dcf-9bfa-e6c4d9dd4970', // Ecologia
-    'c0650565-7c02-4330-a3c6-ad82d8adf5f5', // Citologia
-    'faa87a6f-6a79-4433-b7ee-471a9eb5553c', // Cinemática
-    '65a6c7d9-8ded-4638-8f7f-944ee35bb5d2', // Leis de Newton
-    '757a6ed0-db10-46e4-b8e3-953136e2c633', // Estequiometria
-    '08382315-4e07-4244-993b-91acf994aff6', // Urbanização brasileira
-    'a35cc234-c855-4618-8fcc-df5f0a2af95d', // Globalização e blocos econômicos
+    'Ecologia: cadeias e teias alimentares',
+    'Leis de Mendel: a base da genética',
+    'Citologia: as partes da célula que mais caem',
+    'Cinemática: velocidade e aceleração no dia a dia',
+    'As três Leis de Newton sem decoreba',
+    'Eletricidade básica: corrente, tensão e resistência',
+    'Urbanização brasileira e seus problemas',
+    'Globalização e blocos econômicos',
+    'Climas e vegetação do Brasil',
+    'Era Vargas: por que cai tanto no ENEM',
+    'Guerra Fria e o Brasil: como isso nos afetou',
+    'Revolução Industrial: o que mudou no mundo do trabalho',
+    'Funções: o que são e pra que servem',
+    'Porcentagem e juros: as contas do dia a dia',
+    'Probabilidade e estatística: a matemática das chances',
+    'Interpretação de texto: como não cair em pegadinha',
+    'Figuras de linguagem mais cobradas no ENEM',
+    'Gêneros textuais e coesão: como os textos se conectam',
+    'Estequiometria: a "regra de três" da química',
+    'Ligações químicas: por que os átomos se juntam',
+    'Funções orgânicas: reconhecendo pelo grupo funcional',
+    'Estrutura da redação nota 1000 do ENEM',
+    'Repertório sociocultural: como usar sem enfeitar à toa',
+    'Coesão e coerência: o que faz o texto "fluir"',
   ],
   'Fuvest 2027 (USP)': [
-    '4328eb75-9ecd-4cdb-97bd-8ea93182e0db', // Porcentagem e juros
-    '5f1d6d16-7434-4122-ab6d-c5a2809b4ab8', // Funções
-    '8b3287b8-d97d-4ac5-9d3c-38cf58b1cd65', // Geometria plana
-    'a0000001-0000-4000-8000-000000000001', // Geometria espacial
-    'a0000001-0000-4000-8000-000000000002', // Trigonometria
-    'a0000001-0000-4000-8000-000000000003', // Probabilidade e estatística
-    '65a6c7d9-8ded-4638-8f7f-944ee35bb5d2', // Leis de Newton
-    'f0000001-0000-4000-8000-000000000002', // Trabalho e energia
-    'f0000001-0000-4000-8000-000000000001', // Termologia
-    '92326240-578c-4456-b064-677ffac00945', // Eletricidade básica
-    '757a6ed0-db10-46e4-b8e3-953136e2c633', // Estequiometria
-    'c0000001-0000-4000-8000-000000000001', // Equilíbrio químico
-    'c0000001-0000-4000-8000-000000000002', // Ácidos, bases e pH
-    'c0650565-7c02-4330-a3c6-ad82d8adf5f5', // Citologia
-    '449335d0-226e-408a-888e-b3c7b138be6c', // Leis de Mendel
-    'c7060d1c-4715-4dcf-9bfa-e6c4d9dd4970', // Ecologia
-    'b0000001-0000-4000-8000-000000000001', // Evolução
-    '10000001-0000-4000-8000-000000000001', // Gêneros textuais na redação
+    'Citologia: as partes da célula que mais caem',
+    'Evolução: como Darwin explica a diversidade da vida',
+    'Fisiologia humana: como o corpo funciona por dentro',
+    'Óptica geométrica: como a luz forma as imagens que vemos',
+    'Termologia: calor, temperatura e as leis dos gases',
+    'Trabalho e energia: a física por trás do movimento',
+    'Cartografia: como ler mapas, escalas e projeções',
+    'Geopolítica mundial: conflitos e blocos de poder',
+    'População e demografia: como os países crescem (ou não)',
+    'Idade Moderna: das Grandes Navegações ao Iluminismo',
+    'Brasil Colônia: como começou a história do país',
+    'Revolução Industrial: o que mudou no mundo do trabalho',
+    'Geometria espacial: volumes e áreas de sólidos',
+    'Trigonometria: seno, cosseno e tangente sem decoreba',
+    'Progressões: PA e PG na prática',
+    'Literatura brasileira: os principais movimentos literários',
+    'Gramática: sintaxe e morfologia que mais caem na prova',
+    'Interpretação de texto: como não cair em pegadinha',
+    'Equilíbrio químico: quando a reação não para, mas se estabiliza',
+    'Funções orgânicas: reconhecendo pelo grupo funcional',
+    'Ligações químicas: por que os átomos se juntam',
+    'Estrutura da redação nota 1000 do ENEM',
+    'Coesão e coerência: o que faz o texto "fluir"',
+    'Repertório sociocultural: como usar sem enfeitar à toa',
   ],
   'Vestibular Unicamp 2027': [
-    'c7060d1c-4715-4dcf-9bfa-e6c4d9dd4970', // Ecologia
-    'b0000001-0000-4000-8000-000000000002', // Zoologia
-    'b0000001-0000-4000-8000-000000000003', // Botânica
-    'b0000001-0000-4000-8000-000000000001', // Evolução
-    'c0650565-7c02-4330-a3c6-ad82d8adf5f5', // Citologia
-    '757a6ed0-db10-46e4-b8e3-953136e2c633', // Estequiometria
-    'c0000001-0000-4000-8000-000000000001', // Equilíbrio químico
-    'c0000001-0000-4000-8000-000000000003', // Soluções
-    'faa87a6f-6a79-4433-b7ee-471a9eb5553c', // Cinemática
-    'f0000001-0000-4000-8000-000000000001', // Termologia
-    '5f1d6d16-7434-4122-ab6d-c5a2809b4ab8', // Funções
-    'a0000001-0000-4000-8000-000000000002', // Trigonometria
-    '00000001-0000-4000-8000-000000000001', // Brasil Colônia
-    '00000001-0000-4000-8000-000000000002', // Idade Moderna
-    'e0000001-0000-4000-8000-000000000001', // Biomas
-    'e0000001-0000-4000-8000-000000000002', // Geopolítica mundial
+    'Leis de Mendel: a base da genética',
+    'Ecologia: cadeias e teias alimentares',
+    'Zoologia: os grandes grupos de animais e suas características',
+    'Termologia: calor, temperatura e as leis dos gases',
+    'Ondulatória: o que ondas sonoras e de água têm em comum',
+    'Trabalho e energia: a física por trás do movimento',
+    'População e demografia: como os países crescem (ou não)',
+    'Geopolítica mundial: conflitos e blocos de poder',
+    'Globalização e blocos econômicos',
+    'História da América: colonização espanhola e independências',
+    'História da África: dos reinos antigos à diáspora',
+    'Guerra Fria e o Brasil: como isso nos afetou',
+    'Funções: o que são e pra que servem',
+    'Probabilidade e estatística: a matemática das chances',
+    'Progressões: PA e PG na prática',
+    'Gêneros textuais e coesão: como os textos se conectam',
+    'Literatura brasileira: os principais movimentos literários',
+    'Interpretação de texto: como não cair em pegadinha',
+    'Soluções: concentração, diluição e misturas',
+    'Química ambiental: poluição e sustentabilidade na prova',
+    'Estequiometria: a "regra de três" da química',
+    'Gêneros textuais na redação: além da dissertação',
+    'Repertório sociocultural: como usar sem enfeitar à toa',
+    'Coesão e coerência: o que faz o texto "fluir"',
   ],
   'Vestibular Unesp 2027': [
-    'd0000001-0000-4000-8000-000000000001', // Gramática
-    '59434946-96e0-439b-b107-573e5af22b56', // Interpretação de texto
-    'd0000001-0000-4000-8000-000000000002', // Literatura brasileira
-    '8b3287b8-d97d-4ac5-9d3c-38cf58b1cd65', // Geometria plana
-    '5f1d6d16-7434-4122-ab6d-c5a2809b4ab8', // Funções
-    'a0000001-0000-4000-8000-000000000004', // Progressões
-    'c7060d1c-4715-4dcf-9bfa-e6c4d9dd4970', // Ecologia
-    'c0650565-7c02-4330-a3c6-ad82d8adf5f5', // Citologia
-    'b0000001-0000-4000-8000-000000000004', // Fisiologia humana
-    'b0000001-0000-4000-8000-000000000001', // Evolução
-    '92326240-578c-4456-b064-677ffac00945', // Eletricidade básica
-    'f0000001-0000-4000-8000-000000000003', // Óptica geométrica
-    'f0000001-0000-4000-8000-000000000001', // Termologia
-    'c0000001-0000-4000-8000-000000000003', // Soluções
-    'c0000001-0000-4000-8000-000000000004', // Química ambiental
-    '00000001-0000-4000-8000-000000000003', // História da América
-    '00000001-0000-4000-8000-000000000004', // História da África
-    'e0000001-0000-4000-8000-000000000003', // População e demografia
-    'e0000001-0000-4000-8000-000000000004', // Cartografia
+    'Botânica: como as plantas vivem e se reproduzem',
+    'Fisiologia humana: como o corpo funciona por dentro',
+    'Ecologia: cadeias e teias alimentares',
+    'Cinemática: velocidade e aceleração no dia a dia',
+    'Eletricidade básica: corrente, tensão e resistência',
+    'As três Leis de Newton sem decoreba',
+    'Urbanização brasileira e seus problemas',
+    'Climas e vegetação do Brasil',
+    'Biomas: as paisagens naturais do Brasil e do mundo',
+    'Brasil Colônia: como começou a história do país',
+    'Era Vargas: por que cai tanto no ENEM',
+    'Revolução Industrial: o que mudou no mundo do trabalho',
+    'Geometria plana: áreas e perímetros na prática',
+    'Porcentagem e juros: as contas do dia a dia',
+    'Funções: o que são e pra que servem',
+    'Gramática: sintaxe e morfologia que mais caem na prova',
+    'Interpretação de texto: como não cair em pegadinha',
+    'Figuras de linguagem mais cobradas no ENEM',
+    'Funções orgânicas: reconhecendo pelo grupo funcional',
+    'Ligações químicas: por que os átomos se juntam',
+    'Ácidos, bases e pH: a química do dia a dia',
+    'Estrutura da redação nota 1000 do ENEM',
+    'Coesão e coerência: o que faz o texto "fluir"',
+    'Repertório sociocultural: como usar sem enfeitar à toa',
   ],
   'Vestibular PUC-Campinas': [
-    '5f1d6d16-7434-4122-ab6d-c5a2809b4ab8', // Funções
-    '59434946-96e0-439b-b107-573e5af22b56', // Interpretação de texto
-    'c7060d1c-4715-4dcf-9bfa-e6c4d9dd4970', // Ecologia
-    '65a6c7d9-8ded-4638-8f7f-944ee35bb5d2', // Leis de Newton
-    '757a6ed0-db10-46e4-b8e3-953136e2c633', // Estequiometria
-    '5402e80f-fb4f-4e05-a854-712a3ca58cc1', // Era Vargas
-    '08382315-4e07-4244-993b-91acf994aff6', // Urbanização brasileira
-    'a72e3df5-fa3f-43b4-a7b9-d88e93c0f031', // Estrutura da redação
+    'Ecologia: cadeias e teias alimentares',
+    'Citologia: as partes da célula que mais caem',
+    'Zoologia: os grandes grupos de animais e suas características',
+    'Cinemática: velocidade e aceleração no dia a dia',
+    'Eletricidade básica: corrente, tensão e resistência',
+    'Óptica geométrica: como a luz forma as imagens que vemos',
+    'Urbanização brasileira e seus problemas',
+    'Globalização e blocos econômicos',
+    'Cartografia: como ler mapas, escalas e projeções',
+    'Era Vargas: por que cai tanto no ENEM',
+    'Revolução Industrial: o que mudou no mundo do trabalho',
+    'Guerra Fria e o Brasil: como isso nos afetou',
+    'Funções: o que são e pra que servem',
+    'Porcentagem e juros: as contas do dia a dia',
+    'Geometria plana: áreas e perímetros na prática',
+    'Interpretação de texto: como não cair em pegadinha',
+    'Gramática: sintaxe e morfologia que mais caem na prova',
+    'Figuras de linguagem mais cobradas no ENEM',
+    'Estequiometria: a "regra de três" da química',
+    'Funções orgânicas: reconhecendo pelo grupo funcional',
+    'Soluções: concentração, diluição e misturas',
+    'Estrutura da redação nota 1000 do ENEM',
+    'Repertório sociocultural: como usar sem enfeitar à toa',
+    'Coesão e coerência: o que faz o texto "fluir"',
   ],
 };
 
@@ -385,98 +430,4 @@ async function renderExercicios(aulaId) {
 /* ===== Por assunto (busca por vestibular) ===== */
 
 function renderVestibularAssuntosCard(v) {
-  const aulaIds = ASSUNTOS_POR_VESTIBULAR[v.nome] || [];
-  const aulasEncontradas = aulaIds
-    .map(id => aulasCache.find(a => a.id === id))
-    .filter(Boolean);
-
-  if (!aulasEncontradas.length) {
-    return `
-      <div class="card vestibular-accordion">
-        <div class="vestibular-accordion-header">
-          <div>
-            <div class="nome">${v.nome}</div>
-            <div class="inst">${v.instituicao || ''}</div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  const porMateria = {};
-  aulasEncontradas.forEach(a => {
-    const nomeMateria = a.materias?.nome || 'Geral';
-    if (!porMateria[nomeMateria]) {
-      porMateria[nomeMateria] = { cor: a.materias?.cor || '#7c3aed', itens: [] };
-    }
-    porMateria[nomeMateria].itens.push(a);
-  });
-
-  const gruposHtml = Object.entries(porMateria).map(([nomeMateria, grupo]) => `
-    <div class="assunto-materia-grupo">
-      <div class="assunto-materia-titulo" style="color:${grupo.cor};">${nomeMateria}</div>
-      <div class="assunto-chip-list">
-        ${grupo.itens.map(a => `<div class="assunto-chip" data-id="${a.id}">${a.titulo.split(':')[0]}</div>`).join('')}
-      </div>
-    </div>
-  `).join('');
-
-  return `
-    <div class="card vestibular-accordion">
-      <div class="vestibular-accordion-header">
-        <div>
-          <div class="nome">${v.nome}</div>
-          <div class="inst">${v.instituicao || ''}</div>
-        </div>
-        <span class="vestibular-accordion-arrow">▾</span>
-      </div>
-      <div class="vestibular-accordion-body">${gruposHtml}</div>
-    </div>
-  `;
-}
-
-function renderPesquisaVestibulares() {
-  if (!vestibularesCache.length) {
-    pesquisaListaEl.innerHTML = `<p class="empty-state">Nenhum vestibular cadastrado ainda.</p>`;
-    return;
-  }
-
-  pesquisaListaEl.innerHTML = vestibularesCache.map(v => renderVestibularAssuntosCard(v)).join('');
-
-  pesquisaListaEl.querySelectorAll('.vestibular-accordion-header').forEach(header => {
-    header.addEventListener('click', () => {
-      header.closest('.vestibular-accordion').classList.toggle('open');
-    });
-  });
-
-  pesquisaListaEl.querySelectorAll('.assunto-chip').forEach(chip => {
-    chip.addEventListener('click', (e) => {
-      e.stopPropagation();
-      abrirAula(chip.dataset.id);
-    });
-  });
-}
-
-/* ===== Tabs e modal ===== */
-
-function configurarTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-    });
-  });
-}
-
-function configurarModal() {
-  document.getElementById('modal-aula-close').addEventListener('click', () => {
-    modalAula.classList.remove('open');
-  });
-  modalAula.addEventListener('click', (e) => {
-    if (e.target === modalAula) modalAula.classList.remove('open');
-  });
-}
-
-iniciar();
+  const titulosCurados = ASSUNTOS_POR_VESTIBULAR[v.nome];
