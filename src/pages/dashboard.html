@@ -24,7 +24,21 @@
   .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; }
   .topbar-actions { display: flex; align-items: center; gap: 14px; }
   .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; }
-  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
+
+  .user-menu { position: relative; }
+  .user-dropdown {
+    position: absolute; top: 50px; right: 0; min-width: 170px; padding: 6px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft); display: none; flex-direction: column; gap: 2px; z-index: 30;
+  }
+  .user-dropdown.open { display: flex; }
+  .dropdown-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: .88rem; font-weight: 500; cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .dropdown-item:hover { background: var(--glass-bg); }
 
   .welcome-card { padding: 28px; border-radius: var(--radius-lg); background: var(--gradient-primary); color: #fff; margin-bottom: 24px; position: relative; overflow: hidden; }
   .welcome-card h2 { font-size: 1.4rem; margin-bottom: 6px; }
@@ -69,10 +83,8 @@
    <a class="nav-item" href="./metas.html">🎯 Metas</a>
      <a class="nav-item" href="./ranking.html">🏆 Ranking</a>
    <a class="nav-item" href="./vestibulares.html">🎓 Vestibulares</a>
-      <a class="nav-item" href="./perfil.html">👤 Perfil</a>
       <div class="nav-item">⭐ Favoritos</div>
       <div class="nav-item">📊 Estatísticas</div>
-      <div class="nav-item" style="margin-top:auto;" id="logout-btn">🚪 Sair</div>
     </aside>
 
     <main class="main">
@@ -83,7 +95,13 @@
         <div class="topbar-actions">
           <button id="theme-toggle" class="icon-btn">🌙</button>
           <button class="icon-btn">🔔</button>
-          <div class="avatar" id="avatar-inicial">A</div>
+          <div class="user-menu">
+            <div class="avatar" id="avatar-inicial">A</div>
+            <div class="user-dropdown" id="user-dropdown">
+              <a class="dropdown-item" href="./perfil.html">👤 Perfil</a>
+              <div class="dropdown-item" id="logout-btn">🚪 Sair</div>
+            </div>
+          </div>
         </div>
       </div>
 
