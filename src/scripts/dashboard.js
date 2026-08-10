@@ -117,3 +117,4 @@ iniciarDashboard();
 iniciarMenuAvatar();
 iniciarBusca();
 iniciarNotificacoes();
+iniciarNotificacoes();
