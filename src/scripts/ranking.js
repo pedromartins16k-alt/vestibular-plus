@@ -1,3 +1,4 @@
+import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 const podioEl = document.getElementById('podio');
@@ -49,3 +50,4 @@ function renderLista(perfis, userId) {
   `).join('');
 }
 iniciar();
+iniciarBusca();
