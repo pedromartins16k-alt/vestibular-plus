@@ -1,3 +1,4 @@
+import { iniciarNotificacoes } from './notificacoes-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao, sair } from '../lib/authGuard.js';
 import { calcularProgressoNivel } from '../utils/xp.js';
