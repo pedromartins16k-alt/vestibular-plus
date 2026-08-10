@@ -192,3 +192,4 @@ async function concederXp(xpGanho) {
 
 iniciar();
 iniciarBusca();
+iniciarNotificacoes();
