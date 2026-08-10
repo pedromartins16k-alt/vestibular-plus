@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
+import { iniciarBusca } from './busca-global.js';
 
 const grid = document.getElementById('resumo-grid');
 const filtroContainer = document.getElementById('filtro-materias');
@@ -115,4 +116,4 @@ modalOverlay.addEventListener('click', (e) => {
 });
 
 iniciar();
-//diciona script de resumos"
+iniciarBusca();
