@@ -23,7 +23,7 @@
   .search-box input { padding-left: 40px; }
   .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; }
   .topbar-actions { display: flex; align-items: center; gap: 14px; }
-  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; }
+  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; position: relative; }
   .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
 
   .user-menu { position: relative; }
@@ -60,6 +60,31 @@
   }
   .busca-item:hover { background: var(--glass-bg); }
   .busca-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
+
+  /* Sininho de notificações */
+  .notif-btn-wrap { position: relative; }
+  .notif-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 3px;
+    border-radius: var(--radius-full); background: #ef4444; color: #fff; font-size: .62rem;
+    font-weight: 700; display: none; align-items: center; justify-content: center; line-height: 1;
+  }
+  .notif-badge.show { display: flex; }
+  .notif-dropdown {
+    position: absolute; top: 50px; right: 0; width: 320px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-soft);
+    max-height: 380px; overflow-y: auto; display: none; flex-direction: column;
+    padding: 6px; z-index: 40;
+  }
+  .notif-dropdown.open { display: flex; }
+  .notif-item { padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer; }
+  .notif-item:hover { background: var(--glass-bg); }
+  .notif-item.nao-lida { background: rgba(124,58,237,.08); }
+  .notif-item strong { font-size: .86rem; display: block; margin-bottom: 2px; }
+  .notif-item p { font-size: .8rem; color: var(--text-secondary); margin: 0 0 4px; }
+  .notif-item .notif-data { font-size: .7rem; color: var(--text-secondary); }
+  .notif-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
+  .notif-ver-todas { display: block; text-align: center; padding: 10px; font-size: .82rem; font-weight: 600; color: var(--color-primary-500); border-top: 1px solid var(--border-color); margin-top: 4px; }
 
   .welcome-card { padding: 28px; border-radius: var(--radius-lg); background: var(--gradient-primary); color: #fff; margin-bottom: 24px; position: relative; overflow: hidden; }
   .welcome-card h2 { font-size: 1.4rem; margin-bottom: 6px; }
@@ -109,6 +134,7 @@
    <a class="nav-item" href="./metas.html">🎯 Metas</a>
      <a class="nav-item" href="./ranking.html">🏆 Ranking</a>
    <a class="nav-item" href="./vestibulares.html">🎓 Vestibulares</a>
+      <a class="nav-item" href="./notificacoes.html">🔔 Notificações</a>
       <div class="nav-item">⭐ Favoritos</div>
       <div class="nav-item">📊 Estatísticas</div>
     </aside>
@@ -121,7 +147,10 @@
         </div>
         <div class="topbar-actions">
           <button id="theme-toggle" class="icon-btn">🌙</button>
-          <button class="icon-btn">🔔</button>
+          <div class="notif-btn-wrap">
+            <button id="notif-btn" class="icon-btn">🔔<span class="notif-badge" id="notif-badge"></span></button>
+            <div class="notif-dropdown" id="notif-dropdown"></div>
+          </div>
           <div class="user-menu">
             <div class="avatar" id="avatar-inicial">A</div>
             <div class="user-dropdown" id="user-dropdown">
