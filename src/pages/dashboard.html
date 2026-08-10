@@ -21,7 +21,7 @@
   .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
   .search-box { flex: 1; max-width: 380px; position: relative; }
   .search-box input { padding-left: 40px; }
-  .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; }
+  .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; }
   .topbar-actions { display: flex; align-items: center; gap: 14px; }
   .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; }
   .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
@@ -39,6 +39,27 @@
     transition: background var(--transition-fast);
   }
   .dropdown-item:hover { background: var(--glass-bg); }
+
+  /* Dropdown de resultados da busca */
+  .busca-dropdown {
+    position: absolute; top: 48px; left: 0; right: 0;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-soft);
+    max-height: 360px; overflow-y: auto; display: none; flex-direction: column;
+    padding: 6px; z-index: 40;
+  }
+  .busca-dropdown.open { display: flex; }
+  .busca-grupo-titulo {
+    font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text-secondary); padding: 8px 10px 4px; font-weight: 700;
+  }
+  .busca-item {
+    display: block; padding: 8px 10px; border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: .86rem; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .busca-item:hover { background: var(--glass-bg); }
+  .busca-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
 
   .welcome-card { padding: 28px; border-radius: var(--radius-lg); background: var(--gradient-primary); color: #fff; margin-bottom: 24px; position: relative; overflow: hidden; }
   .welcome-card h2 { font-size: 1.4rem; margin-bottom: 6px; }
@@ -95,7 +116,8 @@
     <main class="main">
       <div class="topbar">
         <div class="search-box">
-          <input class="input-field" type="text" placeholder="Pesquisar resumos, questões..." />
+          <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questões, flashcards, vestibulares..." />
+          <div class="busca-dropdown" id="busca-dropdown"></div>
         </div>
         <div class="topbar-actions">
           <button id="theme-toggle" class="icon-btn">🌙</button>
