@@ -3,7 +3,6 @@ import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao, sair } from '../lib/authGuard.js';
 import { calcularProgressoNivel } from '../utils/xp.js';
 import { iniciarBusca } from './busca-global.js';
-import { iniciarNotificacoes } from './notificacoes-global.js';
 
 async function iniciarDashboard() {
   const session = await exigirAutenticacao();
@@ -117,4 +116,3 @@ iniciarDashboard();
 iniciarMenuAvatar();
 iniciarBusca();
 iniciarNotificacoes();
-
