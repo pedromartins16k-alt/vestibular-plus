@@ -52,3 +52,4 @@ function renderLista(perfis, userId) {
 }
 iniciar();
 iniciarBusca();
+iniciarNotificacoes();
