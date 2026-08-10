@@ -230,3 +230,4 @@ async function avaliar(acertou) {
 
 iniciar();
 iniciarBusca();
+iniciarNotificacoes();
