@@ -25,6 +25,7 @@ export default defineConfig({
         vestibulares: resolve(__dirname, 'src/pages/vestibulares.html'),
         perfil: resolve(__dirname, 'src/pages/perfil.html'),
         progresso: resolve(__dirname, 'src/pages/progresso.html'),
+        notificacoes: resolve(__dirname, 'src/pages/notificacoes.html'),
       }
     }
   },
