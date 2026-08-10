@@ -1,3 +1,4 @@
+import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { PONTOS_XP, xpParaProximoNivel } from '../utils/xp.js';
@@ -189,3 +190,4 @@ async function concederXp(xpGanho) {
 }
 
 iniciar();
+iniciarBusca();
