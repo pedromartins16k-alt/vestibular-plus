@@ -1,3 +1,4 @@
+import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 
@@ -243,3 +244,4 @@ modalOverlay.addEventListener('click', (e) => {
 });
 
 iniciar();
+iniciarBusca();
