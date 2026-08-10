@@ -172,3 +172,4 @@ async function registrarResposta(materiaId, acertou) {
 
 iniciar();
 iniciarBusca();
+iniciarNotificacoes();
