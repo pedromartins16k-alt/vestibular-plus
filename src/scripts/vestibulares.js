@@ -431,3 +431,97 @@ async function renderExercicios(aulaId) {
 
 function renderVestibularAssuntosCard(v) {
   const titulosCurados = ASSUNTOS_POR_VESTIBULAR[v.nome];
+  const aulasEncontradas = titulosCurados
+    ? aulasCache.filter(a => titulosCurados.includes(a.titulo))
+    : aulasCache;
+
+  if (!aulasEncontradas.length) {
+    return `
+      <div class="card vestibular-accordion">
+        <div class="vestibular-accordion-header">
+          <div>
+            <div class="nome">${v.nome}</div>
+            <div class="inst">${v.instituicao || ''}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const porMateria = {};
+  aulasEncontradas.forEach(a => {
+    const nomeMateria = a.materias?.nome || 'Geral';
+    if (!porMateria[nomeMateria]) {
+      porMateria[nomeMateria] = { cor: a.materias?.cor || '#7c3aed', itens: [] };
+    }
+    porMateria[nomeMateria].itens.push(a);
+  });
+
+  const gruposHtml = Object.entries(porMateria).map(([nomeMateria, grupo]) => `
+    <div class="assunto-materia-grupo">
+      <div class="assunto-materia-titulo" style="color:${grupo.cor};">${nomeMateria}</div>
+      <div class="assunto-chip-list">
+        ${grupo.itens.map(a => `<div class="assunto-chip" data-id="${a.id}">${a.titulo.split(':')[0]}</div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="card vestibular-accordion">
+      <div class="vestibular-accordion-header">
+        <div>
+          <div class="nome">${v.nome}</div>
+          <div class="inst">${v.instituicao || ''}</div>
+        </div>
+        <span class="vestibular-accordion-arrow">▾</span>
+      </div>
+      <div class="vestibular-accordion-body">${gruposHtml}</div>
+    </div>
+  `;
+}
+
+function renderPesquisaVestibulares() {
+  if (!vestibularesCache.length) {
+    pesquisaListaEl.innerHTML = `<p class="empty-state">Nenhum vestibular cadastrado ainda.</p>`;
+    return;
+  }
+
+  pesquisaListaEl.innerHTML = vestibularesCache.map(v => renderVestibularAssuntosCard(v)).join('');
+
+  pesquisaListaEl.querySelectorAll('.vestibular-accordion-header').forEach(header => {
+    header.addEventListener('click', () => {
+      header.closest('.vestibular-accordion').classList.toggle('open');
+    });
+  });
+
+  pesquisaListaEl.querySelectorAll('.assunto-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      abrirAula(chip.dataset.id);
+    });
+  });
+}
+
+/* ===== Tabs e modal ===== */
+
+function configurarTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+}
+
+function configurarModal() {
+  document.getElementById('modal-aula-close').addEventListener('click', () => {
+    modalAula.classList.remove('open');
+  });
+  modalAula.addEventListener('click', (e) => {
+    if (e.target === modalAula) modalAula.classList.remove('open');
+  });
+}
+
+iniciar();
