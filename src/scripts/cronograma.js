@@ -264,3 +264,4 @@ modalOverlay.addEventListener('click', (e) => {
 
 iniciar();
 iniciarBusca();
+iniciarNotificacoes();
