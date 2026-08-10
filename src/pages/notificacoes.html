@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Notificações · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .app-layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  @media (max-width: 900px) { .app-layout { grid-template-columns: 1fr; } .sidebar { display: none; } }
+
+  .sidebar { border-right: 1px solid var(--border-color); padding: 24px 18px; display: flex; flex-direction: column; gap: 6px; }
+  .sidebar .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; margin-bottom: 28px; padding: 0 8px; }
+  .sidebar .logo .dot { width: 32px; height: 32px; border-radius: 9px; background: var(--gradient-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--radius-md); color: var(--text-secondary); font-weight: 500; font-size: .92rem; transition: background var(--transition-fast), color var(--transition-fast); cursor: pointer; }
+  .nav-item:hover, .nav-item.active { background: var(--glass-bg); color: var(--text-primary); }
+  .nav-item.active { background: linear-gradient(135deg, rgba(124,58,237,.15), rgba(59,130,246,.15)); }
+
+  .main { padding: 24px 4%; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+  .search-box { flex: 1; max-width: 380px; position: relative; }
+  .search-box input { padding-left: 40px; }
+  .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; }
+  .topbar-actions { display: flex; align-items: center; gap: 14px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; position: relative; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
+
+  .user-menu { position: relative; }
+  .user-dropdown {
+    position: absolute; top: 50px; right: 0; min-width: 170px; padding: 6px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft); display: none; flex-direction: column; gap: 2px; z-index: 30;
+  }
+  .user-dropdown.open { display: flex; }
+  .dropdown-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: .88rem; font-weight: 500; cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .dropdown-item:hover { background: var(--glass-bg); }
+
+  .busca-dropdown {
+    position: absolute; top: 48px; left: 0; right: 0;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-soft);
+    max-height: 360px; overflow-y: auto; display: none; flex-direction: column;
+    padding: 6px; z-index: 40;
+  }
+  .busca-dropdown.open { display: flex; }
+  .busca-grupo-titulo {
+    font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text-secondary); padding: 8px 10px 4px; font-weight: 700;
+  }
+  .busca-item {
+    display: block; padding: 8px 10px; border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: .86rem; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .busca-item:hover { background: var(--glass-bg); }
+  .busca-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
+
+  .notif-btn-wrap { position: relative; }
+  .notif-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 3px;
+    border-radius: var(--radius-full); background: #ef4444; color: #fff; font-size: .62rem;
+    font-weight: 700; display: none; align-items: center; justify-content: center; line-height: 1;
+  }
+  .notif-badge.show { display: flex; }
+  .notif-dropdown {
+    position: absolute; top: 50px; right: 0; width: 320px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-soft);
+    max-height: 380px; overflow-y: auto; display: none; flex-direction: column;
+    padding: 6px; z-index: 40;
+  }
+  .notif-dropdown.open { display: flex; }
+  .notif-item { padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer; }
+  .notif-item:hover { background: var(--glass-bg); }
+  .notif-item.nao-lida { background: rgba(124,58,237,.08); }
+  .notif-item strong { font-size: .86rem; display: block; margin-bottom: 2px; }
+  .notif-item p { font-size: .8rem; color: var(--text-secondary); margin: 0 0 4px; }
+  .notif-item .notif-data { font-size: .7rem; color: var(--text-secondary); }
+  .notif-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
+  .notif-ver-todas { display: block; text-align: center; padding: 10px; font-size: .82rem; font-weight: 600; color: var(--color-primary-500); border-top: 1px solid var(--border-color); margin-top: 4px; }
+
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .page-header h2 { font-size: 1.3rem; }
+  .marcar-todas-btn {
+    padding: 9px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-color);
+    background: var(--bg-elevated); color: var(--text-primary); font-size: .85rem; font-weight: 600; cursor: pointer;
+  }
+  .marcar-todas-btn:hover { background: var(--glass-bg); }
+
+  .notif-linha {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+    padding: 16px; border-radius: var(--radius-md); margin-bottom: 8px;
+  }
+  .notif-linha.nao-lida { background: rgba(124,58,237,.08); }
+  .notif-linha-conteudo strong { font-size: .95rem; display: block; margin-bottom: 4px; }
+  .notif-linha-conteudo p { font-size: .86rem; color: var(--text-secondary); margin: 0 0 6px; }
+  .notif-linha-conteudo .notif-data { font-size: .75rem; color: var(--text-secondary); }
+  .notif-linha-acoes { display: flex; gap: 6px; flex-shrink: 0; }
+  .notif-linha-acoes button {
+    width: 32px; height: 32px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);
+    background: var(--bg-elevated); cursor: pointer; font-size: .85rem;
+  }
+  .notif-linha-acoes button:hover { background: var(--glass-bg); }
+
+  .empty-state { text-align: center; padding: 40px 10px; color: var(--text-secondary); font-size: .88rem; }
+</style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar glass">
+      <div class="logo"><div class="dot">V+</div>Vestibular+</div>
+      <a class="nav-item" href="./dashboard.html">🏠 Dashboard</a>
+      <a class="nav-item" href="./resumos.html">📚 Resumos</a>
+      <a class="nav-item" href="./questoes.html">✅ Questões</a>
+      <a class="nav-item" href="./simulados.html">⏱️ Simulados</a>
+      <a class="nav-item" href="./flashcards.html">🧠 Flashcards</a>
+      <a class="nav-item" href="./cronograma.html">📅 Cronograma</a>
+      <a class="nav-item" href="./metas.html">🎯 Metas</a>
+      <a class="nav-item" href="./ranking.html">🏆 Ranking</a>
+      <a class="nav-item" href="./vestibulares.html">🎓 Vestibulares</a>
+      <div class="nav-item active">🔔 Notificações</div>
+      <div class="nav-item">⭐ Favoritos</div>
+      <div class="nav-item">📊 Estatísticas</div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="search-box">
+          <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questões, flashcards, vestibulares..." />
+          <div class="busca-dropdown" id="busca-dropdown"></div>
+        </div>
+        <div class="topbar-actions">
+          <button id="theme-toggle" class="icon-btn">🌙</button>
+          <div class="notif-btn-wrap">
+            <button id="notif-btn" class="icon-btn">🔔<span class="notif-badge" id="notif-badge"></span></button>
+            <div class="notif-dropdown" id="notif-dropdown"></div>
+          </div>
+          <div class="user-menu">
+            <div class="avatar" id="avatar-inicial">A</div>
+            <div class="user-dropdown" id="user-dropdown">
+              <a class="dropdown-item" href="./perfil.html">👤 Perfil</a>
+              <div class="dropdown-item" id="logout-btn">🚪 Sair</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="page-header">
+        <h2>Notificações</h2>
+        <button class="marcar-todas-btn" id="marcar-todas-btn">Marcar todas como lidas</button>
+      </div>
+
+      <div id="notif-lista-completa">
+        <div class="empty-state">Carregando...</div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/notificacoes.js"></script>
+</body>
+</html>
