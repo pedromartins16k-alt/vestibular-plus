@@ -65,3 +65,4 @@ function mostrarMensagem(texto, tipo) {
 
 iniciarPerfil();
 iniciarBusca();
+iniciarNotificacoes();
