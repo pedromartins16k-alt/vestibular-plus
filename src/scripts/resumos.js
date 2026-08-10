@@ -1,3 +1,4 @@
+import { iniciarNotificacoes } from './notificacoes-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { iniciarBusca } from './busca-global.js';
