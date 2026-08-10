@@ -49,4 +49,20 @@ async function iniciarDashboard() {
   }
   document.getElementById('logout-btn').addEventListener('click', sair);
 }
+
+function iniciarMenuAvatar() {
+  const avatarBtn = document.getElementById('avatar-inicial');
+  const dropdown = document.getElementById('user-dropdown');
+  avatarBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!dropdown.contains(e.target) && e.target !== avatarBtn) {
+      dropdown.classList.remove('open');
+    }
+  });
+}
+
 iniciarDashboard();
+iniciarMenuAvatar();
