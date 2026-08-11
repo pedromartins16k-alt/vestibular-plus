@@ -26,6 +26,7 @@ export default defineConfig({
         perfil: resolve(__dirname, 'src/pages/perfil.html'),
         progresso: resolve(__dirname, 'src/pages/progresso.html'),
         notificacoes: resolve(__dirname, 'src/pages/notificacoes.html'),
+        favoritos: resolve(__dirname, 'src/pages/favoritos.html'),
         admin: resolve(__dirname, 'src/pages/admin.html'),
       }
     }
