@@ -14,11 +14,13 @@ const NOMES_TIPO = {
   simulado: '⏱️ Simulados',
 };
 
-const NOMES_META_TIPO = {
-  horas_estudo: 'Horas de estudo',
-  questoes_resolvidas: 'Questões resolvidas',
-  flashcards_revisados: 'Flashcards revisados',
-  simulados_feitos: 'Simulados feitos',
+// Mesmo mapa usado em metas.js — precisa bater certinho pra combinar
+// ícone/rótulo/unidade com o tipo salvo em metas.tipo
+const TIPO_INFO = {
+  horas_estudo: { label: 'Horas de estudo', icone: '⏰', unidade: 'h' },
+  questoes_resolvidas: { label: 'Questões resolvidas', icone: '✅', unidade: 'questões' },
+  flashcards_revisados: { label: 'Flashcards revisados', icone: '🧠', unidade: 'cards' },
+  simulados_feitos: { label: 'Simulados feitos', icone: '⏱️', unidade: 'simulados' },
 };
 
 async function iniciar() {
@@ -37,19 +39,18 @@ async function iniciar() {
     supabase.from('simulado_respostas').select('nota, finalizado_em, simulados(titulo)').eq('user_id', userId).order('finalizado_em', { ascending: false }),
     supabase.from('conquistas').select('id, nome, descricao, icone, xp_recompensa').order('xp_recompensa'),
     supabase.from('usuario_conquistas').select('conquista_id').eq('user_id', userId),
-    supabase.from('metas').select('descricao, tipo, valor_alvo, valor_atual, prazo').eq('user_id', userId),
+    supabase.from('metas').select('descricao, tipo, valor_alvo, prazo').eq('user_id', userId),
   ]);
 
   renderizarResumo(sessoes || [], respostas || [], conquistasUsuario || []);
   renderizarTipos(sessoes || []);
   renderizarSimulados(respostas || []);
   renderizarConquistas(conquistas || [], conquistasUsuario || []);
-  renderizarMetas(metas || []);
+  renderizarMetas(metas || [], sessoes || []);
 }
 
 function renderizarResumo(sessoes, respostas, conquistasUsuario) {
   const totalMinutos = sessoes.reduce((soma, s) => soma + (s.duracao_minutos || 0), 0);
-  const questoesFeitas = sessoes.filter(s => s.tipo === 'questoes').length;
 
   resumoEl.innerHTML = `
     <div class="card resumo-card"><strong>${Math.round(totalMinutos / 60)}h</strong><span>Total estudado</span></div>
@@ -127,22 +128,64 @@ function renderizarConquistas(conquistas, conquistasUsuario) {
   }).join('');
 }
 
-function renderizarMetas(metas) {
+// Igual ao calcularProgresso() de metas.js — o valor_atual salvo no banco
+// pode estar desatualizado, então recalcula direto das sessões de estudo.
+function calcularProgresso(sessoes) {
+  let totalMinutos = 0;
+  let flashcardsRevisados = 0;
+  let questoesResolvidas = 0;
+  let simuladosFeitos = 0;
+
+  sessoes.forEach(s => {
+    totalMinutos += s.duracao_minutos || 0;
+    if (s.tipo === 'flashcards') flashcardsRevisados++;
+    if (s.tipo === 'questoes') questoesResolvidas++;
+    if (s.tipo === 'simulado') simuladosFeitos++;
+  });
+
+  return {
+    horas_estudo: Math.round((totalMinutos / 60) * 10) / 10,
+    questoes_resolvidas: questoesResolvidas,
+    flashcards_revisados: flashcardsRevisados,
+    simulados_feitos: simuladosFeitos,
+  };
+}
+
+function renderizarMetas(metas, sessoes) {
   if (!metas.length) {
     metaListaEl.innerHTML = `<p class="empty-state">Você ainda não criou nenhuma meta.</p>`;
     return;
   }
 
+  const progresso = calcularProgresso(sessoes);
+  const hojeStr = new Date().toISOString().slice(0, 10);
+
   metaListaEl.innerHTML = metas.map(m => {
-    const percentual = m.valor_alvo > 0 ? Math.min(100, Math.round((m.valor_atual / m.valor_alvo) * 100)) : 0;
-    const nomeTipo = NOMES_META_TIPO[m.tipo] || m.descricao;
+    const info = TIPO_INFO[m.tipo] || { label: m.tipo, icone: '🎯', unidade: '' };
+    const valorAtual = progresso[m.tipo] ?? 0;
+    const percentual = m.valor_alvo > 0 ? Math.min(100, Math.round((valorAtual / m.valor_alvo) * 100)) : 0;
+    const concluida = valorAtual >= m.valor_alvo;
+    const atrasada = !concluida && m.prazo && m.prazo < hojeStr;
+
+    let prazoHtml = '';
+    if (m.prazo) {
+      const dataFormatada = new Date(m.prazo + 'T00:00:00').toLocaleDateString('pt-BR');
+      prazoHtml = `<div class="meta-prazo ${atrasada ? 'atrasada' : ''}">
+        ${atrasada ? '⚠️ Prazo era' : '📅 Até'} ${dataFormatada}
+      </div>`;
+    }
+
     return `
-      <div class="card meta-item">
-        <div class="meta-topo">
-          <span class="meta-nome">${m.descricao || nomeTipo}</span>
-          <span class="meta-percentual">${percentual}%</span>
+      <div class="card meta-item ${concluida ? 'concluida' : ''}">
+        ${concluida ? '<span class="meta-selo">🏆</span>' : ''}
+        <div class="meta-icone-nome">${info.icone} ${m.descricao}</div>
+        <div class="meta-tipo-label">${info.label}</div>
+        <div class="meta-prog-track"><div class="meta-prog-fill ${concluida ? 'concluida' : ''}" style="width:${percentual}%"></div></div>
+        <div class="meta-valores">
+          <span>${valorAtual} / ${m.valor_alvo} ${info.unidade}</span>
+          <span>${percentual}%</span>
         </div>
-        <div class="prog-track"><div class="prog-fill" style="width:${percentual}%"></div></div>
+        ${prazoHtml}
       </div>
     `;
   }).join('');
