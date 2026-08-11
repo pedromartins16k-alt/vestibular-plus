@@ -32,6 +32,20 @@
   .error-msg { color: var(--color-danger); font-size: 0.85rem; min-height: 18px; }
   .btn-full { width: 100%; margin-top: 6px; }
   .forgot-link { text-align: right; font-size: 0.82rem; color: var(--color-secondary-500); }
+
+  .password-wrap { position: relative; }
+  .password-wrap .input-field { padding-right: 44px; }
+  .toggle-senha {
+    position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; padding: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-secondary); border-radius: 6px;
+  }
+  .toggle-senha:hover { color: var(--text-primary); }
+  .toggle-senha:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
+  .toggle-senha .icon-eye-off { display: none; }
+  .toggle-senha.is-visible .icon-eye { display: none; }
+  .toggle-senha.is-visible .icon-eye-off { display: block; }
 </style>
 </head>
 <body>
@@ -43,7 +57,6 @@
       </div>
       <h1 class="auth-title">Bem-vindo de volta</h1>
       <p class="auth-subtitle">Entre para continuar seus estudos.</p>
-
       <form id="login-form">
         <div class="field">
           <label for="email">E-mail</label>
@@ -51,17 +64,32 @@
         </div>
         <div class="field">
           <label for="senha">Senha</label>
-          <input class="input-field" type="password" id="senha" required placeholder="••••••••" />
+          <div class="password-wrap">
+            <input class="input-field" type="password" id="senha" required placeholder="••••••••" />
+            <button type="button" class="toggle-senha" data-target="senha" aria-label="Mostrar senha">
+              <svg class="icon-eye" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon-eye-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 11 7 11 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 1 12s4 7 11 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+            </button>
+          </div>
         </div>
         <a class="forgot-link" href="./recuperar-senha.html">Esqueceu a senha?</a>
         <p class="error-msg" id="error-msg"></p>
         <button type="submit" class="btn btn-primary btn-full" id="submit-btn">Entrar</button>
       </form>
-
       <p class="auth-footer">Não tem conta? <a href="./cadastro.html" style="color:var(--color-primary-500); font-weight:600;">Cadastre-se</a></p>
     </div>
   </div>
-
   <script type="module" src="../scripts/login.js"></script>
+  <script>
+    document.querySelectorAll('.toggle-senha').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        const mostrando = input.type === 'text';
+        input.type = mostrando ? 'password' : 'text';
+        btn.classList.toggle('is-visible', !mostrando);
+        btn.setAttribute('aria-label', mostrando ? 'Mostrar senha' : 'Ocultar senha');
+      });
+    });
+  </script>
 </body>
 </html>
