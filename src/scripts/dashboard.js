@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao, sair } from '../lib/authGuard.js';
 import { calcularProgressoNivel } from '../utils/xp.js';
 import { iniciarBusca } from './busca-global.js';
+import { verificarConquistas } from './conquistas.js';
 
 async function iniciarDashboard() {
   const session = await exigirAutenticacao();
@@ -82,6 +83,8 @@ async function iniciarDashboard() {
     }).join('');
   }
   document.getElementById('logout-btn').addEventListener('click', sair);
+
+  verificarConquistas(userId);
 }
 
 // Conta os dias seguidos (até hoje ou ontem) em que o usuário teve pelo menos 1 sessão de estudo
