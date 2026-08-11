@@ -166,6 +166,51 @@ function renderCalendario() {
   });
 }
 
+// Decide sozinho onde o calendário deve abrir (direita, esquerda ou embaixo)
+// com base no espaço disponível na tela naquele momento — funciona tanto
+// no computador quanto no celular, sem precisar de um breakpoint fixo.
+function posicionarCalendario() {
+  const wrapper = inputPrazoDisplay.parentElement;
+  const wrapperRect = wrapper.getBoundingClientRect();
+
+  // reseta pra medir o tamanho "natural" do popup antes de decidir
+  calendarioPopup.style.left = '0';
+  calendarioPopup.style.right = 'auto';
+  calendarioPopup.style.top = '0';
+  calendarioPopup.style.bottom = 'auto';
+
+  const margem = 16;
+  const larguraPopup = calendarioPopup.offsetWidth;
+  const alturaPopup = calendarioPopup.offsetHeight;
+
+  const espacoDireita = window.innerWidth - wrapperRect.right;
+  const espacoEsquerda = wrapperRect.left;
+  const espacoAbaixo = window.innerHeight - wrapperRect.bottom;
+
+  if (espacoDireita >= larguraPopup + margem) {
+    // cabe do lado direito
+    calendarioPopup.style.left = `calc(100% + 12px)`;
+    calendarioPopup.style.top = '0';
+  } else if (espacoEsquerda >= larguraPopup + margem) {
+    // não cabe na direita, mas cabe na esquerda
+    calendarioPopup.style.left = 'auto';
+    calendarioPopup.style.right = `calc(100% + 12px)`;
+    calendarioPopup.style.top = '0';
+  } else {
+    // tela estreita (celular): abre embaixo, alinhado à esquerda do campo
+    calendarioPopup.style.left = '0';
+    calendarioPopup.style.right = 'auto';
+    calendarioPopup.style.top = `calc(100% + 8px)`;
+  }
+
+  // se abrindo embaixo e ainda assim não couber verticalmente, sobe pra cima do campo
+  const novaRect = calendarioPopup.getBoundingClientRect();
+  if (novaRect.bottom > window.innerHeight - margem && espacoAbaixo < alturaPopup) {
+    calendarioPopup.style.top = 'auto';
+    calendarioPopup.style.bottom = `calc(100% + 8px)`;
+  }
+}
+
 function selecionarDia(dataStr) {
   dataSelecionada = dataStr;
   inputPrazoHidden.value = dataStr;
@@ -213,12 +258,17 @@ function abrirModal() {
 }
 function fecharModal() {
   modalOverlay.classList.remove('open');
+  calendarioPopup.classList.remove('open');
 }
 
 inputPrazoDisplay.addEventListener('click', (e) => {
   e.stopPropagation();
+  const vaiAbrir = !calendarioPopup.classList.contains('open');
   calendarioPopup.classList.toggle('open');
-  renderCalendario();
+  if (vaiAbrir) {
+    renderCalendario();
+    posicionarCalendario();
+  }
 });
 document.getElementById('cal-prev').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -235,6 +285,11 @@ document.getElementById('cal-next').addEventListener('click', (e) => {
 document.addEventListener('click', (e) => {
   if (!calendarioPopup.contains(e.target) && e.target !== inputPrazoDisplay) {
     calendarioPopup.classList.remove('open');
+  }
+});
+window.addEventListener('resize', () => {
+  if (calendarioPopup.classList.contains('open')) {
+    posicionarCalendario();
   }
 });
 document.getElementById('btn-add').addEventListener('click', abrirModal);
