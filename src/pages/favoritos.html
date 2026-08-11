@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Meus Favoritos · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .page-wrap { padding: 32px 5%; max-width: 1100px; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .back-link:hover { color: var(--text-primary); }
+  .page-title { font-size: 1.8rem; margin-top: 6px; }
+
+  .secao-titulo { font-size: 1.15rem; margin: 30px 0 16px; display:flex; align-items:center; gap:8px; }
+  .secao-titulo:first-of-type { margin-top: 0; }
+
+  .resumo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px; }
+  .resumo-card { cursor: pointer; position: relative; }
+  .resumo-tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); margin-bottom: 10px; }
+  .resumo-card h3 { font-size: 1.05rem; margin-bottom: 8px; }
+  .resumo-card p { color: var(--text-secondary); font-size: .85rem; line-height: 1.5; }
+  .resumo-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; font-size: .78rem; color: var(--text-secondary); }
+
+  .favorito-btn {
+    position: absolute; top: 12px; right: 12px; background: none; border: none;
+    font-size: 1.3rem; cursor: pointer; color: #ef4444; line-height: 1; z-index: 2;
+    transition: transform var(--transition-fast);
+  }
+  .favorito-btn:hover { transform: scale(1.15); }
+
+  .questao-lista { display: flex; flex-direction: column; gap: 16px; }
+  .questao-card-view { padding: 24px; position: relative; }
+  .questao-tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); margin-bottom: 12px; }
+  .questao-enunciado { font-size: .98rem; line-height: 1.6; margin-bottom: 16px; }
+  .alternativa-view {
+    display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--radius-md);
+    border: 1px solid var(--border-color); margin-bottom: 8px; font-size: .9rem;
+  }
+  .alternativa-view.correta { border-color: var(--color-success); background: rgba(34,197,94,.1); }
+  .alt-letra {
+    width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border-color);
+    display: flex; align-items: center; justify-content: center; font-size: .78rem; font-weight: 700; flex-shrink: 0;
+  }
+  .alternativa-view.correta .alt-letra { background: var(--color-success); border-color: var(--color-success); color: #fff; }
+  .questao-comentario { margin-top: 14px; padding: 14px; border-radius: var(--radius-md); background: rgba(124,58,237,.08); font-size: .85rem; line-height: 1.6; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    align-items: center; justify-content: center; z-index: 50; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-content { max-width: 640px; width: 100%; max-height: 80vh; overflow-y: auto; padding: 32px; }
+  .modal-header-row { display:flex; align-items:center; justify-content:space-between; margin-bottom: 6px; }
+  .modal-close { cursor: pointer; font-size: 1.2rem; color: var(--text-secondary); }
+  .modal-body { white-space: pre-wrap; line-height: 1.7; font-size: .95rem; margin-top: 16px; }
+  .modal-fonte { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color); font-size: .82rem; color: var(--text-secondary); }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-header">
+      <div>
+        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
+        <h1 class="page-title">❤️ Meus Favoritos</h1>
+      </div>
+      <button id="theme-toggle" class="icon-btn" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;">🌙</button>
+    </div>
+
+    <h2 class="secao-titulo">📚 Resumos favoritados</h2>
+    <div class="resumo-grid" id="favoritos-resumos-grid">
+      <p class="empty-state">Carregando...</p>
+    </div>
+
+    <h2 class="secao-titulo">✅ Questões favoritadas</h2>
+    <div class="questao-lista" id="favoritos-questoes-grid">
+      <p class="empty-state">Carregando...</p>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal-content card">
+      <div class="modal-header-row">
+        <span class="resumo-tag" id="modal-tag"></span>
+        <span class="modal-close" id="modal-close">✕</span>
+      </div>
+      <h2 id="modal-titulo"></h2>
+      <div class="modal-body" id="modal-conteudo"></div>
+      <div class="modal-fonte" id="modal-fonte"></div>
+    </div>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/favoritos.js"></script>
+</body>
+</html>
