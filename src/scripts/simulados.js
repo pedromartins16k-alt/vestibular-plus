@@ -3,6 +3,7 @@ import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { PONTOS_XP, xpParaProximoNivel } from '../utils/xp.js';
+import { verificarConquistas } from './conquistas.js';
 
 const conteudo = document.getElementById('conteudo');
 let sessionUserId = null;
@@ -160,6 +161,7 @@ async function finalizarSimulado() {
   });
 
   await concederXp(PONTOS_XP.simulado_finalizado);
+  await verificarConquistas(sessionUserId);
 
   conteudo.innerHTML = `
     <div class="card resultado-card fade-up">
