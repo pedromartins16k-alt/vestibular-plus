@@ -22,8 +22,16 @@
 
   .progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: .85rem; color: var(--text-secondary); }
   .questao-card { padding: 28px; }
-  .questao-tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); margin-bottom: 14px; }
+  .questao-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .questao-tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); }
   .questao-enunciado { font-size: 1.05rem; line-height: 1.6; margin-bottom: 22px; }
+
+  .favorito-btn {
+    background: none; border: none; font-size: 1.3rem; cursor: pointer;
+    color: var(--text-secondary); line-height: 1; transition: transform var(--transition-fast), color var(--transition-fast);
+  }
+  .favorito-btn:hover { transform: scale(1.15); }
+  .favorito-btn.ativo { color: #ef4444; }
 
   .alternativa {
     display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--radius-md);
