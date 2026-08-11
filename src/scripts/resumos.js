@@ -2,6 +2,7 @@ import { iniciarNotificacoes } from './notificacoes-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { iniciarBusca } from './busca-global.js';
+import { verificarConquistas } from './conquistas.js';
 
 const grid = document.getElementById('resumo-grid');
 const filtroContainer = document.getElementById('filtro-materias');
@@ -103,6 +104,7 @@ async function registrarLeitura(materiaId) {
     duracao_minutos: 3,
     tipo: 'resumo',
   });
+  verificarConquistas(session.user.id);
 }
 
 function traduzDificuldade(nivel) {
