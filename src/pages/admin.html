@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .app-layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  @media (max-width: 900px) { .app-layout { grid-template-columns: 1fr; } .sidebar { display: none; } }
+
+  .sidebar { border-right: 1px solid var(--border-color); padding: 24px 18px; display: flex; flex-direction: column; gap: 6px; }
+  .sidebar .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; margin-bottom: 28px; padding: 0 8px; }
+  .sidebar .logo .dot { width: 32px; height: 32px; border-radius: 9px; background: var(--gradient-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--radius-md); color: var(--text-secondary); font-weight: 500; font-size: .92rem; transition: background var(--transition-fast), color var(--transition-fast); cursor: pointer; }
+  .nav-item:hover, .nav-item.active { background: var(--glass-bg); color: var(--text-primary); }
+  .nav-item.active { background: linear-gradient(135deg, rgba(124,58,237,.15), rgba(59,130,246,.15)); }
+  .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border-color); }
+
+  .main { padding: 24px 4%; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+  .topbar h1 { font-size: 1.3rem; }
+  .topbar-actions { display: flex; align-items: center; gap: 14px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
+  .user-menu { position: relative; }
+  .user-dropdown {
+    position: absolute; top: 50px; right: 0; min-width: 170px; padding: 6px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft); display: none; flex-direction: column; gap: 2px; z-index: 30;
+  }
+  .user-dropdown.open { display: flex; }
+  .dropdown-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm); color: var(--text-primary); font-size: .88rem; font-weight: 500; cursor: pointer; transition: background var(--transition-fast); }
+  .dropdown-item:hover { background: var(--glass-bg); }
+
+  /* Tabs */
+  .admin-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .admin-tab-btn {
+    padding: 9px 18px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
+    background: var(--bg-elevated); color: var(--text-secondary); font-weight: 600; font-size: .86rem; cursor: pointer;
+  }
+  .admin-tab-btn.active { background: var(--gradient-primary); color: #fff; border-color: transparent; }
+  .admin-panel { display: none; }
+  .admin-panel.active { display: block; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-card { text-align: center; }
+  .stat-card strong { font-size: 1.5rem; font-family: var(--font-display); display: block; }
+  .stat-card span { color: var(--text-secondary); font-size: .8rem; }
+
+  /* Sub-tabs (dentro de Conteúdo) */
+  .sub-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .sub-tab-btn { padding: 7px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); font-size: .82rem; font-weight: 600; cursor: pointer; }
+  .sub-tab-btn.active { background: var(--glass-bg); color: var(--text-primary); border-color: var(--color-primary-500); }
+  .sub-panel { display: none; }
+  .sub-panel.active { display: block; }
+
+  form.admin-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  form.admin-form .full { grid-column: 1 / -1; }
+  form.admin-form label { font-size: .78rem; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+  form.admin-form textarea.input-field { min-height: 80px; resize: vertical; font-family: var(--font-body); }
+  form.admin-form select.input-field { cursor: pointer; }
+
+  table.admin-table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+  table.admin-table th { text-align: left; padding: 10px 8px; color: var(--text-secondary); font-size: .76rem; text-transform: uppercase; letter-spacing: .03em; border-bottom: 1px solid var(--border-color); }
+  table.admin-table td { padding: 10px 8px; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+  table.admin-table td.truncate { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn-del { background: rgba(239,68,68,.12); color: var(--color-danger); border: none; border-radius: var(--radius-sm); padding: 6px 10px; font-size: .76rem; font-weight: 700; cursor: pointer; }
+  .btn-del:hover { background: rgba(239,68,68,.22); }
+  .btn-small { padding: 6px 12px; font-size: .78rem; }
+
+  .vest-card { padding: 16px; margin-bottom: 12px; }
+  .vest-card h4 { font-size: .98rem; margin-bottom: 4px; }
+  .vest-card .vest-meta { color: var(--text-secondary); font-size: .8rem; margin-bottom: 8px; }
+  .vest-card-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+  .link-search-results { max-height: 220px; overflow-y: auto; margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .link-search-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--glass-bg); font-size: .82rem; }
+  .btn-add-link { background: var(--gradient-neon); color: #fff; border: none; border-radius: var(--radius-sm); padding: 5px 10px; font-size: .74rem; font-weight: 700; cursor: pointer; }
+
+  .empty-state { text-align: center; padding: 24px 10px; color: var(--text-secondary); font-size: .86rem; }
+  .msg-ok { color: var(--color-success); font-size: .82rem; margin-top: 6px; }
+  .msg-err { color: var(--color-danger); font-size: .82rem; margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar glass">
+      <div class="logo"><div class="dot">V+</div>Admin</div>
+      <div class="nav-item active" data-tab="visao-geral">📊 Visão geral</div>
+      <div class="nav-item" data-tab="usuarios">👥 Usuários</div>
+      <div class="nav-item" data-tab="vestibulares">🎓 Vestibulares</div>
+      <div class="nav-item" data-tab="conteudo">📚 Conteúdo</div>
+      <div class="sidebar-footer">
+        <a class="nav-item" href="./dashboard.html">⬅ Voltar ao site</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <h1>Painel administrativo</h1>
+        <div class="topbar-actions">
+          <button id="theme-toggle" class="icon-btn">🌙</button>
+          <div class="user-menu">
+            <div class="avatar" id="avatar-inicial">A</div>
+            <div class="user-dropdown" id="user-dropdown">
+              <a class="dropdown-item" href="./dashboard.html">🏠 Site</a>
+              <div class="dropdown-item" id="logout-btn">🚪 Sair</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-tabs">
+        <button class="admin-tab-btn active" data-tab="visao-geral">Visão geral</button>
+        <button class="admin-tab-btn" data-tab="usuarios">Usuários</button>
+        <button class="admin-tab-btn" data-tab="vestibulares">Vestibulares</button>
+        <button class="admin-tab-btn" data-tab="conteudo">Conteúdo</button>
+      </div>
+
+      <!-- ===== VISÃO GERAL ===== -->
+      <section class="admin-panel active" id="panel-visao-geral">
+        <div class="stats-grid" id="stats-grid">
+          <div class="card stat-card"><strong id="stat-usuarios">–</strong><span>Usuários</span></div>
+          <div class="card stat-card"><strong id="stat-resumos">–</strong><span>Resumos</span></div>
+          <div class="card stat-card"><strong id="stat-questoes">–</strong><span>Questões</span></div>
+          <div class="card stat-card"><strong id="stat-flashcards">–</strong><span>Flashcards</span></div>
+          <div class="card stat-card"><strong id="stat-simulados">–</strong><span>Simulados</span></div>
+          <div class="card stat-card"><strong id="stat-vestibulares">–</strong><span>Vestibulares</span></div>
+          <div class="card stat-card"><strong id="stat-aulas">–</strong><span>Aulas</span></div>
+          <div class="card stat-card"><strong id="stat-sessoes">–</strong><span>Sessões de estudo</span></div>
+        </div>
+      </section>
+
+      <!-- ===== USUÁRIOS ===== -->
+      <section class="admin-panel" id="panel-usuarios">
+        <div class="card">
+          <table class="admin-table">
+            <thead><tr><th>Nome</th><th>Apelido</th><th>Nível</th><th>XP</th><th>Cadastrado em</th></tr></thead>
+            <tbody id="tbody-usuarios"><tr><td colspan="5" class="empty-state">Carregando...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== VESTIBULARES ===== -->
+      <section class="admin-panel" id="panel-vestibulares">
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin-bottom:14px;">Novo vestibular</h3>
+          <form class="admin-form" id="form-vestibular">
+            <div><label>Nome</label><input class="input-field" name="nome" required /></div>
+            <div><label>Instituição</label><input class="input-field" name="instituicao" required /></div>
+            <div><label>Cidade</label><input class="input-field" name="cidade" /></div>
+            <div><label>Estado (UF)</label><input class="input-field" name="estado" maxlength="2" value="SP" /></div>
+            <div><label>Região</label><input class="input-field" name="regiao" /></div>
+            <div><label>Tipo de prova</label><input class="input-field" name="tipo_prova" placeholder="ex: ENEM, vestibular próprio" /></div>
+            <div><label>Início inscrição</label><input class="input-field" type="date" name="inscricao_inicio" /></div>
+            <div><label>Fim inscrição</label><input class="input-field" type="date" name="inscricao_fim" /></div>
+            <div><label>Data da prova</label><input class="input-field" type="date" name="data_prova" /></div>
+            <div><label>Aceita treineiro?</label>
+              <select class="input-field" name="aceita_treineiro">
+                <option value="true" selected>Sim</option>
+                <option value="false">Não</option>
+              </select>
+            </div>
+            <div><label>Link do edital</label><input class="input-field" name="link_edital" /></div>
+            <div><label>Link oficial</label><input class="input-field" name="link_oficial" /></div>
+            <div class="full"><label>Descrição</label><textarea class="input-field" name="descricao"></textarea></div>
+            <div class="full">
+              <button type="submit" class="btn btn-primary btn-small">Adicionar vestibular</button>
+              <div class="msg-ok" id="msg-vestibular"></div>
+            </div>
+          </form>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+          <h3 style="margin-bottom:14px;">Ligar conteúdo a um vestibular</h3>
+          <label style="font-size:.78rem;color:var(--text-secondary);display:block;margin-bottom:6px;">Vestibular</label>
+          <select class="input-field" id="select-vestibular-link" style="margin-bottom:14px;"></select>
+
+          <label style="font-size:.78rem;color:var(--text-secondary);display:block;margin-bottom:6px;">Buscar resumo por título</label>
+          <input class="input-field" id="busca-resumo-link" placeholder="digite pra filtrar..." />
+          <div class="link-search-results" id="resultados-resumo-link"></div>
+
+          <label style="font-size:.78rem;color:var(--text-secondary);display:block;margin:14px 0 6px;">Buscar questão por enunciado</label>
+          <input class="input-field" id="busca-questao-link" placeholder="digite pra filtrar..." />
+          <div class="link-search-results" id="resultados-questao-link"></div>
+        </div>
+
+        <div id="lista-vestibulares"></div>
+      </section>
+
+      <!-- ===== CONTEÚDO ===== -->
+      <section class="admin-panel" id="panel-conteudo">
+        <div class="sub-tabs">
+          <button class="sub-tab-btn active" data-sub="resumos">Resumos</button>
+          <button class="sub-tab-btn" data-sub="questoes">Questões</button>
+          <button class="sub-tab-btn" data-sub="flashcards">Flashcards</button>
+          <button class="sub-tab-btn" data-sub="aulas">Aulas</button>
+        </div>
+
+        <!-- Resumos -->
+        <div class="sub-panel active" id="sub-resumos">
+          <div class="card" style="margin-bottom:16px;">
+            <form class="admin-form" id="form-resumo">
+              <div><label>Matéria</label><select class="input-field" name="materia_id" required></select></div>
+              <div><label>Dificuldade</label>
+                <select class="input-field" name="nivel_dificuldade">
+                  <option value="facil">Fácil</option><option value="medio" selected>Médio</option><option value="dificil">Difícil</option>
+                </select>
+              </div>
+              <div class="full"><label>Título</label><input class="input-field" name="titulo" required /></div>
+              <div class="full"><label>Conteúdo</label><textarea class="input-field" name="conteudo" required></textarea></div>
+              <div><label>Fonte</label><input class="input-field" name="fonte" /></div>
+              <div class="full"><button type="submit" class="btn btn-primary btn-small">Adicionar resumo</button><div class="msg-ok" id="msg-resumo"></div></div>
+            </form>
+          </div>
+          <div class="card">
+            <table class="admin-table">
+              <thead><tr><th>Título</th><th>Matéria</th><th>Dificuldade</th><th></th></tr></thead>
+              <tbody id="tbody-resumos"><tr><td colspan="4" class="empty-state">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Questões -->
+        <div class="sub-panel" id="sub-questoes">
+          <div class="card" style="margin-bottom:16px;">
+            <form class="admin-form" id="form-questao">
+              <div><label>Matéria</label><select class="input-field" name="materia_id" required></select></div>
+              <div><label>Aula (opcional)</label><select class="input-field" name="aula_id"><option value="">— nenhuma —</option></select></div>
+              <div class="full"><label>Enunciado</label><textarea class="input-field" name="enunciado" required></textarea></div>
+              <div><label>Alternativa A</label><input class="input-field" name="alt_a" required /></div>
+              <div><label>Alternativa B</label><input class="input-field" name="alt_b" required /></div>
+              <div><label>Alternativa C</label><input class="input-field" name="alt_c" required /></div>
+              <div><label>Alternativa D</label><input class="input-field" name="alt_d" required /></div>
+              <div><label>Resposta correta</label>
+                <select class="input-field" name="resposta_correta" required>
+                  <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option>
+                </select>
+              </div>
+              <div><label>Dificuldade</label>
+                <select class="input-field" name="dificuldade">
+                  <option value="facil">Fácil</option><option value="medio" selected>Médio</option>
+                  <option value="dificil">Difícil</option><option value="genio">Gênio</option>
+                </select>
+              </div>
+              <div><label>Ano</label><input class="input-field" type="number" name="ano" /></div>
+              <div><label>Fonte</label><input class="input-field" name="fonte" /></div>
+              <div class="full"><label>Comentário (explicação da resposta)</label><textarea class="input-field" name="comentario"></textarea></div>
+              <div class="full"><button type="submit" class="btn btn-primary btn-small">Adicionar questão</button><div class="msg-ok" id="msg-questao"></div></div>
+            </form>
+          </div>
+          <div class="card">
+            <table class="admin-table">
+              <thead><tr><th>Enunciado</th><th>Matéria</th><th>Dificuldade</th><th></th></tr></thead>
+              <tbody id="tbody-questoes"><tr><td colspan="4" class="empty-state">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Flashcards -->
+        <div class="sub-panel" id="sub-flashcards">
+          <div class="card" style="margin-bottom:16px;">
+            <form class="admin-form" id="form-flashcard">
+              <div><label>Matéria</label><select class="input-field" name="materia_id" required></select></div>
+              <div class="full"><label>Frente</label><input class="input-field" name="frente" required /></div>
+              <div class="full"><label>Verso</label><textarea class="input-field" name="verso" required></textarea></div>
+              <div class="full"><button type="submit" class="btn btn-primary btn-small">Adicionar flashcard</button><div class="msg-ok" id="msg-flashcard"></div></div>
+            </form>
+          </div>
+          <div class="card">
+            <table class="admin-table">
+              <thead><tr><th>Frente</th><th>Matéria</th><th></th></tr></thead>
+              <tbody id="tbody-flashcards"><tr><td colspan="3" class="empty-state">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Aulas -->
+        <div class="sub-panel" id="sub-aulas">
+          <div class="card" style="margin-bottom:16px;">
+            <form class="admin-form" id="form-aula">
+              <div><label>Matéria</label><select class="input-field" name="materia_id" required></select></div>
+              <div><label>Ordem</label><input class="input-field" type="number" name="ordem" value="0" /></div>
+              <div class="full"><label>Título</label><input class="input-field" name="titulo" required /></div>
+              <div class="full"><label>Explicação</label><textarea class="input-field" name="explicacao" required></textarea></div>
+              <div class="full"><label>Termo de busca no YouTube</label><input class="input-field" name="youtube_busca" /></div>
+              <div class="full"><button type="submit" class="btn btn-primary btn-small">Adicionar aula</button><div class="msg-ok" id="msg-aula"></div></div>
+            </form>
+          </div>
+          <div class="card">
+            <table class="admin-table">
+              <thead><tr><th>Título</th><th>Matéria</th><th></th></tr></thead>
+              <tbody id="tbody-aulas"><tr><td colspan="3" class="empty-state">Carregando...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/admin.js"></script>
+</body>
+</html>
