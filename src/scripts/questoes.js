@@ -3,6 +3,7 @@ import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { PONTOS_XP, xpParaProximoNivel } from '../utils/xp.js';
+import { verificarConquistas } from './conquistas.js';
 
 const container = document.getElementById('questao-container');
 const filtroContainer = document.getElementById('filtro-materias');
@@ -146,6 +147,7 @@ async function registrarResposta(materiaId, acertou) {
     materia_id: materiaId,
     duracao_minutos: 2,
     tipo: 'questoes',
+    acertou,
   });
 
   // Atualiza XP do perfil (e sobe de nível se necessário)
@@ -168,6 +170,8 @@ async function registrarResposta(materiaId, acertou) {
     .from('profiles')
     .update({ xp: novoXp, nivel: novoNivel })
     .eq('id', sessionUserId);
+
+  verificarConquistas(sessionUserId);
 }
 
 iniciar();
