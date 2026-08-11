@@ -40,4 +40,158 @@
   }
   .dropdown-item:hover { background: var(--glass-bg); }
 
-  /* Dropdown de
+  /* Dropdown de resultados da busca */
+  .busca-dropdown {
+    position: absolute; top: 48px; left: 0; right: 0;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-soft);
+    max-height: 360px; overflow-y: auto; display: none; flex-direction: column;
+    padding: 6px; z-index: 40;
+  }
+  .busca-dropdown.open { display: flex; }
+  .busca-grupo-titulo {
+    font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text-secondary); padding: 8px 10px 4px; font-weight: 700;
+  }
+  .busca-item {
+    display: block; padding: 8px 10px; border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: .86rem; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .busca-item:hover { background: var(--glass-bg); }
+  .busca-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
+
+  /* Sininho de notificações */
+  .notif-btn-wrap { position: relative; }
+  .notif-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 3px;
+    border-radius: var(--radius-full); background: #ef4444; color: #fff; font-size: .62rem;
+    font-weight: 700; display: none; align-items: center; justify-content: center; line-height: 1;
+  }
+  .notif-badge.show { display: flex; }
+  .notif-dropdown {
+    position: absolute; top: 50px; right: 0; width: 320px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-soft);
+    max-height: 380px; overflow-y: auto; display: none; flex-direction: column;
+    padding: 6px; z-index: 40;
+  }
+  .notif-dropdown.open { display: flex; }
+  .notif-item { padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer; }
+  .notif-item:hover { background: var(--glass-bg); }
+  .notif-item.nao-lida { background: rgba(124,58,237,.08); }
+  .notif-item strong { font-size: .86rem; display: block; margin-bottom: 2px; }
+  .notif-item p { font-size: .8rem; color: var(--text-secondary); margin: 0 0 4px; }
+  .notif-item .notif-data { font-size: .7rem; color: var(--text-secondary); }
+  .notif-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
+  .notif-ver-todas { display: block; text-align: center; padding: 10px; font-size: .82rem; font-weight: 600; color: var(--color-primary-500); border-top: 1px solid var(--border-color); margin-top: 4px; }
+
+  .welcome-card { padding: 28px; border-radius: var(--radius-lg); background: var(--gradient-primary); color: #fff; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .welcome-card h2 { font-size: 1.4rem; margin-bottom: 6px; }
+  .welcome-card p { opacity: .9; font-size: .92rem; }
+  .xp-bar-track { background: rgba(255,255,255,.25); border-radius: var(--radius-full); height: 10px; margin-top: 16px; overflow: hidden; }
+  .xp-bar-fill { height: 100%; background: #fff; border-radius: var(--radius-full); transition: width .6s ease; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card { text-align: center; }
+  .stat-card strong { font-size: 1.6rem; font-family: var(--font-display); display: block; }
+  .stat-card span { color: var(--text-secondary); font-size: .82rem; }
+
+  .section-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .section-row { grid-template-columns: 1fr; } }
+  .panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .panel-title h3 { font-size: 1.05rem; }
+  .see-all { font-size: .82rem; color: var(--color-primary-500); font-weight: 600; }
+
+  .materia-list { display: flex; flex-direction: column; gap: 10px; }
+  .materia-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .materia-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .materia-item .prog-track { flex: 1; height: 6px; border-radius: var(--radius-full); background: var(--border-color); overflow: hidden; }
+  .materia-item .prog-fill { height: 100%; border-radius: var(--radius-full); background: var(--gradient-neon); }
+
+  .ranking-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-color); font-size: .9rem; }
+  .ranking-item:last-child { border-bottom: none; }
+  .ranking-pos { width: 22px; text-align: center; font-weight: 700; color: var(--text-secondary); }
+  .ranking-avatar-mini {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-primary);
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    font-weight: 700; font-size: .72rem; flex-shrink: 0;
+  }
+
+  .empty-state { text-align: center; padding: 30px 10px; color: var(--text-secondary); font-size: .88rem; }
+</style>
+</head>
+<body>
+  <div class="app-layout">
+    <aside class="sidebar glass">
+      <div class="logo"><div class="dot">V+</div>Vestibular+</div>
+<div class="nav-item active">🏠 Dashboard</div>
+  <a class="nav-item" href="./resumos.html">📚 Resumos</a>
+      <a class="nav-item" href="./questoes.html">✅ Questões</a>
+      <a class="nav-item" href="./simulados.html">⏱️ Simulados</a>
+     <a class="nav-item" href="./flashcards.html">🧠 Flashcards</a>
+     <a class="nav-item" href="./cronograma.html">📅 Cronograma</a>
+   <a class="nav-item" href="./metas.html">🎯 Metas</a>
+     <a class="nav-item" href="./ranking.html">🏆 Ranking</a>
+   <a class="nav-item" href="./vestibulares.html">🎓 Vestibulares</a>
+      <a class="nav-item" href="./favoritos.html">⭐ Favoritos</a>
+      <div class="nav-item">📊 Estatísticas</div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar">
+        <div class="search-box">
+          <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questões, flashcards, vestibulares..." />
+          <div class="busca-dropdown" id="busca-dropdown"></div>
+        </div>
+        <div class="topbar-actions">
+          <button id="theme-toggle" class="icon-btn">🌙</button>
+          <div class="notif-btn-wrap">
+            <button id="notif-btn" class="icon-btn">🔔<span class="notif-badge" id="notif-badge"></span></button>
+            <div class="notif-dropdown" id="notif-dropdown"></div>
+          </div>
+          <div class="user-menu">
+            <div class="avatar" id="avatar-inicial">A</div>
+            <div class="user-dropdown" id="user-dropdown">
+              <a class="dropdown-item" href="./perfil.html">👤 Perfil</a>
+              <div class="dropdown-item" id="logout-btn">🚪 Sair</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="welcome-card fade-up">
+        <h2 id="saudacao">Olá! 👋</h2>
+        <p id="nivel-info">Carregando seu progresso...</p>
+        <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar" style="width:0%"></div></div>
+      </div>
+
+      <div class="stats-grid fade-up">
+        <div class="card stat-card"><strong id="stat-horas">0h</strong><span>Horas estudadas</span></div>
+        <div class="card stat-card"><strong id="stat-questoes">0</strong><span>Questões resolvidas</span></div>
+        <div class="card stat-card"><strong id="stat-simulados">0</strong><span>Simulados feitos</span></div>
+        <div class="card stat-card"><strong id="stat-sequencia">0</strong><span>Dias seguidos</span></div>
+      </div>
+
+      <div class="section-row">
+        <div class="card fade-up">
+          <div class="panel-title"><h3>Progresso por matéria</h3><a class="see-all" href="./progresso.html">ver tudo</a></div>
+          <div class="materia-list" id="materia-list">
+            <div class="empty-state">Assim que houver matérias cadastradas, seu progresso aparece aqui.</div>
+          </div>
+        </div>
+
+        <div class="card fade-up">
+          <div class="panel-title"><h3>Ranking</h3><a class="see-all" href="./ranking.html">ver tudo</a></div>
+          <div id="ranking-list">
+            <div class="empty-state">O ranking aparece assim que outros alunos começarem a estudar 🚀</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/dashboard.js"></script>
+</body>
+</html>
