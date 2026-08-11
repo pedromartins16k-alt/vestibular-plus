@@ -39,11 +39,19 @@
   .conquista-nome { font-weight: 700; font-size: .84rem; display: block; }
   .conquista-xp { font-size: .74rem; color: var(--text-secondary); }
 
-  .meta-lista { display: flex; flex-direction: column; gap: 12px; }
-  .meta-item { padding: 14px 18px; }
-  .meta-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 10px; }
-  .meta-nome { font-weight: 600; font-size: .92rem; }
-  .meta-percentual { font-weight: 700; color: var(--color-primary-500); flex-shrink: 0; }
+  /* Metas — mesmo visual da página metas.html */
+  .meta-lista { display: flex; flex-direction: column; gap: 14px; }
+  .meta-item { position: relative; padding: 16px 20px; }
+  .meta-item.concluida { border: 1px solid #22c55e; }
+  .meta-selo { position: absolute; top: 16px; right: 18px; font-size: 1.15rem; }
+  .meta-icone-nome { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: .95rem; margin-bottom: 2px; }
+  .meta-tipo-label { font-size: .78rem; color: var(--text-secondary); margin-bottom: 12px; }
+  .meta-prog-track { height: 8px; border-radius: var(--radius-full); background: var(--border-color); overflow: hidden; margin-bottom: 8px; }
+  .meta-prog-fill { height: 100%; border-radius: var(--radius-full); background: var(--gradient-primary); transition: width .5s ease; }
+  .meta-prog-fill.concluida { background: #22c55e; }
+  .meta-valores { display: flex; align-items: center; justify-content: space-between; font-size: .82rem; color: var(--text-secondary); }
+  .meta-prazo { margin-top: 10px; font-size: .78rem; color: var(--text-secondary); }
+  .meta-prazo.atrasada { color: #ef4444; }
 
   .empty-state { text-align: center; padding: 30px 10px; color: var(--text-secondary); font-size: .88rem; }
 </style>
