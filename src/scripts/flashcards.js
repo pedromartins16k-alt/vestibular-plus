@@ -2,6 +2,7 @@ import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
+import { verificarConquistas } from './conquistas.js';
 
 const studyArea = document.getElementById('study-area');
 const filtroContainer = document.getElementById('filtro-materias');
@@ -208,6 +209,8 @@ async function avaliar(acertou) {
     duracao_minutos: 1,
     tipo: 'flashcards',
   });
+
+  verificarConquistas(userId);
 
   cardAtual.progresso = {
     flashcard_id: cardAtual.id,
