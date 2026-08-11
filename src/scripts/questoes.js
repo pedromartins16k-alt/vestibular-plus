@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { PONTOS_XP, xpParaProximoNivel } from '../utils/xp.js';
 import { verificarConquistas } from './conquistas.js';
+import { buscarFavoritos, alternarFavorito } from './favoritos-global.js';
 
 const container = document.getElementById('questao-container');
 const filtroContainer = document.getElementById('filtro-materias');
@@ -15,6 +16,7 @@ let indiceAtual = 0;
 let respondida = false;
 let acertos = 0;
 let sessionUserId = null;
+let favoritosSet = new Set();
 
 async function iniciar() {
   const session = await exigirAutenticacao();
@@ -31,6 +33,7 @@ async function iniciar() {
     .select('id, enunciado, alternativas, resposta_correta, comentario, fonte, ano, dificuldade, materia_id, materias(nome, cor)');
 
   questoesCache = questoes || [];
+  favoritosSet = await buscarFavoritos('questao');
 
   renderFiltros(materias || []);
   renderQuestaoAtual();
@@ -81,11 +84,15 @@ function renderQuestaoAtual() {
 
   const q = lista[indiceAtual];
   const cor = q.materias?.cor || '#7c3aed';
+  const favoritado = favoritosSet.has(q.id);
   progressInfo.innerHTML = `<span>Questão ${indiceAtual + 1} de ${lista.length}</span><span>✅ ${acertos} acertos</span>`;
 
   container.innerHTML = `
     <div class="card questao-card fade-up">
-      <span class="questao-tag" style="background:${cor}22; color:${cor};">${q.materias?.nome || 'Geral'} ${q.fonte ? '· ' + q.fonte : ''}</span>
+      <div class="questao-topo">
+        <span class="questao-tag" style="background:${cor}22; color:${cor};">${q.materias?.nome || 'Geral'} ${q.fonte ? '· ' + q.fonte : ''}</span>
+        <button class="favorito-btn ${favoritado ? 'ativo' : ''}" id="favorito-btn" title="Salvar para revisar depois">${favoritado ? '♥' : '♡'}</button>
+      </div>
       <p class="questao-enunciado">${q.enunciado}</p>
       <div id="alternativas-list"></div>
       <div class="feedback-box" id="feedback-box"></div>
@@ -112,6 +119,20 @@ function renderQuestaoAtual() {
     indiceAtual++;
     renderQuestaoAtual();
   });
+
+  document.getElementById('favorito-btn').addEventListener('click', () => toggleFavoritoQuestao(q.id));
+}
+
+async function toggleFavoritoQuestao(id) {
+  const estava = favoritosSet.has(id);
+  const novoEstado = await alternarFavorito('questao', id, estava);
+  if (novoEstado) favoritosSet.add(id); else favoritosSet.delete(id);
+
+  const btn = document.getElementById('favorito-btn');
+  if (btn) {
+    btn.textContent = novoEstado ? '♥' : '♡';
+    btn.classList.toggle('ativo', novoEstado);
+  }
 }
 
 async function selecionarResposta(el, questao) {
@@ -150,7 +171,6 @@ async function registrarResposta(materiaId, acertou) {
     acertou,
   });
 
-  // Atualiza XP do perfil (e sobe de nível se necessário)
   const { data: profile } = await supabase
     .from('profiles')
     .select('xp, nivel')
