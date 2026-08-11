@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Estatísticas · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .page-wrap { padding: 32px 5%; max-width: 900px; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .back-link:hover { color: var(--text-primary); }
+  .page-title { font-size: 1.8rem; margin-top: 6px; }
+  .resumo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .resumo-card { text-align: center; padding: 20px 12px; }
+  .resumo-card strong { font-size: 1.6rem; font-family: var(--font-display); display: block; }
+  .resumo-card span { color: var(--text-secondary); font-size: .82rem; }
+
+  .secao { margin-bottom: 32px; }
+  .secao-titulo { font-size: 1.05rem; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+  .tipo-lista { display: flex; flex-direction: column; gap: 12px; }
+  .tipo-item { padding: 14px 18px; }
+  .tipo-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-weight: 600; font-size: .92rem; }
+  .prog-track { height: 8px; border-radius: var(--radius-full); background: var(--border-color); overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: var(--radius-full); background: var(--gradient-neon); transition: width .6s ease; }
+
+  .simulado-lista { display: flex; flex-direction: column; gap: 10px; }
+  .simulado-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; gap: 12px; }
+  .simulado-nome { font-weight: 600; font-size: .92rem; }
+  .simulado-data { font-size: .78rem; color: var(--text-secondary); }
+  .simulado-nota { font-weight: 700; font-size: 1.1rem; color: var(--color-primary-500); flex-shrink: 0; }
+
+  .conquista-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .conquista-card { text-align: center; padding: 16px 10px; opacity: 1; }
+  .conquista-card.bloqueada { opacity: .35; filter: grayscale(1); }
+  .conquista-icone { font-size: 1.8rem; display: block; margin-bottom: 6px; }
+  .conquista-nome { font-weight: 700; font-size: .84rem; display: block; }
+  .conquista-xp { font-size: .74rem; color: var(--text-secondary); }
+
+  .meta-lista { display: flex; flex-direction: column; gap: 12px; }
+  .meta-item { padding: 14px 18px; }
+  .meta-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 10px; }
+  .meta-nome { font-weight: 600; font-size: .92rem; }
+  .meta-percentual { font-weight: 700; color: var(--color-primary-500); flex-shrink: 0; }
+
+  .empty-state { text-align: center; padding: 30px 10px; color: var(--text-secondary); font-size: .88rem; }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-header">
+      <div>
+        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
+        <h1 class="page-title">📊 Estatísticas</h1>
+      </div>
+      <button id="theme-toggle" class="icon-btn" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;">🌙</button>
+    </div>
+
+    <div class="resumo-grid" id="resumo-geral"></div>
+
+    <div class="secao">
+      <h3 class="secao-titulo">📈 Distribuição por tipo de atividade</h3>
+      <div class="tipo-lista" id="tipo-lista">
+        <p class="empty-state">Carregando...</p>
+      </div>
+    </div>
+
+    <div class="secao">
+      <h3 class="secao-titulo">⏱️ Desempenho em simulados</h3>
+      <div class="simulado-lista" id="simulado-lista">
+        <p class="empty-state">Carregando...</p>
+      </div>
+    </div>
+
+    <div class="secao">
+      <h3 class="secao-titulo">🏆 Conquistas</h3>
+      <div class="conquista-grid" id="conquista-grid">
+        <p class="empty-state">Carregando...</p>
+      </div>
+    </div>
+
+    <div class="secao">
+      <h3 class="secao-titulo">🎯 Metas</h3>
+      <div class="meta-lista" id="meta-lista">
+        <p class="empty-state">Carregando...</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/estatisticas.js"></script>
+</body>
+</html>
