@@ -101,13 +101,15 @@ async function carregarVisaoGeral() {
 
 // ===== Usuários =====
 async function carregarUsuarios() {
-  const { data } = await supabase.from('profiles').select('nome, nome_usuario, nivel, xp, criado_em').order('criado_em', { ascending: false });
+  const { data, error } = await supabase.rpc('admin_listar_usuarios');
   const tbody = document.getElementById('tbody-usuarios');
-  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Nenhum usuário.</td></tr>'; return; }
+  if (error) { tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Erro: ${escapeHtml(error.message)}</td></tr>`; return; }
+  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum usuário.</td></tr>'; return; }
   tbody.innerHTML = data.map(u => `
     <tr>
       <td>${escapeHtml(u.nome || '—')}</td>
       <td>${escapeHtml(u.nome_usuario || '—')}</td>
+      <td>${escapeHtml(u.email || '—')}</td>
       <td>${u.nivel ?? '—'}</td>
       <td>${u.xp ?? 0}</td>
       <td>${new Date(u.criado_em).toLocaleDateString('pt-BR')}</td>
