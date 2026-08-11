@@ -14,4 +14,30 @@
   .sidebar .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; margin-bottom: 28px; padding: 0 8px; }
   .sidebar .logo .dot { width: 32px; height: 32px; border-radius: 9px; background: var(--gradient-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; }
   .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--radius-md); color: var(--text-secondary); font-weight: 500; font-size: .92rem; transition: background var(--transition-fast), color var(--transition-fast); cursor: pointer; }
-  .nav-item:hover, .nav-item.active { background: var(--glass-bg); color:
+  .nav-item:hover, .nav-item.active { background: var(--glass-bg); color: var(--text-primary); }
+  .nav-item.active { background: linear-gradient(135deg, rgba(124,58,237,.15), rgba(59,130,246,.15)); }
+
+  .main { padding: 24px 4%; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+  .search-box { flex: 1; max-width: 380px; position: relative; }
+  .search-box input { padding-left: 40px; }
+  .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; }
+  .topbar-actions { display: flex; align-items: center; gap: 14px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; position: relative; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
+
+  .user-menu { position: relative; }
+  .user-dropdown {
+    position: absolute; top: 50px; right: 0; min-width: 170px; padding: 6px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft); display: none; flex-direction: column; gap: 2px; z-index: 30;
+  }
+  .user-dropdown.open { display: flex; }
+  .dropdown-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: .88rem; font-weight: 500; cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .dropdown-item:hover { background: var(--glass-bg); }
+
+  /* Dropdown de
