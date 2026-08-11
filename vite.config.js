@@ -28,6 +28,7 @@ export default defineConfig({
         notificacoes: resolve(__dirname, 'src/pages/notificacoes.html'),
         favoritos: resolve(__dirname, 'src/pages/favoritos.html'),
         admin: resolve(__dirname, 'src/pages/admin.html'),
+        estatisticas: resolve(__dirname, 'src/pages/estatisticas.html'),
       }
     }
   },
