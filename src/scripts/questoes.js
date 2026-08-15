@@ -1,3 +1,4 @@
+
 import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
@@ -11,7 +12,13 @@ const filtroContainer = document.getElementById('filtro-materias');
 const progressInfo = document.getElementById('progress-info');
 
 let questoesCache = [];
-let materiaAtiva = 'todas';
+let materiasCache = [];
+let aulasCache = [];
+
+let materiaAtiva = 'todas';   // 'todas' ou id da matéria
+let mostrandoTemas = false;   // true quando estamos na tela de seleção de tema
+let temaAtivo = null;         // null (ainda não escolheu), 'todos' (todos os temas da matéria) ou id da aula
+
 let indiceAtual = 0;
 let respondida = false;
 let acertos = 0;
@@ -28,14 +35,21 @@ async function iniciar() {
     .select('id, nome, cor')
     .order('ordem');
 
+  const { data: aulas } = await supabase
+    .from('treineiro_aulas')
+    .select('id, titulo, materia_id, ordem')
+    .order('ordem');
+
   const { data: questoes } = await supabase
     .from('questoes')
-    .select('id, enunciado, alternativas, resposta_correta, comentario, fonte, ano, dificuldade, materia_id, materias(nome, cor)');
+    .select('id, enunciado, alternativas, resposta_correta, comentario, fonte, ano, dificuldade, materia_id, aula_id, materias(nome, cor), treineiro_aulas(titulo)');
 
+  materiasCache = materias || [];
+  aulasCache = aulas || [];
   questoesCache = questoes || [];
   favoritosSet = await buscarFavoritos('questao');
 
-  renderFiltros(materias || []);
+  renderFiltros(materiasCache);
   renderQuestaoAtual();
 }
 
@@ -47,50 +61,142 @@ function renderFiltros(materias) {
     chip.addEventListener('click', () => {
       filtroContainer.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      materiaAtiva = chip.dataset.materia;
+
+      const materiaId = chip.dataset.materia;
       indiceAtual = 0;
-      acertos = 0;
-      renderQuestaoAtual();
+
+      if (materiaId === 'todas') {
+        materiaAtiva = 'todas';
+        mostrandoTemas = false;
+        temaAtivo = null;
+        renderQuestaoAtual();
+      } else {
+        materiaAtiva = materiaId;
+        mostrandoTemas = true;
+        temaAtivo = null;
+        renderTemas(materiaId);
+      }
     });
   });
 }
 
 function questoesFiltradas() {
-  return materiaAtiva === 'todas'
-    ? questoesCache
-    : questoesCache.filter(q => q.materia_id === materiaAtiva);
+  if (materiaAtiva === 'todas') return questoesCache;
+
+  const daMateria = questoesCache.filter(q => q.materia_id === materiaAtiva);
+
+  if (!temaAtivo || temaAtivo === 'todos') return daMateria;
+
+  return daMateria.filter(q => q.aula_id === temaAtivo);
+}
+
+function renderTemas(materiaId) {
+  respondida = false;
+  progressInfo.textContent = '';
+
+  const materia = materiasCache.find(m => m.id === materiaId);
+  const temas = aulasCache.filter(a => a.materia_id === materiaId);
+  const questoesDaMateria = questoesCache.filter(q => q.materia_id === materiaId);
+
+  if (!temas.length) {
+    container.innerHTML = `
+      <p class="empty-state">Ainda não há temas cadastrados para ${materia?.nome || 'essa matéria'}. Volte em breve! ✅</p>
+    `;
+    return;
+  }
+
+  const totalMateria = questoesDaMateria.length;
+
+  const cardsHtml = temas.map(tema => {
+    const qtd = questoesDaMateria.filter(q => q.aula_id === tema.id).length;
+    return `
+      <div class="tema-card" data-tema="${tema.id}">
+        <div class="tema-card-titulo">${tema.titulo}</div>
+        <div class="tema-card-count">${qtd} questõe${qtd === 1 ? '' : 's'}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="temas-header">
+      <span class="back-link" id="voltar-materias-link">← Voltar às matérias</span>
+      <h2 class="temas-titulo">${materia?.nome || ''}: escolha um tema</h2>
+    </div>
+    <div class="tema-grid">
+      <div class="tema-card todos" data-tema="todos">
+        <div class="tema-card-titulo">Todos os temas</div>
+        <div class="tema-card-count">${totalMateria} questõe${totalMateria === 1 ? '' : 's'}</div>
+      </div>
+      ${cardsHtml}
+    </div>
+  `;
+
+  document.getElementById('voltar-materias-link').addEventListener('click', () => {
+    filtroContainer.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    filtroContainer.querySelector('[data-materia="todas"]').classList.add('active');
+    materiaAtiva = 'todas';
+    mostrandoTemas = false;
+    temaAtivo = null;
+    indiceAtual = 0;
+    renderQuestaoAtual();
+  });
+
+  container.querySelectorAll('.tema-card').forEach(card => {
+    card.addEventListener('click', () => {
+      temaAtivo = card.dataset.tema;
+      mostrandoTemas = false;
+      indiceAtual = 0;
+      renderQuestaoAtual();
+    });
+  });
 }
 
 function renderQuestaoAtual() {
+  if (materiaAtiva !== 'todas' && mostrandoTemas) {
+    renderTemas(materiaAtiva);
+    return;
+  }
+
   const lista = questoesFiltradas();
   respondida = false;
 
+  const voltarTemasHtml = materiaAtiva !== 'todas'
+    ? `<span class="back-link" id="voltar-temas-link" style="display:block; margin-bottom:12px;">← Voltar aos temas</span>`
+    : '';
+
   if (!lista.length) {
-    container.innerHTML = `<p class="empty-state">Nenhuma questão nessa matéria ainda. Volte em breve! ✅</p>`;
+    container.innerHTML = `${voltarTemasHtml}<p class="empty-state">Nenhuma questão nesse tema ainda. Volte em breve! ✅</p>`;
     progressInfo.textContent = '';
+    ligarVoltarTemas();
     return;
   }
 
   if (indiceAtual >= lista.length) {
     container.innerHTML = `
+      ${voltarTemasHtml}
       <div class="card questao-card" style="text-align:center;">
         <h2>Você terminou! 🎉</h2>
-        <p style="color:var(--text-secondary); margin-top:10px;">Acertou ${acertos} de ${lista.length} questões.</p>
+        <p style="color:var(--text-secondary); margin-top:10px;">Acertou ${acertos} questões no total.</p>
         <button class="btn btn-primary" style="margin-top:18px;" onclick="location.reload()">Recomeçar</button>
       </div>`;
     progressInfo.textContent = '';
+    ligarVoltarTemas();
     return;
   }
 
   const q = lista[indiceAtual];
   const cor = q.materias?.cor || '#7c3aed';
   const favoritado = favoritosSet.has(q.id);
+  const temaTitulo = q.treineiro_aulas?.titulo;
+  const tagTexto = `${q.materias?.nome || 'Geral'}${temaTitulo ? ' · ' + temaTitulo : ''}${q.fonte ? ' · ' + q.fonte : ''}`;
+
   progressInfo.innerHTML = `<span>Questão ${indiceAtual + 1} de ${lista.length}</span><span>✅ ${acertos} acertos</span>`;
 
   container.innerHTML = `
+    ${voltarTemasHtml}
     <div class="card questao-card fade-up">
       <div class="questao-topo">
-        <span class="questao-tag" style="background:${cor}22; color:${cor};">${q.materias?.nome || 'Geral'} ${q.fonte ? '· ' + q.fonte : ''}</span>
+        <span class="questao-tag" style="background:${cor}22; color:${cor};">${tagTexto}</span>
         <button class="favorito-btn ${favoritado ? 'ativo' : ''}" id="favorito-btn" title="Salvar para revisar depois">${favoritado ? '♥' : '♡'}</button>
       </div>
       <p class="questao-enunciado">${q.enunciado}</p>
@@ -121,6 +227,19 @@ function renderQuestaoAtual() {
   });
 
   document.getElementById('favorito-btn').addEventListener('click', () => toggleFavoritoQuestao(q.id));
+
+  ligarVoltarTemas();
+}
+
+function ligarVoltarTemas() {
+  const link = document.getElementById('voltar-temas-link');
+  if (!link) return;
+  link.addEventListener('click', () => {
+    mostrandoTemas = true;
+    temaAtivo = null;
+    indiceAtual = 0;
+    renderTemas(materiaAtiva);
+  });
 }
 
 async function toggleFavoritoQuestao(id) {
