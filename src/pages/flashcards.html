@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR" data-theme="dark">
 <head>
@@ -12,7 +13,7 @@
   .back-link { color: var(--text-secondary); font-size: .9rem; }
   .back-link:hover { color: var(--text-primary); }
   .page-title { font-size: 1.8rem; margin-top: 6px; }
-  .filtro-materias { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+  .filtro-materias { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
   .chip {
     padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
     background: var(--bg-elevated); font-size: .85rem; font-weight: 600; cursor: pointer;
@@ -20,8 +21,24 @@
   }
   .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
 
-  .stats-bar { display: flex; justify-content: center; gap: 24px; margin-bottom: 28px; font-size: .9rem; color: var(--text-secondary); }
+  .modo-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .modo-btn {
+    padding: 8px 18px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
+    background: transparent; color: var(--text-secondary); font-weight: 600; font-size: .85rem;
+    cursor: pointer; transition: all var(--transition-fast);
+  }
+  .modo-btn.active { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--border-color); }
+
+  .stats-bar { display: flex; justify-content: center; gap: 24px; margin-bottom: 16px; font-size: .9rem; color: var(--text-secondary); }
   .stats-bar strong { color: var(--text-primary); font-size: 1.1rem; }
+
+  .progresso-track {
+    width: 100%; max-width: 480px; height: 6px; border-radius: 999px;
+    background: var(--bg-elevated); overflow: hidden; margin: 0 auto 28px;
+  }
+  .progresso-fill {
+    height: 100%; width: 0%; background: var(--gradient-primary); transition: width .3s ease;
+  }
 
   .study-area { display: flex; flex-direction: column; align-items: center; gap: 24px; }
 
@@ -66,9 +83,18 @@
       <div class="chip active" data-materia="todas">Todas</div>
     </div>
 
+    <div class="modo-tabs" id="modo-tabs">
+      <button class="modo-btn active" data-modo="revisar">Para revisar</button>
+      <button class="modo-btn" data-modo="sei">Já sei</button>
+    </div>
+
     <div class="stats-bar" id="stats-bar">
       <span><strong id="stat-restantes">0</strong> para revisar</span>
       <span><strong id="stat-revisados">0</strong> revisados hoje</span>
+    </div>
+
+    <div class="progresso-track">
+      <div class="progresso-fill" id="progresso-fill"></div>
     </div>
 
     <div class="study-area" id="study-area">
