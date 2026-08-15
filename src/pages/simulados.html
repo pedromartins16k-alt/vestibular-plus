@@ -11,18 +11,33 @@
   .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
   .back-link { color: var(--text-secondary); font-size: .9rem; }
   .page-title { font-size: 1.8rem; margin-top: 6px; }
-
+  .filtros-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+  .filtro-btn {
+    padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
+    background: var(--bg-elevated); color: var(--text-secondary); font-size: .85rem; font-weight: 600;
+    cursor: pointer; transition: all var(--transition-fast);
+  }
+  .filtro-btn:hover { border-color: var(--color-primary-500); color: var(--text-primary); }
+  .filtro-btn.active { background: var(--color-primary-500); border-color: var(--color-primary-500); color: #fff; }
   .simulado-card { padding: 24px; margin-bottom: 16px; }
   .simulado-card h3 { font-size: 1.1rem; margin-bottom: 6px; }
   .simulado-card p { color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px; }
+  .simulado-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .badge-dificuldade, .badge-vestibular {
+    display: inline-flex; align-items: center; padding: 4px 12px; border-radius: var(--radius-full);
+    font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em;
+  }
+  .badge-facil { background: rgba(34,197,94,.15); color: #22c55e; }
+  .badge-medio { background: rgba(124,58,237,.15); color: #a78bfa; }
+  .badge-dificil { background: rgba(245,158,11,.15); color: #f59e0b; }
+  .badge-genio { background: rgba(239,68,68,.15); color: #ef4444; }
+  .badge-vestibular { background: rgba(255,255,255,.08); color: var(--text-secondary); }
   .simulado-meta { display: flex; gap: 16px; font-size: .82rem; color: var(--text-secondary); margin-bottom: 16px; }
-
   .timer-badge {
     display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-full);
     background: rgba(239,68,68,.12); color: var(--color-danger); font-weight: 700; font-size: .9rem;
   }
   .progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: .85rem; color: var(--text-secondary); }
-
   .questao-card { padding: 28px; }
   .questao-enunciado { font-size: 1.05rem; line-height: 1.6; margin-bottom: 22px; }
   .alternativa {
@@ -36,9 +51,7 @@
     display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; flex-shrink: 0;
   }
   .alternativa.selecionada .alt-letra { background: var(--color-primary-500); border-color: var(--color-primary-500); color: #fff; }
-
   .actions-row { display: flex; justify-content: space-between; margin-top: 22px; }
-
   .resultado-card { text-align: center; padding: 40px 28px; }
   .resultado-nota { font-size: 3rem; font-family: var(--font-display); background: var(--gradient-neon); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
@@ -53,12 +66,11 @@
       </div>
       <button id="theme-toggle" class="icon-btn" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;">🌙</button>
     </div>
-
+    <div class="filtros-tabs" id="filtros-tabs"></div>
     <div id="conteudo">
       <p class="empty-state">Carregando simulados...</p>
     </div>
   </div>
-
   <script type="module" src="../scripts/theme.js"></script>
   <script type="module" src="../scripts/simulados.js"></script>
 </body>
