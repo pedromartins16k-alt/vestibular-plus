@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR" data-theme="dark">
 <head>
@@ -9,7 +10,7 @@
 <style>
   .page-wrap { padding: 32px 5%; max-width: 800px; margin: 0 auto; }
   .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; cursor: pointer; }
   .back-link:hover { color: var(--text-primary); }
   .page-title { font-size: 1.8rem; margin-top: 6px; }
 
@@ -56,6 +57,19 @@
 
   .actions-row { display: flex; justify-content: space-between; margin-top: 22px; }
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+
+  /* Tela de seleção de temas */
+  .temas-header { margin-bottom: 18px; }
+  .temas-titulo { font-size: 1.2rem; font-weight: 700; margin-top: 8px; }
+  .tema-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .tema-card {
+    padding: 16px 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color);
+    background: var(--bg-elevated); cursor: pointer; transition: all var(--transition-fast);
+  }
+  .tema-card:hover { border-color: var(--color-primary-500); transform: translateY(-1px); }
+  .tema-card.todos { border-color: var(--color-primary-500); background: rgba(124,58,237,.08); }
+  .tema-card-titulo { font-weight: 600; font-size: .92rem; margin-bottom: 6px; line-height: 1.35; }
+  .tema-card-count { font-size: .78rem; color: var(--text-secondary); }
 </style>
 </head>
 <body>
