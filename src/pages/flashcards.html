@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR" data-theme="dark">
 <head>
@@ -35,36 +34,44 @@
   .progresso-track {
     width: 100%; max-width: 480px; height: 6px; border-radius: 999px;
     background: var(--bg-elevated); overflow: hidden; margin: 0 auto 28px;
+    box-sizing: border-box;
   }
   .progresso-fill {
     height: 100%; width: 0%; background: var(--gradient-primary); transition: width .3s ease;
   }
 
-  .study-area { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+  /* namespace fc- pra não colidir com classes de outras páginas no base.css */
+  .fc-study-area { display: flex; flex-direction: column; align-items: center; gap: 24px; width: 100%; box-sizing: border-box; }
 
-  .flashcard-container { width: 100%; max-width: 480px; height: 280px; perspective: 1200px; cursor: pointer; }
-  .flashcard { position: relative; width: 100%; height: 100%; transition: transform .5s; transform-style: preserve-3d; }
-  .flashcard.flipped { transform: rotateY(180deg); }
-  .flashcard-face {
+  .fc-container {
+    display: block; width: 100%; max-width: 480px; height: 280px;
+    perspective: 1200px; cursor: pointer; box-sizing: border-box; margin: 0 auto;
+  }
+  .fc-card {
+    position: relative; width: 100%; height: 100%; transition: transform .5s;
+    transform-style: preserve-3d; box-sizing: border-box;
+  }
+  .fc-card.flipped { transform: rotateY(180deg); }
+  .fc-face {
     position: absolute; inset: 0; backface-visibility: hidden; border-radius: 16px;
     display: flex; align-items: center; justify-content: center; text-align: center; padding: 28px;
     border: 1px solid var(--border-color); background: var(--bg-elevated);
-    font-size: 1.15rem; line-height: 1.5; font-weight: 600;
+    font-size: 1.15rem; line-height: 1.5; font-weight: 600; box-sizing: border-box;
   }
-  .flashcard-face.verso { transform: rotateY(180deg); color: var(--text-secondary); font-weight: 500; font-size: 1rem; }
-  .flashcard-tag { position: absolute; top: 16px; left: 16px; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); }
-  .flip-hint { position: absolute; bottom: 14px; font-size: .75rem; color: var(--text-secondary); }
+  .fc-face.fc-verso { transform: rotateY(180deg); color: var(--text-secondary); font-weight: 500; font-size: 1rem; }
+  .fc-tag { position: absolute; top: 16px; left: 16px; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); }
+  .fc-hint { position: absolute; bottom: 14px; font-size: .75rem; color: var(--text-secondary); }
 
-  .avaliar-botoes { display: flex; gap: 14px; }
-  .btn-avaliar {
+  .fc-avaliar-botoes { display: flex; gap: 14px; }
+  .fc-btn-avaliar {
     padding: 12px 22px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
     background: var(--bg-elevated); font-size: .9rem; font-weight: 700; cursor: pointer;
     transition: all var(--transition-fast);
   }
-  .btn-avaliar.errei { color: #ef4444; }
-  .btn-avaliar.errei:hover { background: #ef444422; border-color: #ef4444; }
-  .btn-avaliar.acertei { color: #22c55e; }
-  .btn-avaliar.acertei:hover { background: #22c55e22; border-color: #22c55e; }
+  .fc-btn-avaliar.fc-errei { color: #ef4444; }
+  .fc-btn-avaliar.fc-errei:hover { background: #ef444422; border-color: #ef4444; }
+  .fc-btn-avaliar.fc-acertei { color: #22c55e; }
+  .fc-btn-avaliar.fc-acertei:hover { background: #22c55e22; border-color: #22c55e; }
 
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
 </style>
@@ -97,7 +104,7 @@
       <div class="progresso-fill" id="progresso-fill"></div>
     </div>
 
-    <div class="study-area" id="study-area">
+    <div class="fc-study-area" id="study-area">
       <p class="empty-state">Carregando flashcards...</p>
     </div>
   </div>
