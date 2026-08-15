@@ -1,4 +1,3 @@
-
 import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
@@ -126,8 +125,18 @@ function renderTemas(materiaId) {
 
   if (!temas.length) {
     container.innerHTML = `
+      <span class="back-link" id="voltar-materias-link" style="display:block; margin-bottom:12px;">← Voltar às matérias</span>
       <p class="empty-state">Ainda não há temas cadastrados para ${materia?.nome || 'essa matéria'}. Volte em breve! ✅</p>
     `;
+    document.getElementById('voltar-materias-link').addEventListener('click', () => {
+      filtroContainer.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      filtroContainer.querySelector('[data-materia="todas"]').classList.add('active');
+      materiaAtiva = 'todas';
+      mostrandoTemas = false;
+      temaAtivo = null;
+      indiceAtual = 0;
+      renderQuestaoAtual();
+    });
     return;
   }
 
