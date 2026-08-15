@@ -1,3 +1,4 @@
+
 import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
@@ -123,7 +124,7 @@ function mostrarProximoCard() {
 
     if (modoAtivo === 'sei') {
       studyArea.innerHTML = `
-        <div class="empty-state card-session">
+        <div class="empty-state">
           Você ainda não tem flashcards marcados como "lembrei" por aqui.<br>
           Estuda um pouco na aba "Para revisar" primeiro 🙂
         </div>
@@ -132,7 +133,7 @@ function mostrarProximoCard() {
     }
 
     studyArea.innerHTML = `
-      <div class="empty-state card-session">
+      <div class="empty-state">
         🎉 Você revisou todos os flashcards por aqui!<br>
         Volte mais tarde ou treine de novo sem esperar a data de revisão.
         <br><br>
@@ -156,23 +157,21 @@ function mostrarProximoCard() {
   const nomeMateria = cardAtual.materias?.nome || 'Geral';
 
   studyArea.innerHTML = `
-    <div class="card-session">
-      <div class="flashcard-container" id="flashcard-container">
-        <div class="flashcard" id="flashcard">
-          <div class="flashcard-face frente">
-            <span class="flashcard-tag" style="background:${cor}22; color:${cor};">${nomeMateria}</span>
-            ${cardAtual.frente}
-            <span class="flip-hint">👆 toque para virar</span>
-          </div>
-          <div class="flashcard-face verso">
-            ${cardAtual.verso}
-          </div>
+    <div class="fc-container" id="flashcard-container">
+      <div class="fc-card" id="flashcard">
+        <div class="fc-face fc-frente">
+          <span class="fc-tag" style="background:${cor}22; color:${cor};">${nomeMateria}</span>
+          ${cardAtual.frente}
+          <span class="fc-hint">👆 toque para virar</span>
+        </div>
+        <div class="fc-face fc-verso">
+          ${cardAtual.verso}
         </div>
       </div>
-      <div class="avaliar-botoes" id="avaliar-botoes" style="display:none;">
-        <button class="btn-avaliar errei" id="btn-errei">😵 Não lembrei</button>
-        <button class="btn-avaliar acertei" id="btn-acertei">🙂 Lembrei</button>
-      </div>
+    </div>
+    <div class="fc-avaliar-botoes" id="avaliar-botoes" style="display:none;">
+      <button class="fc-btn-avaliar fc-errei" id="btn-errei">😵 Não lembrei</button>
+      <button class="fc-btn-avaliar fc-acertei" id="btn-acertei">🙂 Lembrei</button>
     </div>
   `;
 
@@ -184,7 +183,7 @@ function mostrarProximoCard() {
 function virarCard() {
   if (virado) return;
   virado = true;
-  document.getElementById('flashcard').classList.add('flipped');
+  document.getElementById('flashcard').classList.add('fc-card', 'flipped');
   document.getElementById('avaliar-botoes').style.display = 'flex';
 }
 
