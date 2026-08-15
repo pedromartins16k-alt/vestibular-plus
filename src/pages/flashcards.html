@@ -20,6 +20,14 @@
   }
   .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
 
+  .assunto-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip-sub {
+    padding: 6px 14px; border-radius: var(--radius-full); border: 1px dashed var(--border-color);
+    background: transparent; font-size: .8rem; font-weight: 600; cursor: pointer;
+    color: var(--text-secondary); transition: all var(--transition-fast);
+  }
+  .chip-sub.active { background: var(--bg-elevated); border-style: solid; color: var(--text-primary); border-color: var(--color-primary-500); }
+
   .modo-tabs { display: flex; gap: 8px; margin-bottom: 24px; }
   .modo-btn {
     padding: 8px 18px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
@@ -40,7 +48,6 @@
     height: 100%; width: 0%; background: var(--gradient-primary); transition: width .3s ease;
   }
 
-  /* namespace fc- pra não colidir com classes de outras páginas no base.css */
   .fc-study-area { display: flex; flex-direction: column; align-items: center; gap: 24px; width: 100%; box-sizing: border-box; }
 
   .fc-container {
@@ -89,6 +96,8 @@
     <div class="filtro-materias" id="filtro-materias">
       <div class="chip active" data-materia="todas">Todas</div>
     </div>
+
+    <div class="assunto-tabs" id="assunto-tabs" style="display:none;"></div>
 
     <div class="modo-tabs" id="modo-tabs">
       <button class="modo-btn active" data-modo="revisar">Para revisar</button>
