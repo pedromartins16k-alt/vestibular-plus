@@ -1,4 +1,3 @@
-
 import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
@@ -7,6 +6,7 @@ import { verificarConquistas } from './conquistas.js';
 
 const studyArea = document.getElementById('study-area');
 const filtroContainer = document.getElementById('filtro-materias');
+const assuntoContainer = document.getElementById('assunto-tabs');
 const modoTabsContainer = document.getElementById('modo-tabs');
 const statRestantes = document.getElementById('stat-restantes');
 const statRevisados = document.getElementById('stat-revisados');
@@ -17,6 +17,7 @@ const INTERVALOS_DIAS = [1, 1, 3, 7, 15, 30]; // índice = nível de memorizaç�
 let userId = null;
 let todosFlashcards = [];
 let materiaAtiva = 'todas';
+let assuntoAtivo = 'todos';
 let modoAtivo = 'revisar'; // 'revisar' = pendentes | 'sei' = já lembrados antes
 let fila = [];
 let totalSessao = 0;
@@ -36,7 +37,7 @@ async function iniciar() {
 
   const { data: flashcards } = await supabase
     .from('flashcards')
-    .select('id, frente, verso, materia_id, materias(nome, cor)');
+    .select('id, frente, verso, materia_id, assunto, materias(nome, cor)');
 
   const { data: progresso } = await supabase
     .from('flashcards_progresso')
@@ -80,6 +81,44 @@ function renderFiltros(materias) {
       filtroContainer.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       materiaAtiva = chip.dataset.materia;
+      assuntoAtivo = 'todos';
+      renderAssuntos();
+      montarFila();
+      mostrarProximoCard();
+    });
+  });
+}
+
+function renderAssuntos() {
+  if (materiaAtiva === 'todas') {
+    assuntoContainer.style.display = 'none';
+    assuntoContainer.innerHTML = '';
+    return;
+  }
+
+  const assuntosDaMateria = [...new Set(
+    todosFlashcards
+      .filter(c => c.materia_id === materiaAtiva && c.assunto)
+      .map(c => c.assunto)
+  )];
+
+  if (!assuntosDaMateria.length) {
+    assuntoContainer.style.display = 'none';
+    assuntoContainer.innerHTML = '';
+    return;
+  }
+
+  const chipsHtml = assuntosDaMateria.map(a => `
+    <div class="chip-sub" data-assunto="${a}">${a}</div>
+  `).join('');
+  assuntoContainer.innerHTML = `<div class="chip-sub active" data-assunto="todos">Todos os assuntos</div>${chipsHtml}`;
+  assuntoContainer.style.display = 'flex';
+
+  assuntoContainer.querySelectorAll('.chip-sub').forEach(chip => {
+    chip.addEventListener('click', () => {
+      assuntoContainer.querySelectorAll('.chip-sub').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      assuntoAtivo = chip.dataset.assunto;
       montarFila();
       mostrarProximoCard();
     });
@@ -96,9 +135,13 @@ function jaLembrado(card) {
 }
 
 function montarFila() {
-  const base = materiaAtiva === 'todas'
+  let base = materiaAtiva === 'todas'
     ? todosFlashcards
     : todosFlashcards.filter(c => c.materia_id === materiaAtiva);
+
+  if (assuntoAtivo !== 'todos') {
+    base = base.filter(c => c.assunto === assuntoAtivo);
+  }
 
   fila = modoAtivo === 'sei'
     ? base.filter(jaLembrado)
@@ -114,6 +157,14 @@ function atualizarStats() {
 
   const progresso = totalSessao > 0 ? ((totalSessao - fila.length) / totalSessao) * 100 : 0;
   progressoFill.style.width = `${progresso}%`;
+}
+
+function baseAtual() {
+  let base = materiaAtiva === 'todas' ? todosFlashcards : todosFlashcards.filter(c => c.materia_id === materiaAtiva);
+  if (assuntoAtivo !== 'todos') {
+    base = base.filter(c => c.assunto === assuntoAtivo);
+  }
+  return base;
 }
 
 function mostrarProximoCard() {
@@ -143,8 +194,7 @@ function mostrarProximoCard() {
       </div>
     `;
     document.getElementById('btn-revisar-tudo').addEventListener('click', () => {
-      const base = materiaAtiva === 'todas' ? todosFlashcards : todosFlashcards.filter(c => c.materia_id === materiaAtiva);
-      fila = [...base];
+      fila = [...baseAtual()];
       totalSessao = fila.length;
       atualizarStats();
       mostrarProximoCard();
@@ -183,7 +233,7 @@ function mostrarProximoCard() {
 function virarCard() {
   if (virado) return;
   virado = true;
-  document.getElementById('flashcard').classList.add('fc-card', 'flipped');
+  document.getElementById('flashcard').classList.add('flipped');
   document.getElementById('avaliar-botoes').style.display = 'flex';
 }
 
