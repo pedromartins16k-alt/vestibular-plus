@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR" data-theme="dark">
 <head>
@@ -11,14 +12,12 @@
   .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
   .back-link { color: var(--text-secondary); font-size: .9rem; }
   .page-title { font-size: 1.8rem; margin-top: 6px; }
-  .filtros-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
-  .filtro-btn {
+  .filtros-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+  .chip {
     padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
-    background: var(--bg-elevated); color: var(--text-secondary); font-size: .85rem; font-weight: 600;
-    cursor: pointer; transition: all var(--transition-fast);
+    background: var(--bg-elevated); font-size: .85rem; font-weight: 600; cursor: pointer;
   }
-  .filtro-btn:hover { border-color: var(--color-primary-500); color: var(--text-primary); }
-  .filtro-btn.active { background: var(--color-primary-500); border-color: var(--color-primary-500); color: #fff; }
+  .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
   .simulado-card { padding: 24px; margin-bottom: 16px; }
   .simulado-card h3 { font-size: 1.1rem; margin-bottom: 6px; }
   .simulado-card p { color: var(--text-secondary); font-size: .88rem; margin-bottom: 14px; }
