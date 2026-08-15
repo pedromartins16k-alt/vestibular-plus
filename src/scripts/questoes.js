@@ -25,6 +25,34 @@ let acertos = 0;
 let sessionUserId = null;
 let favoritosSet = new Set();
 
+async function buscarTodasQuestoes() {
+  const TAMANHO_PAGINA = 1000;
+  let todas = [];
+  let pagina = 0;
+
+  while (true) {
+    const inicio = pagina * TAMANHO_PAGINA;
+    const fim = inicio + TAMANHO_PAGINA - 1;
+
+    const { data, error } = await supabase
+      .from('questoes')
+      .select('id, enunciado, alternativas, resposta_correta, comentario, fonte, ano, dificuldade, materia_id, aula_id, materias(nome, cor), treineiro_aulas(titulo)')
+      .range(inicio, fim);
+
+    if (error) {
+      console.error('Erro ao buscar questões:', error);
+      break;
+    }
+
+    todas = todas.concat(data || []);
+
+    if (!data || data.length < TAMANHO_PAGINA) break;
+    pagina++;
+  }
+
+  return todas;
+}
+
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
@@ -40,13 +68,11 @@ async function iniciar() {
     .select('id, titulo, materia_id, ordem')
     .order('ordem');
 
-  const { data: questoes } = await supabase
-    .from('questoes')
-    .select('id, enunciado, alternativas, resposta_correta, comentario, fonte, ano, dificuldade, materia_id, aula_id, materias(nome, cor), treineiro_aulas(titulo)');
+  const questoes = await buscarTodasQuestoes();
 
   materiasCache = materias || [];
   aulasCache = aulas || [];
-  questoesCache = questoes || [];
+  questoesCache = questoes;
   favoritosSet = await buscarFavoritos('questao');
 
   renderFiltros(materiasCache);
