@@ -8,7 +8,6 @@
 <link rel="stylesheet" href="../styles/base.css" />
 <style>
   .app-layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
-  @media (max-width: 900px) { .app-layout { grid-template-columns: 1fr; } .sidebar { display: none; } }
 
   .sidebar { border-right: 1px solid var(--border-color); padding: 24px 18px; display: flex; flex-direction: column; gap: 6px; }
   .sidebar .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; margin-bottom: 28px; padding: 0 8px; }
@@ -23,7 +22,7 @@
   .search-box input { padding-left: 40px; }
   .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; }
   .topbar-actions { display: flex; align-items: center; gap: 14px; }
-  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; position: relative; }
+  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; position: relative; flex-shrink: 0; }
   .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
 
   .user-menu { position: relative; }
@@ -98,7 +97,6 @@
   .stat-card span { color: var(--text-secondary); font-size: .82rem; }
 
   .section-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-  @media (max-width: 900px) { .section-row { grid-template-columns: 1fr; } }
   .panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
   .panel-title h3 { font-size: 1.05rem; }
   .see-all { font-size: .82rem; color: var(--color-primary-500); font-weight: 600; }
@@ -119,27 +117,59 @@
   }
 
   .empty-state { text-align: center; padding: 30px 10px; color: var(--text-secondary); font-size: .88rem; }
+
+  /* ===== Menu hambúrguer (só aparece no celular) ===== */
+  .menu-toggle { display: none; }
+
+  /* ===== Fundo escuro atrás do menu, quando ele está aberto no celular ===== */
+  .sidebar-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 55;
+    opacity: 0; pointer-events: none; transition: opacity var(--transition-base);
+  }
+  .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  @media (max-width: 900px) {
+    .app-layout { grid-template-columns: 1fr; }
+
+    /* O menu vira uma gaveta que fica fora da tela (à esquerda) até ser aberto */
+    .sidebar {
+      position: fixed; top: 0; left: 0; height: 100vh; width: 260px; max-width: 82vw;
+      z-index: 60; border-radius: 0;
+      transform: translateX(-100%);
+      transition: transform var(--transition-base);
+      overflow-y: auto;
+    }
+    .sidebar.open { transform: translateX(0); }
+
+    .menu-toggle { display: inline-flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+
+    .section-row { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
   <div class="app-layout">
-    <aside class="sidebar glass">
+    <aside class="sidebar glass" id="sidebar">
       <div class="logo"><div class="dot">V+</div>Vestibular+</div>
-<div class="nav-item active">🏠 Dashboard</div>
-  <a class="nav-item" href="./resumos.html">📚 Resumos</a>
+      <div class="nav-item active">🏠 Dashboard</div>
+      <a class="nav-item" href="./resumos.html">📚 Resumos</a>
       <a class="nav-item" href="./questoes.html">✅ Questões</a>
       <a class="nav-item" href="./simulados.html">⏱️ Simulados</a>
-     <a class="nav-item" href="./flashcards.html">🧠 Flashcards</a>
-     <a class="nav-item" href="./cronograma.html">📅 Cronograma</a>
-   <a class="nav-item" href="./metas.html">🎯 Metas</a>
-     <a class="nav-item" href="./ranking.html">🏆 Ranking</a>
-   <a class="nav-item" href="./vestibulares.html">🎓 Vestibulares</a>
+      <a class="nav-item" href="./flashcards.html">🧠 Flashcards</a>
+      <a class="nav-item" href="./cronograma.html">📅 Cronograma</a>
+      <a class="nav-item" href="./metas.html">🎯 Metas</a>
+      <a class="nav-item" href="./ranking.html">🏆 Ranking</a>
+      <a class="nav-item" href="./vestibulares.html">🎓 Vestibulares</a>
       <a class="nav-item" href="./favoritos.html">⭐ Favoritos</a>
+      <a class="nav-item" href="./chat.html">💬 Chat com IA</a>
       <a class="nav-item" href="./estatisticas.html">📊 Estatísticas</a>
     </aside>
 
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
     <main class="main">
       <div class="topbar">
+        <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Abrir menu">☰</button>
         <div class="search-box">
           <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questões, flashcards, vestibulares..." />
           <div class="busca-dropdown" id="busca-dropdown"></div>
@@ -193,5 +223,28 @@
 
   <script type="module" src="../scripts/theme.js"></script>
   <script type="module" src="../scripts/dashboard.js"></script>
+
+  <!-- Controla abrir/fechar o menu no celular. Não mexe em dashboard.js. -->
+  <script type="module">
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const botaoMenu = document.getElementById('menu-toggle');
+
+    function abrirMenu() {
+      sidebar.classList.add('open');
+      backdrop.classList.add('open');
+    }
+    function fecharMenu() {
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('open');
+    }
+
+    botaoMenu?.addEventListener('click', abrirMenu);
+    backdrop?.addEventListener('click', fecharMenu);
+    // Fecha o menu automaticamente ao clicar em qualquer item (útil no celular)
+    sidebar?.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', fecharMenu);
+    });
+  </script>
 </body>
 </html>
