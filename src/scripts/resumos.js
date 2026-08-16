@@ -81,7 +81,7 @@ function renderResumos() {
   }).join('');
 
   grid.querySelectorAll('.resumo-card').forEach(card => {
-    card.addEventListener('click', () => abrirModal(filtrados[card.dataset.index]));
+    card.addEventListener('click', () => handleAbrirResumo(filtrados[card.dataset.index]));
   });
 
   grid.querySelectorAll('.favorito-btn').forEach(btn => {
@@ -90,6 +90,27 @@ function renderResumos() {
       toggleFavoritoResumo(btn.dataset.id, btn);
     });
   });
+}
+
+// Checa o limite diário do plano antes de deixar o aluno ler o resumo.
+async function handleAbrirResumo(resumo) {
+  const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'resumo' });
+
+  if (error) {
+    console.error('[uso resumo]', error);
+    abrirModal(resumo); // se der erro de rede, não trava o aluno por causa disso
+    return;
+  }
+
+  if (!uso.permitido) {
+    const msg = uso.motivo === 'limite_diario'
+      ? `Você atingiu o limite de ${uso.limite} resumos por dia do seu plano atual. Volte amanhã ou faça upgrade pra continuar estudando hoje.`
+      : 'Não foi possível verificar seu acesso agora. Tenta de novo em instantes.';
+    mostrarAvisoLimite(msg);
+    return;
+  }
+
+  abrirModal(resumo);
 }
 
 async function toggleFavoritoResumo(id, btnEl) {
@@ -144,6 +165,21 @@ async function registrarLeitura(materiaId) {
 
 function traduzDificuldade(nivel) {
   return { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' }[nivel] || '—';
+}
+
+// Aviso visual reutilizável quando o aluno bate no limite do plano.
+function mostrarAvisoLimite(mensagem) {
+  let aviso = document.getElementById('aviso-limite');
+  if (!aviso) {
+    aviso = document.createElement('div');
+    aviso.id = 'aviso-limite';
+    aviso.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100;max-width:420px;width:90%;padding:14px 18px;border-radius:12px;background:rgba(239,68,68,.18);border:1px solid #ef4444;color:#fff;font-size:.88rem;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.35);backdrop-filter:blur(6px);';
+    document.body.appendChild(aviso);
+  }
+  aviso.textContent = mensagem;
+  aviso.style.display = 'block';
+  clearTimeout(aviso._timeout);
+  aviso._timeout = setTimeout(() => { aviso.style.display = 'none'; }, 6000);
 }
 
 document.getElementById('modal-close').addEventListener('click', () => {
