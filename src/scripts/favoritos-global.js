@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabaseClient.js';
-
 // Retorna um Set com os IDs já favoritados pelo usuário logado,
 // filtrando por tipo ('resumo' ou 'questao').
 export async function buscarFavoritos(tipo) {
@@ -12,7 +11,6 @@ export async function buscarFavoritos(tipo) {
     .eq('tipo', tipo);
   return new Set((data || []).map(f => f.referencia_id));
 }
-
 // Alterna o favorito (adiciona se não existe, remove se já existe).
 // Retorna o novo estado (true = favoritado, false = não favoritado).
 // Centraliza a checagem de plano: quem chama essa função (resumos.js,
@@ -20,7 +18,6 @@ export async function buscarFavoritos(tipo) {
 export async function alternarFavorito(tipo, referenciaId, favoritadoAtualmente) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return favoritadoAtualmente;
-
   if (favoritadoAtualmente) {
     await supabase
       .from('favoritos')
@@ -30,34 +27,26 @@ export async function alternarFavorito(tipo, referenciaId, favoritadoAtualmente)
       .eq('referencia_id', referenciaId);
     return false;
   }
-
   // Antes de tentar favoritar, checa se o plano do aluno permite.
   const { data: temAcesso, error: erroAcesso } = await supabase.rpc('usuario_tem_acesso', {
     p_recurso: 'favoritos',
   });
-
   if (erroAcesso) {
     console.error('[favoritos] erro ao checar acesso', erroAcesso);
   } else if (!temAcesso) {
     mostrarAvisoFavoritos('Favoritar é um recurso exclusivo dos planos pagos. Faça upgrade pra salvar seus resumos e questões preferidos.');
     return false;
   }
-
   const { error } = await supabase
     .from('favoritos')
     .insert({ user_id: session.user.id, tipo, referencia_id: referenciaId });
-
   if (error) {
-    // Segunda camada de proteção: se por algum motivo passou da checagem acima
-    // mas o banco (RLS) recusou o insert mesmo assim, avisa o aluno também.
     console.error('[favoritos] insert recusado', error);
     mostrarAvisoFavoritos('Não foi possível favoritar agora. Faça upgrade do seu plano pra usar essa função.');
     return false;
   }
-
   return true;
 }
-
 function mostrarAvisoFavoritos(mensagem) {
   let aviso = document.getElementById('aviso-favoritos');
   if (!aviso) {
