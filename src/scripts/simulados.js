@@ -9,14 +9,12 @@ const conteudo = document.getElementById('conteudo');
 const filtrosTabs = document.getElementById('filtros-tabs');
 let sessionUserId = null;
 
-// Estado da listagem
 let todosSimulados = [];
 let filtroAtual = 'todos';
 
-// Estado de um simulado em andamento
 let questoesDoSimulado = [];
 let indiceAtual = 0;
-let respostasDadas = {}; // { questao_id: 'letra' }
+let respostasDadas = {};
 let simuladoAtual = null;
 let tempoRestante = 0;
 let timerInterval = null;
@@ -97,8 +95,29 @@ function renderListaSimulados(simulados) {
   }).join('');
 
   conteudo.querySelectorAll('button[data-index]').forEach(btn => {
-    btn.addEventListener('click', () => iniciarSimulado(simulados[btn.dataset.index]));
+    btn.addEventListener('click', () => handleIniciarSimulado(simulados[btn.dataset.index]));
   });
+}
+
+// Checa o limite semanal do plano ANTES de deixar o aluno começar a prova.
+async function handleIniciarSimulado(simulado) {
+  const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'simulado' });
+
+  if (error) {
+    console.error('[uso simulado]', error);
+    iniciarSimulado(simulado); // erro de rede não deve travar o aluno
+    return;
+  }
+
+  if (!uso.permitido) {
+    const msg = uso.motivo === 'limite_semanal'
+      ? `Você já fez ${uso.usado} de ${uso.limite} simulados essa semana no seu plano atual. Volte na próxima semana ou faça upgrade pra continuar.`
+      : 'Não foi possível verificar seu acesso agora. Tenta de novo em instantes.';
+    mostrarAvisoLimite(msg);
+    return;
+  }
+
+  iniciarSimulado(simulado);
 }
 
 async function iniciarSimulado(simulado) {
@@ -243,6 +262,20 @@ async function concederXp(xpGanho) {
   }
 
   await supabase.from('profiles').update({ xp: novoXp, nivel: novoNivel }).eq('id', sessionUserId);
+}
+
+function mostrarAvisoLimite(mensagem) {
+  let aviso = document.getElementById('aviso-limite');
+  if (!aviso) {
+    aviso = document.createElement('div');
+    aviso.id = 'aviso-limite';
+    aviso.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100;max-width:420px;width:90%;padding:14px 18px;border-radius:12px;background:rgba(239,68,68,.18);border:1px solid #ef4444;color:#fff;font-size:.88rem;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.35);backdrop-filter:blur(6px);';
+    document.body.appendChild(aviso);
+  }
+  aviso.textContent = mensagem;
+  aviso.style.display = 'block';
+  clearTimeout(aviso._timeout);
+  aviso._timeout = setTimeout(() => { aviso.style.display = 'none'; }, 6000);
 }
 
 iniciar();
