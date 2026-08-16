@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chat com IA · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .page-wrap { padding: 32px 5%; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; height: calc(100vh - 64px); }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .back-link:hover { color: var(--text-primary); }
+  .page-title { font-size: 1.8rem; margin-top: 6px; }
+  .uso-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-full);
+    background: rgba(124,58,237,.12); color: var(--text-secondary); font-size: .8rem; font-weight: 600;
+  }
+  .filtro-materias { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .chip {
+    padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
+    background: var(--bg-elevated); font-size: .85rem; font-weight: 600; cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
+  .chat-card { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+  .mensagens { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .msg { max-width: 80%; padding: 12px 16px; border-radius: var(--radius-md); font-size: .92rem; line-height: 1.55; white-space: pre-wrap; }
+  .msg-usuario { align-self: flex-end; background: var(--gradient-primary); color: #fff; border-bottom-right-radius: 4px; }
+  .msg-assistente { align-self: flex-start; background: var(--bg-elevated); border: 1px solid var(--border-color); border-bottom-left-radius: 4px; }
+  .msg-erro { align-self: center; background: rgba(239,68,68,.15); border: 1px solid #ef4444; color: #fff; text-align: center; max-width: 90%; }
+  .msg-carregando { align-self: flex-start; color: var(--text-secondary); font-size: .85rem; padding: 4px 16px; }
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+  .input-row { display: flex; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border-color); }
+  .input-row textarea {
+    flex: 1; resize: none; border-radius: var(--radius-md); border: 1px solid var(--border-color);
+    background: var(--bg-elevated); color: var(--text-primary); padding: 12px 14px; font-family: inherit;
+    font-size: .92rem; line-height: 1.4; max-height: 120px;
+  }
+  .input-row textarea:focus { outline: none; border-color: var(--color-primary-500); }
+  .input-row button { align-self: flex-end; }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-header">
+      <div>
+        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
+        <h1 class="page-title">💬 Chat com IA</h1>
+      </div>
+      <span class="uso-badge" id="uso-badge">Carregando...</span>
+    </div>
+    <div class="filtro-materias" id="filtro-materias">
+      <div class="chip active" data-materia="">Sem matéria específica</div>
+    </div>
+    <div class="card chat-card">
+      <div class="mensagens" id="mensagens">
+        <p class="empty-state">Manda sua dúvida sobre qualquer matéria e o tutor te ajuda a entender o conceito 🎓</p>
+      </div>
+      <form class="input-row" id="form-mensagem">
+        <textarea id="input-mensagem" rows="1" placeholder="Digite sua pergunta..." required></textarea>
+        <button type="submit" class="btn btn-primary" id="btn-enviar">Enviar</button>
+      </form>
+    </div>
+  </div>
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/chat.js"></script>
+</body>
+</html>
