@@ -24,11 +24,65 @@ let totalSessao = 0;
 let cardAtual = null;
 let virado = false;
 let revisadosHoje = 0;
+let ultimoCardContadoId = null; // evita contar o mesmo card 2x em re-renders
+
+// Checa e registra o uso via função central do banco (mesma de questoes.js/resumos.js).
+async function checarELimitarFlashcard() {
+  const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'flashcard' });
+
+  if (error) {
+    console.error('[uso flashcard]', error);
+    return { permitido: true }; // erro de rede não deve travar o aluno
+  }
+  return uso;
+}
+
+function renderBloqueado() {
+  studyArea.innerHTML = `
+    <div class="empty-state">
+      🔒 Flashcards não estão disponíveis no seu plano atual.<br>
+      Faça upgrade pra desbloquear.
+      <br><br>
+      <a class="btn btn-primary" style="display:inline-flex; text-decoration:none;" href="./precos.html?upgrade=flashcards">Ver planos</a>
+    </div>
+  `;
+}
+
+function renderLimiteAtingido(limite) {
+  studyArea.innerHTML = `
+    <div class="empty-state">
+      🔒 Você atingiu o limite de ${limite} flashcards por dia do seu plano.<br>
+      Volte amanhã ou faça upgrade pra continuar agora.
+      <br><br>
+      <a class="btn btn-primary" style="display:inline-flex; text-decoration:none;" href="./precos.html?upgrade=flashcards">Ver planos</a>
+    </div>
+  `;
+}
+
+async function buscarAcessoFlashcards() {
+  const { data: perfil, error } = await supabase
+    .from('profiles')
+    .select('planos(acesso_flashcards)')
+    .eq('id', userId)
+    .single();
+
+  if (error || !perfil?.planos) {
+    console.error('Erro ao buscar plano do usuário, bloqueando por segurança:', error);
+    return false;
+  }
+  return perfil.planos.acesso_flashcards;
+}
 
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
   userId = session.user.id;
+
+  const acesso = await buscarAcessoFlashcards();
+  if (!acesso) {
+    renderBloqueado();
+    return;
+  }
 
   const { data: materias } = await supabase
     .from('materias')
@@ -167,7 +221,7 @@ function baseAtual() {
   return base;
 }
 
-function mostrarProximoCard() {
+async function mostrarProximoCard() {
   virado = false;
 
   if (!fila.length) {
@@ -203,6 +257,16 @@ function mostrarProximoCard() {
   }
 
   cardAtual = fila[0];
+
+  if (ultimoCardContadoId !== cardAtual.id) {
+    const uso = await checarELimitarFlashcard();
+    if (!uso.permitido) {
+      renderLimiteAtingido(uso.limite);
+      return;
+    }
+    ultimoCardContadoId = cardAtual.id;
+  }
+
   const cor = cardAtual.materias?.cor || '#7c3aed';
   const nomeMateria = cardAtual.materias?.nome || 'Geral';
 
