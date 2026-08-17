@@ -11,6 +11,7 @@ let sessionUserId = null;
 
 let todosSimulados = [];
 let filtroAtual = 'todos';
+let dificuldadeMaxima = 'medio'; // vem do plano do usuário, ajustado no iniciar()
 
 let questoesDoSimulado = [];
 let indiceAtual = 0;
@@ -19,6 +20,7 @@ let simuladoAtual = null;
 let tempoRestante = 0;
 let timerInterval = null;
 
+const NIVEIS_DIFICULDADE = ['facil', 'medio', 'dificil', 'genio'];
 const ORDEM_DIFICULDADE = { facil: 0, medio: 1, dificil: 2, genio: 3 };
 const LABEL_DIFICULDADE = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', genio: 'Gênio' };
 const FILTROS = [
@@ -29,35 +31,65 @@ const FILTROS = [
   { chave: 'genio', label: 'Gênio' },
 ];
 
+function nivelPermitido(nivel) {
+  return NIVEIS_DIFICULDADE.indexOf(nivel) <= NIVEIS_DIFICULDADE.indexOf(dificuldadeMaxima);
+}
+
+async function buscarDificuldadeMaxima() {
+  const { data: perfil, error } = await supabase
+    .from('profiles')
+    .select('planos(dificuldade_maxima)')
+    .eq('id', sessionUserId)
+    .single();
+
+  if (error || !perfil?.planos) {
+    console.error('Erro ao buscar plano do usuário, aplicando limite do Free:', error);
+    return 'medio';
+  }
+  return perfil.planos.dificuldade_maxima || 'medio';
+}
+
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
   sessionUserId = session.user.id;
+
+  dificuldadeMaxima = await buscarDificuldadeMaxima();
 
   const { data: simulados } = await supabase
     .from('simulados')
     .select('id, titulo, descricao, tempo_limite_minutos, dificuldade, vestibulares(nome)')
     .order('criado_em', { ascending: false });
 
-  todosSimulados = (simulados || []).slice().sort((a, b) => {
-    const da = ORDEM_DIFICULDADE[a.dificuldade] ?? 99;
-    const db = ORDEM_DIFICULDADE[b.dificuldade] ?? 99;
-    if (da !== db) return da - db;
-    return a.titulo.localeCompare(b.titulo);
-  });
+  todosSimulados = (simulados || [])
+    .filter(s => nivelPermitido(s.dificuldade))
+    .slice()
+    .sort((a, b) => {
+      const da = ORDEM_DIFICULDADE[a.dificuldade] ?? 99;
+      const db = ORDEM_DIFICULDADE[b.dificuldade] ?? 99;
+      if (da !== db) return da - db;
+      return a.titulo.localeCompare(b.titulo);
+    });
 
   renderFiltros();
   renderListaSimulados(aplicarFiltro(todosSimulados));
 }
 
 function renderFiltros() {
-  filtrosTabs.innerHTML = FILTROS.map(f => `
-    <div class="chip ${filtroAtual === f.chave ? 'active' : ''}" data-filtro="${f.chave}">${f.label}</div>
-  `).join('');
+  filtrosTabs.innerHTML = FILTROS.map(f => {
+    const bloqueado = f.chave !== 'todos' && !nivelPermitido(f.chave);
+    const classes = `chip ${filtroAtual === f.chave ? 'active' : ''}${bloqueado ? ' chip-bloqueado' : ''}`;
+    return `<div class="${classes}" data-filtro="${f.chave}">${f.label}${bloqueado ? ' 🔒' : ''}</div>`;
+  }).join('');
 
   filtrosTabs.querySelectorAll('.chip').forEach(el => {
     el.addEventListener('click', () => {
-      filtroAtual = el.dataset.filtro;
+      const chave = el.dataset.filtro;
+      if (chave !== 'todos' && !nivelPermitido(chave)) {
+        mostrarAvisoLimite(`O nível "${LABEL_DIFICULDADE[chave]}" não está disponível no seu plano atual. Faça upgrade pra desbloquear.`);
+        return;
+      }
+      filtroAtual = chave;
       renderFiltros();
       renderListaSimulados(aplicarFiltro(todosSimulados));
     });
