@@ -1,3 +1,4 @@
+
 import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
@@ -9,6 +10,9 @@ import { buscarFavoritos, alternarFavorito } from './favoritos-global.js';
 const container = document.getElementById('questao-container');
 const filtroContainer = document.getElementById('filtro-materias');
 const progressInfo = document.getElementById('progress-info');
+
+const NIVEIS_DIFICULDADE = ['facil', 'medio', 'dificil', 'genio'];
+const PLANO_PADRAO = { dificuldade_maxima: 'medio', percentual_banco_liberado: 30, limite_questoes_dia: 5 };
 
 let questoesCache = [];
 let materiasCache = [];
@@ -23,6 +27,11 @@ let respondida = false;
 let acertos = 0;
 let sessionUserId = null;
 let favoritosSet = new Set();
+
+let planoUsuario = PLANO_PADRAO;
+let questoesVistasHoje = 0;
+let hojeISO = new Date().toISOString().slice(0, 10);
+let questaoAtualContada = false; // evita contar a mesma questão 2x em re-renders
 
 async function buscarTodasQuestoes() {
   const TAMANHO_PAGINA = 1000;
@@ -52,10 +61,86 @@ async function buscarTodasQuestoes() {
   return todas;
 }
 
+function nivelPermitido(dificuldadeQuestao, maxPermitido) {
+  const idxQuestao = NIVEIS_DIFICULDADE.indexOf(dificuldadeQuestao || 'facil');
+  const idxMax = NIVEIS_DIFICULDADE.indexOf(maxPermitido || 'medio');
+  return idxQuestao <= idxMax;
+}
+
+function aplicarPercentualBanco(lista, percentual) {
+  const pct = Number(percentual);
+  if (!pct || pct >= 100) return lista;
+
+  const porMateria = new Map();
+  lista.forEach(q => {
+    if (!porMateria.has(q.materia_id)) porMateria.set(q.materia_id, []);
+    porMateria.get(q.materia_id).push(q);
+  });
+
+  let resultado = [];
+  porMateria.forEach(qs => {
+    const qtd = Math.max(1, Math.ceil(qs.length * pct / 100));
+    resultado = resultado.concat(qs.slice(0, qtd));
+  });
+  return resultado;
+}
+
+async function buscarPlanoUsuario() {
+  const { data: perfil, error } = await supabase
+    .from('profiles')
+    .select('planos(dificuldade_maxima, percentual_banco_liberado, limite_questoes_dia)')
+    .eq('id', sessionUserId)
+    .single();
+
+  if (error || !perfil?.planos) {
+    console.error('Erro ao buscar plano do usuário, aplicando limites do Free:', error);
+    return PLANO_PADRAO;
+  }
+  return perfil.planos;
+}
+
+async function buscarUsoHoje() {
+  const { data } = await supabase
+    .from('uso_diario')
+    .select('questoes_vistas')
+    .eq('user_id', sessionUserId)
+    .eq('data', hojeISO)
+    .maybeSingle();
+
+  return data?.questoes_vistas ?? 0;
+}
+
+async function registrarQuestaoVista() {
+  if (!planoUsuario.limite_questoes_dia) return; // plano com uso ilimitado
+  questoesVistasHoje++;
+  await supabase
+    .from('uso_diario')
+    .upsert({ user_id: sessionUserId, data: hojeISO, questoes_vistas: questoesVistasHoje }, { onConflict: 'user_id,data' });
+}
+
+function limiteDiarioAtingido() {
+  return !!planoUsuario.limite_questoes_dia && questoesVistasHoje >= planoUsuario.limite_questoes_dia;
+}
+
+function renderLimiteAtingido() {
+  container.innerHTML = `
+    <div class="card questao-card" style="text-align:center;">
+      <h2>🔒 Limite diário atingido</h2>
+      <p style="color:var(--text-secondary); margin-top:10px;">
+        Seu plano permite ${planoUsuario.limite_questoes_dia} questões por dia. Volte amanhã ou faça upgrade pra continuar agora.
+      </p>
+      <a class="btn btn-primary" style="margin-top:18px; display:inline-flex;" href="./precos.html?upgrade=questoes">Ver planos</a>
+    </div>`;
+  progressInfo.textContent = '';
+}
+
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
   sessionUserId = session.user.id;
+
+  planoUsuario = await buscarPlanoUsuario();
+  questoesVistasHoje = await buscarUsoHoje();
 
   const { data: materias } = await supabase
     .from('materias')
@@ -67,7 +152,9 @@ async function iniciar() {
     .select('id, titulo, materia_id, ordem')
     .order('ordem');
 
-  const questoes = await buscarTodasQuestoes();
+  const questoesBrutas = await buscarTodasQuestoes();
+  const dentroDaDificuldade = questoesBrutas.filter(q => nivelPermitido(q.dificuldade, planoUsuario.dificuldade_maxima));
+  const questoes = aplicarPercentualBanco(dentroDaDificuldade, planoUsuario.percentual_banco_liberado);
 
   materiasCache = materias || [];
   aulasCache = aulas || [];
@@ -186,14 +273,20 @@ function renderTemas(materiaId) {
   });
 }
 
-function renderQuestaoAtual() {
+async function renderQuestaoAtual() {
   if (materiaAtiva !== 'todas' && mostrandoTemas) {
     renderTemas(materiaAtiva);
     return;
   }
 
+  if (limiteDiarioAtingido()) {
+    renderLimiteAtingido();
+    return;
+  }
+
   const lista = questoesFiltradas();
   respondida = false;
+  questaoAtualContada = false;
 
   const voltarTemasHtml = materiaAtiva !== 'todas'
     ? `<span class="back-link" id="voltar-temas-link" style="display:block; margin-bottom:12px;">← Voltar aos temas</span>`
@@ -220,6 +313,12 @@ function renderQuestaoAtual() {
   }
 
   const q = lista[indiceAtual];
+
+  if (!questaoAtualContada) {
+    questaoAtualContada = true;
+    await registrarQuestaoVista();
+  }
+
   const cor = q.materias?.cor || '#7c3aed';
   const favoritado = favoritosSet.has(q.id);
   const temaTitulo = q.treineiro_aulas?.titulo;
