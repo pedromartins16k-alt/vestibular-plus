@@ -1,7 +1,9 @@
+
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao, sair } from '../lib/authGuard.js';
 import { iniciarBusca } from './busca-global.js';
 import { iniciarNotificacoes } from './notificacoes-global.js';
+import { aplicarCadeadosSidebar } from './plano-sidebar.js';
 
 async function iniciarPagina() {
   const session = await exigirAutenticacao();
@@ -24,6 +26,7 @@ async function iniciarPagina() {
   });
 
   document.getElementById('logout-btn').addEventListener('click', sair);
+  aplicarCadeadosSidebar(userId);
 }
 
 async function carregarTodas(userId) {
