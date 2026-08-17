@@ -9,14 +9,60 @@ const grid = document.getElementById('resumo-grid');
 const filtroContainer = document.getElementById('filtro-materias');
 const modalOverlay = document.getElementById('modal-overlay');
 
+// Resumos só têm nivel_dificuldade facil/medio/dificil (não existe "genio" pra resumos).
+const NIVEIS_RESUMO = ['facil', 'medio', 'dificil'];
+const PLANO_PADRAO = { dificuldade_maxima: 'medio', percentual_banco_liberado: 30 };
+
 let resumosCache = [];
 let materiaAtiva = 'todas';
 let favoritosSet = new Set();
 let resumoModalAtual = null;
 
+function nivelPermitido(nivelResumo, maxPlano) {
+  const idxResumo = NIVEIS_RESUMO.indexOf(nivelResumo || 'facil');
+  // dificuldade_maxima do plano pode ser 'genio', que não existe em resumos — trata como 'dificil'.
+  const maxEquivalente = maxPlano === 'genio' ? 'dificil' : (maxPlano || 'medio');
+  const idxMax = NIVEIS_RESUMO.indexOf(maxEquivalente);
+  return idxResumo <= idxMax;
+}
+
+function aplicarPercentualBanco(lista, percentual) {
+  const pct = Number(percentual);
+  if (!pct || pct >= 100) return lista;
+
+  const porMateria = new Map();
+  lista.forEach(r => {
+    if (!porMateria.has(r.materia_id)) porMateria.set(r.materia_id, []);
+    porMateria.get(r.materia_id).push(r);
+  });
+
+  let resultado = [];
+  porMateria.forEach(rs => {
+    const qtd = Math.max(1, Math.ceil(rs.length * pct / 100));
+    resultado = resultado.concat(rs.slice(0, qtd));
+  });
+  return resultado;
+}
+
+async function buscarPlanoUsuario(userId) {
+  const { data: perfil, error } = await supabase
+    .from('profiles')
+    .select('planos(dificuldade_maxima, percentual_banco_liberado)')
+    .eq('id', userId)
+    .single();
+
+  if (error || !perfil?.planos) {
+    console.error('Erro ao buscar plano do usuário, aplicando limites do Free:', error);
+    return PLANO_PADRAO;
+  }
+  return perfil.planos;
+}
+
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
+
+  const plano = await buscarPlanoUsuario(session.user.id);
 
   const { data: materias } = await supabase
     .from('materias')
@@ -28,7 +74,9 @@ async function iniciar() {
     .select('id, titulo, conteudo, fonte, nivel_dificuldade, materia_id, materias(nome, cor)')
     .order('criado_em', { ascending: false });
 
-  resumosCache = resumos || [];
+  const dentroDaDificuldade = (resumos || []).filter(r => nivelPermitido(r.nivel_dificuldade, plano.dificuldade_maxima));
+  resumosCache = aplicarPercentualBanco(dentroDaDificuldade, plano.percentual_banco_liberado);
+
   favoritosSet = await buscarFavoritos('resumo');
 
   renderFiltros(materias || []);
