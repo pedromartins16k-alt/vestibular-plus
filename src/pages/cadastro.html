@@ -3,83 +3,258 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Criar conta · Vestibular+</title>
+<title>Dashboard · Vestibular+</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles/base.css" />
 <style>
-  .auth-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; padding: 24px; }
-  .auth-page::before { content: ''; position: absolute; inset: 0; background: var(--gradient-glow); pointer-events: none; }
-  .auth-card { width: 100%; max-width: 440px; padding: 40px; position: relative; z-index: 1; }
-  .auth-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
-  .auth-logo .dot { width: 34px; height: 34px; border-radius: 10px; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #fff; box-shadow: var(--shadow-glow); }
-  .auth-title { font-size: 1.7rem; margin-bottom: 4px; }
-  .auth-subtitle { color: var(--text-secondary); margin-bottom: 28px; font-size: 0.95rem; }
-  form { display: flex; flex-direction: column; gap: 14px; }
-  label { font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; display: block; }
-  .field { display: flex; flex-direction: column; }
-  .auth-footer { text-align: center; margin-top: 20px; font-size: 0.9rem; color: var(--text-secondary); }
-  .error-msg { color: var(--color-danger); font-size: 0.85rem; min-height: 18px; }
-  .success-msg { color: var(--color-success); font-size: 0.9rem; text-align: center; }
-  .btn-full { width: 100%; margin-top: 6px; }
-  .hint { font-size: .78rem; color: var(--text-secondary); }
+  .app-layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
 
-  .password-wrap { position: relative; }
-  .password-wrap .input-field { padding-right: 44px; }
-  .toggle-senha {
-    position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; cursor: pointer; padding: 8px;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--text-secondary); border-radius: 6px;
+  .sidebar { border-right: 1px solid var(--border-color); padding: 24px 18px; display: flex; flex-direction: column; gap: 6px; }
+  .sidebar .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; margin-bottom: 28px; padding: 0 8px; }
+  .sidebar .logo .dot { width: 32px; height: 32px; border-radius: 9px; background: var(--gradient-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; }
+  .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: var(--radius-md); color: var(--text-secondary); font-weight: 500; font-size: .92rem; transition: background var(--transition-fast), color var(--transition-fast); cursor: pointer; }
+  .nav-item:hover, .nav-item.active { background: var(--glass-bg); color: var(--text-primary); }
+  .nav-item.active { background: linear-gradient(135deg, rgba(124,58,237,.15), rgba(59,130,246,.15)); }
+
+  /* ===== Cadeados de plano na sidebar ===== */
+  .nav-item-bloqueado { position: relative; opacity: .62; }
+  .nav-item-bloqueado:hover { opacity: .85; }
+  .cadeado-mini {
+    margin-left: auto; font-size: .74rem; line-height: 1; flex-shrink: 0;
+    filter: grayscale(0) drop-shadow(0 0 1px rgba(0,0,0,.3));
   }
-  .toggle-senha:hover { color: var(--text-primary); }
-  .toggle-senha:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
-  .toggle-senha .icon-eye-off { display: none; }
-  .toggle-senha.is-visible .icon-eye { display: none; }
-  .toggle-senha.is-visible .icon-eye-off { display: block; }
+  .cadeado-mini.cadeado-prata { filter: grayscale(1) brightness(1.6) drop-shadow(0 0 2px #c0c0c0); }
+  .cadeado-mini.cadeado-dourado { filter: sepia(1) saturate(4) hue-rotate(-10deg) brightness(1.1) drop-shadow(0 0 2px #d4af37); }
+  .cadeado-mini.cadeado-roxo { filter: hue-rotate(220deg) saturate(4) brightness(1.2) drop-shadow(0 0 2px #7c3aed); }
+
+  .main { padding: 24px 4%; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
+  .search-box { flex: 1; max-width: 380px; position: relative; }
+  .search-box input { padding-left: 40px; }
+  .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; }
+  .topbar-actions { display: flex; align-items: center; gap: 14px; }
+  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; position: relative; flex-shrink: 0; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
+
+  .user-menu { position: relative; }
+  .user-dropdown {
+    position: absolute; top: 50px; right: 0; min-width: 170px; padding: 6px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft); display: none; flex-direction: column; gap: 2px; z-index: 30;
+  }
+  .user-dropdown.open { display: flex; }
+  .dropdown-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: .88rem; font-weight: 500; cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .dropdown-item:hover { background: var(--glass-bg); }
+
+  /* Dropdown de resultados da busca */
+  .busca-dropdown {
+    position: absolute; top: 48px; left: 0; right: 0;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-soft);
+    max-height: 360px; overflow-y: auto; display: none; flex-direction: column;
+    padding: 6px; z-index: 40;
+  }
+  .busca-dropdown.open { display: flex; }
+  .busca-grupo-titulo {
+    font-size: .7rem; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--text-secondary); padding: 8px 10px 4px; font-weight: 700;
+  }
+  .busca-item {
+    display: block; padding: 8px 10px; border-radius: var(--radius-sm);
+    color: var(--text-primary); font-size: .86rem; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .busca-item:hover { background: var(--glass-bg); }
+  .busca-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
+
+  /* Sininho de notificações */
+  .notif-btn-wrap { position: relative; }
+  .notif-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 3px;
+    border-radius: var(--radius-full); background: #ef4444; color: #fff; font-size: .62rem;
+    font-weight: 700; display: none; align-items: center; justify-content: center; line-height: 1;
+  }
+  .notif-badge.show { display: flex; }
+  .notif-dropdown {
+    position: absolute; top: 50px; right: 0; width: 320px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-soft);
+    max-height: 380px; overflow-y: auto; display: none; flex-direction: column;
+    padding: 6px; z-index: 40;
+  }
+  .notif-dropdown.open { display: flex; }
+  .notif-item { padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer; }
+  .notif-item:hover { background: var(--glass-bg); }
+  .notif-item.nao-lida { background: rgba(124,58,237,.08); }
+  .notif-item strong { font-size: .86rem; display: block; margin-bottom: 2px; }
+  .notif-item p { font-size: .8rem; color: var(--text-secondary); margin: 0 0 4px; }
+  .notif-item .notif-data { font-size: .7rem; color: var(--text-secondary); }
+  .notif-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
+  .notif-ver-todas { display: block; text-align: center; padding: 10px; font-size: .82rem; font-weight: 600; color: var(--color-primary-500); border-top: 1px solid var(--border-color); margin-top: 4px; }
+
+  .welcome-card { padding: 28px; border-radius: var(--radius-lg); background: var(--gradient-primary); color: #fff; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .welcome-card h2 { font-size: 1.4rem; margin-bottom: 6px; }
+  .welcome-card p { opacity: .9; font-size: .92rem; }
+  .xp-bar-track { background: rgba(255,255,255,.25); border-radius: var(--radius-full); height: 10px; margin-top: 16px; overflow: hidden; }
+  .xp-bar-fill { height: 100%; background: #fff; border-radius: var(--radius-full); transition: width .6s ease; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card { text-align: center; }
+  .stat-card strong { font-size: 1.6rem; font-family: var(--font-display); display: block; }
+  .stat-card span { color: var(--text-secondary); font-size: .82rem; }
+
+  .section-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+  .panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .panel-title h3 { font-size: 1.05rem; }
+  .see-all { font-size: .82rem; color: var(--color-primary-500); font-weight: 600; }
+
+  .materia-list { display: flex; flex-direction: column; gap: 10px; }
+  .materia-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .materia-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .materia-item .prog-track { flex: 1; height: 6px; border-radius: var(--radius-full); background: var(--border-color); overflow: hidden; }
+  .materia-item .prog-fill { height: 100%; border-radius: var(--radius-full); background: var(--gradient-neon); }
+
+  .ranking-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-color); font-size: .9rem; }
+  .ranking-item:last-child { border-bottom: none; }
+  .ranking-pos { width: 22px; text-align: center; font-weight: 700; color: var(--text-secondary); }
+  .ranking-avatar-mini {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-primary);
+    display: flex; align-items: center; justify-content: center; color: #fff;
+    font-weight: 700; font-size: .72rem; flex-shrink: 0;
+  }
+
+  .empty-state { text-align: center; padding: 30px 10px; color: var(--text-secondary); font-size: .88rem; }
+
+  /* ===== Menu hambúrguer (só aparece no celular) ===== */
+  .menu-toggle { display: none; }
+
+  /* ===== Fundo escuro atrás do menu, quando ele está aberto no celular ===== */
+  .sidebar-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 55;
+    opacity: 0; pointer-events: none; transition: opacity var(--transition-base);
+  }
+  .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  @media (max-width: 900px) {
+    .app-layout { grid-template-columns: 1fr; }
+
+    /* O menu vira uma gaveta que fica fora da tela (à esquerda) até ser aberto */
+    .sidebar {
+      position: fixed; top: 0; left: 0; height: 100vh; width: 260px; max-width: 82vw;
+      z-index: 60; border-radius: 0;
+      transform: translateX(-100%);
+      transition: transform var(--transition-base);
+      overflow-y: auto;
+    }
+    .sidebar.open { transform: translateX(0); }
+
+    .menu-toggle { display: inline-flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+
+    .section-row { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
-  <div class="auth-page">
-    <div class="auth-card glass fade-up" id="auth-card">
-      <div class="auth-logo"><div class="dot">V+</div><strong>Vestibular+</strong></div>
-      <h1 class="auth-title">Crie sua conta</h1>
-      <p class="auth-subtitle">Comece a estudar de graça, agora mesmo.</p>
-      <form id="cadastro-form">
-        <div class="field">
-          <label for="nome">Nome</label>
-          <input class="input-field" type="text" id="nome" required placeholder="Seu nome" />
+  <div class="app-layout">
+    <aside class="sidebar glass" id="sidebar">
+      <div class="logo"><div class="dot">V+</div>Vestibular+</div>
+      <div class="nav-item active">🏠 Dashboard</div>
+      <a class="nav-item" href="./resumos.html">📚 Resumos</a>
+      <a class="nav-item" href="./questoes.html">✅ Questões</a>
+      <a class="nav-item" href="./simulados.html">⏱️ Simulados</a>
+      <a class="nav-item" href="./flashcards.html">🧠 Flashcards</a>
+      <a class="nav-item" href="./cronograma.html" data-recurso="cronograma">📅 Cronograma</a>
+      <a class="nav-item" href="./metas.html" data-recurso="metas">🎯 Metas</a>
+      <a class="nav-item" href="./ranking.html">🏆 Ranking</a>
+      <a class="nav-item" href="./vestibulares.html">🎓 Vestibulares</a>
+      <a class="nav-item" href="./favoritos.html" data-recurso="favoritos">⭐ Favoritos</a>
+      <a class="nav-item" href="./chat.html">💬 Chat com IA</a>
+      <a class="nav-item" href="./estatisticas.html" data-recurso="estatisticas">📊 Estatísticas</a>
+    </aside>
+
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+    <main class="main">
+      <div class="topbar">
+        <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Abrir menu">☰</button>
+        <div class="search-box">
+          <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questões, flashcards, vestibulares..." />
+          <div class="busca-dropdown" id="busca-dropdown"></div>
         </div>
-        <div class="field">
-          <label for="email">E-mail</label>
-          <input class="input-field" type="email" id="email" required placeholder="voce@email.com" />
-        </div>
-        <div class="field">
-          <label for="senha">Senha</label>
-          <div class="password-wrap">
-            <input class="input-field" type="password" id="senha" required minlength="6" placeholder="Mínimo 6 caracteres" />
-            <button type="button" class="toggle-senha" data-target="senha" aria-label="Mostrar senha">
-              <svg class="icon-eye" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
-              <svg class="icon-eye-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 11 7 11 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 1 12s4 7 11 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
-            </button>
+        <div class="topbar-actions">
+          <button id="theme-toggle" class="icon-btn">🌙</button>
+          <div class="notif-btn-wrap">
+            <button id="notif-btn" class="icon-btn">🔔<span class="notif-badge" id="notif-badge"></span></button>
+            <div class="notif-dropdown" id="notif-dropdown"></div>
           </div>
-          <span class="hint">Use pelo menos 6 caracteres.</span>
+          <div class="user-menu">
+            <div class="avatar" id="avatar-inicial">A</div>
+            <div class="user-dropdown" id="user-dropdown">
+              <a class="dropdown-item" href="./perfil.html">👤 Perfil</a>
+              <div class="dropdown-item" id="logout-btn">🚪 Sair</div>
+            </div>
+          </div>
         </div>
-        <p class="error-msg" id="error-msg"></p>
-        <button type="submit" class="btn btn-primary btn-full" id="submit-btn">Criar conta</button>
-      </form>
-      <p class="auth-footer">Já tem conta? <a href="./login.html" style="color:var(--color-primary-500); font-weight:600;">Entrar</a></p>
-    </div>
+      </div>
+
+      <div class="welcome-card fade-up">
+        <h2 id="saudacao">Olá! 👋</h2>
+        <p id="nivel-info">Carregando seu progresso...</p>
+        <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar" style="width:0%"></div></div>
+      </div>
+
+      <div class="stats-grid fade-up">
+        <div class="card stat-card"><strong id="stat-horas">0h</strong><span>Horas estudadas</span></div>
+        <div class="card stat-card"><strong id="stat-questoes">0</strong><span>Questões resolvidas</span></div>
+        <div class="card stat-card"><strong id="stat-simulados">0</strong><span>Simulados feitos</span></div>
+        <div class="card stat-card"><strong id="stat-sequencia">0</strong><span>Dias seguidos</span></div>
+      </div>
+
+      <div class="section-row">
+        <div class="card fade-up">
+          <div class="panel-title"><h3>Progresso por matéria</h3><a class="see-all" href="./progresso.html">ver tudo</a></div>
+          <div class="materia-list" id="materia-list">
+            <div class="empty-state">Assim que houver matérias cadastradas, seu progresso aparece aqui.</div>
+          </div>
+        </div>
+
+        <div class="card fade-up">
+          <div class="panel-title"><h3>Ranking</h3><a class="see-all" href="./ranking.html">ver tudo</a></div>
+          <div id="ranking-list">
+            <div class="empty-state">O ranking aparece assim que outros alunos começarem a estudar 🚀</div>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
-  <script type="module" src="../scripts/cadastro.js"></script>
-  <script>
-    document.querySelectorAll('.toggle-senha').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const input = document.getElementById(btn.dataset.target);
-        const mostrando = input.type === 'text';
-        input.type = mostrando ? 'password' : 'text';
-        btn.classList.toggle('is-visible', !mostrando);
-        btn.setAttribute('aria-label', mostrando ? 'Mostrar senha' : 'Ocultar senha');
-      });
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/dashboard.js"></script>
+
+  <!-- Controla abrir/fechar o menu no celular. Não mexe em dashboard.js. -->
+  <script type="module">
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    const botaoMenu = document.getElementById('menu-toggle');
+
+    function abrirMenu() {
+      sidebar.classList.add('open');
+      backdrop.classList.add('open');
+    }
+    function fecharMenu() {
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('open');
+    }
+
+    botaoMenu?.addEventListener('click', abrirMenu);
+    backdrop?.addEventListener('click', fecharMenu);
+    // Fecha o menu automaticamente ao clicar em qualquer item (útil no celular)
+    sidebar?.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', fecharMenu);
     });
   </script>
 </body>
