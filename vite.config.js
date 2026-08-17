@@ -30,6 +30,7 @@ export default defineConfig({
         admin: resolve(__dirname, 'src/pages/admin.html'),
         estatisticas: resolve(__dirname, 'src/pages/estatisticas.html'),
         chat: resolve(__dirname, 'src/pages/chat.html'),
+        precos: resolve(__dirname, 'src/pages/precos.html'),
       }
     }
   },
