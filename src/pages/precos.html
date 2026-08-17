@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Planos e Preços · Vestibular+</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<style>
+  .page-wrap { padding: 32px 5% 80px; max-width: 1180px; margin: 0 auto; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 12px; }
+  .back-link { color: var(--text-secondary); font-size: .9rem; }
+  .back-link:hover { color: var(--text-primary); }
+
+  .hero-planos { text-align: center; padding: 30px 0 44px; }
+  .hero-planos h1 { font-size: clamp(1.9rem, 4vw, 2.6rem); margin-bottom: 10px; }
+  .hero-planos p { color: var(--text-secondary); max-width: 560px; margin: 0 auto; }
+
+  .upgrade-banner {
+    display: none; max-width: 640px; margin: 0 auto 32px; padding: 14px 20px;
+    border-radius: var(--radius-md); background: rgba(124,58,237,.12);
+    border: 1px solid rgba(124,58,237,.35); text-align: center; font-size: .9rem;
+  }
+  .upgrade-banner.show { display: block; }
+
+  .ciclo-toggle {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin: 0 auto 44px; width: fit-content; padding: 5px; border-radius: var(--radius-full);
+    background: var(--glass-bg); border: 1px solid var(--border-color);
+  }
+  .ciclo-btn {
+    padding: 9px 20px; border-radius: var(--radius-full); border: none; background: transparent;
+    color: var(--text-secondary); font-weight: 600; font-size: .85rem; cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .ciclo-btn.active { background: var(--gradient-primary); color: #fff; box-shadow: var(--shadow-glow); }
+  .ciclo-badge {
+    font-size: .68rem; font-weight: 700; background: var(--color-success); color: #fff;
+    padding: 2px 8px; border-radius: var(--radius-full); margin-left: 6px;
+  }
+
+  .planos-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .plano-card {
+    display: flex; flex-direction: column; padding: 28px 22px; position: relative;
+    border: 1px solid var(--border-color);
+  }
+  .plano-card.destaque {
+    border: 1px solid var(--color-primary-500);
+    box-shadow: var(--shadow-glow);
+    transform: translateY(-8px);
+  }
+  .plano-card.atual { border: 1px solid var(--color-success); }
+
+  .plano-selo {
+    position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+    background: var(--gradient-primary); color: #fff; font-size: .7rem; font-weight: 700;
+    padding: 5px 14px; border-radius: var(--radius-full); white-space: nowrap; box-shadow: var(--shadow-glow);
+  }
+  .plano-selo.atual-selo { background: var(--color-success); }
+
+  .plano-nome { font-size: 1.15rem; font-weight: 800; margin-bottom: 4px; }
+  .plano-desc { color: var(--text-secondary); font-size: .82rem; min-height: 32px; margin-bottom: 18px; }
+
+  .plano-preco { display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px; }
+  .plano-preco .moeda { font-size: 1rem; font-weight: 700; color: var(--text-secondary); }
+  .plano-preco .valor { font-size: 2.3rem; font-weight: 800; font-family: var(--font-display); }
+  .plano-preco .periodo { color: var(--text-secondary); font-size: .85rem; }
+  .plano-preco-anual-obs { font-size: .76rem; color: var(--text-secondary); margin-bottom: 20px; min-height: 16px; }
+
+  .plano-btn { width: 100%; margin-bottom: 22px; }
+
+  .plano-recursos { display: flex; flex-direction: column; gap: 11px; flex: 1; }
+  .plano-recurso { display: flex; align-items: flex-start; gap: 9px; font-size: .85rem; line-height: 1.4; }
+  .plano-recurso .check { flex-shrink: 0; color: var(--color-success); font-weight: 800; }
+  .plano-recurso.indisponivel { color: var(--text-secondary); opacity: .55; }
+  .plano-recurso.indisponivel .check { color: var(--text-secondary); }
+
+  .faq-section { max-width: 720px; margin: 70px auto 0; }
+  .faq-section h2 { text-align: center; font-size: 1.5rem; margin-bottom: 28px; }
+  .faq-item { padding: 18px 22px; margin-bottom: 12px; cursor: pointer; }
+  .faq-pergunta { display: flex; align-items: center; justify-content: space-between; font-weight: 700; font-size: .95rem; }
+  .faq-seta { transition: transform var(--transition-fast); color: var(--text-secondary); }
+  .faq-item.open .faq-seta { transform: rotate(180deg); }
+  .faq-resposta {
+    max-height: 0; overflow: hidden; transition: max-height var(--transition-base);
+    color: var(--text-secondary); font-size: .88rem; line-height: 1.6;
+  }
+  .faq-item.open .faq-resposta { max-height: 240px; margin-top: 12px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+
+  @media (max-width: 980px) {
+    .planos-grid { grid-template-columns: 1fr 1fr; }
+    .plano-card.destaque { transform: none; }
+  }
+  @media (max-width: 620px) {
+    .planos-grid { grid-template-columns: 1fr; max-width: 380px; }
+  }
+</style>
+</head>
+<body>
+  <div class="page-wrap">
+    <div class="page-header">
+      <a class="back-link" id="back-link" href="../index.html">← Voltar</a>
+      <button id="theme-toggle" class="icon-btn" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;">🌙</button>
+    </div>
+
+    <div class="hero-planos">
+      <h1>Planos e <span class="text-gradient">valores</span></h1>
+      <p>Escolha o plano que combina com o seu ritmo de estudo. Cancele quando quiser, sem burocracia.</p>
+    </div>
+
+    <div class="upgrade-banner" id="upgrade-banner"></div>
+
+    <div class="planos-grid" id="planos-grid">
+      <p class="empty-state">Carregando planos...</p>
+    </div>
+
+    <div class="faq-section">
+      <h2>Perguntas frequentes</h2>
+      <div id="faq-lista"></div>
+    </div>
+  </div>
+
+  <script type="module" src="../scripts/theme.js"></script>
+  <script type="module" src="../scripts/precos.js"></script>
+</body>
+</html>
