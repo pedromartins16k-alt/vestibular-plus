@@ -1,4 +1,3 @@
-
 import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
@@ -12,7 +11,7 @@ const filtroContainer = document.getElementById('filtro-materias');
 const progressInfo = document.getElementById('progress-info');
 
 const NIVEIS_DIFICULDADE = ['facil', 'medio', 'dificil', 'genio'];
-const PLANO_PADRAO = { dificuldade_maxima: 'medio', percentual_banco_liberado: 30, limite_questoes_dia: 5 };
+const PLANO_PADRAO = { dificuldade_maxima: 'medio', percentual_banco_liberado: 30 };
 
 let questoesCache = [];
 let materiasCache = [];
@@ -29,8 +28,6 @@ let sessionUserId = null;
 let favoritosSet = new Set();
 
 let planoUsuario = PLANO_PADRAO;
-let questoesVistasHoje = 0;
-let hojeISO = new Date().toISOString().slice(0, 10);
 let questaoAtualContada = false; // evita contar a mesma questão 2x em re-renders
 
 async function buscarTodasQuestoes() {
@@ -88,7 +85,7 @@ function aplicarPercentualBanco(lista, percentual) {
 async function buscarPlanoUsuario() {
   const { data: perfil, error } = await supabase
     .from('profiles')
-    .select('planos(dificuldade_maxima, percentual_banco_liberado, limite_questoes_dia)')
+    .select('planos(dificuldade_maxima, percentual_banco_liberado)')
     .eq('id', sessionUserId)
     .single();
 
@@ -99,35 +96,24 @@ async function buscarPlanoUsuario() {
   return perfil.planos;
 }
 
-async function buscarUsoHoje() {
-  const { data } = await supabase
-    .from('uso_diario')
-    .select('questoes_vistas')
-    .eq('user_id', sessionUserId)
-    .eq('data', hojeISO)
-    .maybeSingle();
+// Checa e registra o uso via função central do banco (mesma usada em resumos.js),
+// que faz a checagem+incremento de forma atômica direto no Postgres.
+async function checarELimitarQuestao() {
+  const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'questao' });
 
-  return data?.questoes_vistas ?? 0;
+  if (error) {
+    console.error('[uso questao]', error);
+    return { permitido: true }; // erro de rede não deve travar o aluno
+  }
+  return uso;
 }
 
-async function registrarQuestaoVista() {
-  if (!planoUsuario.limite_questoes_dia) return; // plano com uso ilimitado
-  questoesVistasHoje++;
-  await supabase
-    .from('uso_diario')
-    .upsert({ user_id: sessionUserId, data: hojeISO, questoes_vistas: questoesVistasHoje }, { onConflict: 'user_id,data' });
-}
-
-function limiteDiarioAtingido() {
-  return !!planoUsuario.limite_questoes_dia && questoesVistasHoje >= planoUsuario.limite_questoes_dia;
-}
-
-function renderLimiteAtingido() {
+function renderLimiteAtingido(limite) {
   container.innerHTML = `
     <div class="card questao-card" style="text-align:center;">
       <h2>🔒 Limite diário atingido</h2>
       <p style="color:var(--text-secondary); margin-top:10px;">
-        Seu plano permite ${planoUsuario.limite_questoes_dia} questões por dia. Volte amanhã ou faça upgrade pra continuar agora.
+        Seu plano permite ${limite} questões por dia. Volte amanhã ou faça upgrade pra continuar agora.
       </p>
       <a class="btn btn-primary" style="margin-top:18px; display:inline-flex;" href="./precos.html?upgrade=questoes">Ver planos</a>
     </div>`;
@@ -140,7 +126,6 @@ async function iniciar() {
   sessionUserId = session.user.id;
 
   planoUsuario = await buscarPlanoUsuario();
-  questoesVistasHoje = await buscarUsoHoje();
 
   const { data: materias } = await supabase
     .from('materias')
@@ -279,11 +264,6 @@ async function renderQuestaoAtual() {
     return;
   }
 
-  if (limiteDiarioAtingido()) {
-    renderLimiteAtingido();
-    return;
-  }
-
   const lista = questoesFiltradas();
   respondida = false;
   questaoAtualContada = false;
@@ -316,7 +296,11 @@ async function renderQuestaoAtual() {
 
   if (!questaoAtualContada) {
     questaoAtualContada = true;
-    await registrarQuestaoVista();
+    const uso = await checarELimitarQuestao();
+    if (!uso.permitido) {
+      renderLimiteAtingido(uso.limite);
+      return;
+    }
   }
 
   const cor = q.materias?.cor || '#7c3aed';
