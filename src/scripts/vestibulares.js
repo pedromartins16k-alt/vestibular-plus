@@ -1,4 +1,3 @@
-
 import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
@@ -155,6 +154,9 @@ async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
 
+  treineiroNivelUsuario = await carregarNivelTreineiroUsuario(session.user.id);
+  aplicarTravaAbas();
+
   configurarTabs();
   configurarModal();
 
@@ -167,6 +169,71 @@ async function iniciar() {
   await carregarVestibulares();
   await carregarAulas();
   renderPesquisaVestibulares();
+}
+
+/* ===== Plano do usuário / trava de acesso ===== */
+
+// Nível de acesso do plano do usuário na área de vestibulares.
+// 'sp' = só aba SP | 'sp_treineiro' = SP + Sou treineiro | 'completo' = tudo, incluindo Por assunto
+let treineiroNivelUsuario = 'sp';
+
+const ORDEM_NIVEIS = { sp: 0, sp_treineiro: 1, completo: 2 };
+const NOME_PLANO_PARA_TREINEIRO = 'Pro';
+const NOME_PLANO_PARA_ASSUNTO = 'Ultimate';
+
+async function carregarNivelTreineiroUsuario(userId) {
+  const { data: perfil } = await supabase
+    .from('profiles')
+    .select('plano_id')
+    .eq('id', userId)
+    .single();
+
+  if (!perfil?.plano_id) return 'sp';
+
+  const { data: plano } = await supabase
+    .from('planos')
+    .select('treineiro_nivel')
+    .eq('id', perfil.plano_id)
+    .single();
+
+  return plano?.treineiro_nivel || 'sp';
+}
+
+function nivelLibera(nivelMinimoNecessario) {
+  return ORDEM_NIVEIS[treineiroNivelUsuario] >= ORDEM_NIVEIS[nivelMinimoNecessario];
+}
+
+// Adiciona o cadeado visual nas abas "Sou treineiro" e "Por assunto"
+// quando o plano do usuário não libera aquele nível, e bloqueia o clique
+// nelas, mostrando um aviso de upgrade no lugar do conteúdo.
+function aplicarTravaAbas() {
+  const tabTreineiro = document.querySelector('.tab-btn[data-tab="treineiro"]');
+  const tabPesquisa = document.querySelector('.tab-btn[data-tab="pesquisa"]');
+
+  if (tabTreineiro && !nivelLibera('sp_treineiro')) {
+    tabTreineiro.innerHTML = `🔒 Sou treineiro`;
+    tabTreineiro.dataset.bloqueado = 'true';
+    tabTreineiro.dataset.planoNecessario = NOME_PLANO_PARA_TREINEIRO;
+  }
+
+  if (tabPesquisa && !nivelLibera('completo')) {
+    tabPesquisa.innerHTML = `🔒 Por assunto`;
+    tabPesquisa.dataset.bloqueado = 'true';
+    tabPesquisa.dataset.planoNecessario = NOME_PLANO_PARA_ASSUNTO;
+  }
+}
+
+function renderBloqueioPlano(nomePlano) {
+  return `
+    <div class="card" style="text-align:center; padding:40px 24px;">
+      <div style="font-size:2rem; margin-bottom:12px;">🔒</div>
+      <h3 style="margin-bottom:8px;">Disponível no plano ${nomePlano}</h3>
+      <p style="color:var(--text-secondary); font-size:.9rem; margin-bottom:20px;">
+        Assine o plano ${nomePlano} pra desbloquear esse conteúdo e continuar se preparando com tudo que o Vestibular+ oferece.
+      </p>
+      <a class="link-btn primary" href="./precos.html">Ver planos ↗</a>
+    </div>
+  `;
 }
 
 /* ===== Vestibulares ===== */
@@ -243,6 +310,8 @@ function formatarData(dataStr) {
 /* ===== Treineiro ===== */
 
 function renderFiltroTreineiro(materias) {
+  if (!nivelLibera('sp_treineiro')) return; // sem filtro pra quem não tem acesso
+
   const chipsHtml = materias.map(m => `<div class="chip" data-materia="${m.id}">${m.nome}</div>`).join('');
   filtroTreineiroEl.innerHTML = `<div class="chip active" data-materia="todas">Todas</div>${chipsHtml}`;
 
@@ -272,6 +341,11 @@ async function carregarAulas() {
 }
 
 function renderAulas() {
+  if (!nivelLibera('sp_treineiro')) {
+    aulasListaEl.innerHTML = renderBloqueioPlano(NOME_PLANO_PARA_TREINEIRO);
+    return;
+  }
+
   const filtradas = materiaAtivaTreineiro === 'todas'
     ? aulasCache
     : aulasCache.filter(a => a.materia_id === materiaAtivaTreineiro);
@@ -484,6 +558,11 @@ function renderVestibularAssuntosCard(v) {
 }
 
 function renderPesquisaVestibulares() {
+  if (!nivelLibera('completo')) {
+    pesquisaListaEl.innerHTML = renderBloqueioPlano(NOME_PLANO_PARA_ASSUNTO);
+    return;
+  }
+
   if (!vestibularesCache.length) {
     pesquisaListaEl.innerHTML = `<p class="empty-state">Nenhum vestibular cadastrado ainda.</p>`;
     return;
