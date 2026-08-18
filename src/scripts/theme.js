@@ -1,3 +1,5 @@
+import './fundo-ondas.js';
+
 // Alterna entre tema claro e escuro, salvando a preferência do usuário.
 const root = document.documentElement;
 const STORAGE_KEY = 'vestibular-theme';
