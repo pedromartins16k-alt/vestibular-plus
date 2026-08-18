@@ -145,6 +145,26 @@
 
     .section-row { grid-template-columns: 1fr; }
   }
+
+  /* Ajuste mobile: dropdowns fixos e limitados à largura da tela, evitando corte nas bordas */
+  @media (max-width: 600px) {
+    .notif-dropdown,
+    .busca-dropdown {
+      position: fixed;
+      top: 70px;
+      left: 12px;
+      right: 12px;
+      width: auto;
+      max-width: none;
+    }
+    .notif-dropdown { max-height: 70vh; }
+    .user-dropdown {
+      position: fixed;
+      top: 70px;
+      right: 12px;
+      left: auto;
+    }
+  }
 </style>
 </head>
 <body>
