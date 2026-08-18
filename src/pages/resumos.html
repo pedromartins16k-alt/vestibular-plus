@@ -34,22 +34,31 @@
   .favorito-btn.ativo { color: #ef4444; }
 
   /* Cadeado por plano */
-  .resumo-card.bloqueado { opacity: .8; }
-  .resumo-card.bloqueado:hover { opacity: 1; }
+  .resumo-card.bloqueado { opacity: .85; }
+  .resumo-card.bloqueado:hover { opacity: 1; transform: translateY(-2px); }
   .resumo-card.bloqueado p {
     filter: blur(3px);
     user-select: none;
   }
   .cadeado-badge {
     position: absolute; top: 12px; right: 12px;
-    background: rgba(0,0,0,.55); color: #fff;
     font-size: .72rem; font-weight: 700;
     padding: 4px 10px; border-radius: var(--radius-full);
-    display: flex; align-items: center; gap: 4px;
-    backdrop-filter: blur(4px);
+    display: flex; align-items: center; gap: 5px;
+    backdrop-filter: blur(6px);
     z-index: 2;
-    max-width: 65%;
-    text-align: right;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .cadeado-badge.pro {
+    background: rgba(124, 58, 237, 0.28);
+    border: 1px solid rgba(168, 85, 247, 0.6);
+    color: #e9d5ff;
+  }
+  .cadeado-badge.ultimate {
+    background: linear-gradient(135deg, rgba(244, 114, 182, 0.35), rgba(192, 132, 252, 0.35), rgba(96, 165, 250, 0.35));
+    border: 1px solid rgba(244, 114, 182, 0.7);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(244, 114, 182, 0.35);
   }
 
   .modal-overlay {
