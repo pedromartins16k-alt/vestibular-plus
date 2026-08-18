@@ -10,20 +10,25 @@ const REQUISITOS_PLANO = {
   estatisticas: 3, // Ultimate
 };
 
-const CADEADO_CLASSE = { 1: 'cadeado-basic', 2: 'cadeado-pro', 3: 'cadeado-ultimate' };
+const PLANO_CLASSES = {
+  1: 'nav-bloqueado-basic',
+  2: 'nav-bloqueado-pro',
+  3: 'nav-bloqueado-ultimate'
+};
+
 const CADEADO_LABEL = { 1: 'Basic', 2: 'Pro', 3: 'Ultimate' };
 
 function renderIconeCadeadoMini(ordem) {
   if (ordem === 3) {
-    // Ultimate holográfico
+    // Ultimate holográfico - 18px nítido e destacado com glow
     return `
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="margin-left:auto; vertical-align:middle;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:block; filter:drop-shadow(0 2px 8px rgba(244,114,182,0.6));">
         <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
-        <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradUltMini)" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+        <rect x="4" y="10" width="16" height="12" rx="3.5" fill="url(#gradUltSide)" stroke="rgba(255,255,255,0.6)" stroke-width="1.2"/>
         <circle cx="12" cy="15" r="1.5" fill="#34d399"/>
         <path d="M12 16.5V18.5" stroke="#34d399" stroke-width="2" stroke-linecap="round"/>
         <defs>
-          <linearGradient id="gradUltMini" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+          <linearGradient id="gradUltSide" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
             <stop stop-color="#f472b6"/>
             <stop offset="0.5" stop-color="#c084fc"/>
             <stop offset="1" stop-color="#60a5fa"/>
@@ -33,15 +38,15 @@ function renderIconeCadeadoMini(ordem) {
     `;
   }
   if (ordem === 2) {
-    // PRO roxo
+    // PRO roxo - 18px nítido com glow
     return `
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="margin-left:auto; vertical-align:middle;">
-        <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round"/>
-        <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradProMini)" stroke="rgba(168,85,247,0.5)" stroke-width="1"/>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:block; filter:drop-shadow(0 2px 8px rgba(168,85,247,0.6));">
+        <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#c084fc" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="4" y="10" width="16" height="12" rx="3.5" fill="url(#gradProSide)" stroke="rgba(233,213,255,0.6)" stroke-width="1.2"/>
         <circle cx="12" cy="15" r="1.5" fill="#e9d5ff"/>
         <path d="M12 16.5V18.5" stroke="#e9d5ff" stroke-width="2" stroke-linecap="round"/>
         <defs>
-          <linearGradient id="gradProMini" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+          <linearGradient id="gradProSide" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
             <stop stop-color="#7c3aed"/>
             <stop offset="1" stop-color="#a855f7"/>
           </linearGradient>
@@ -49,15 +54,15 @@ function renderIconeCadeadoMini(ordem) {
       </svg>
     `;
   }
-  // Basic azul
+  // Basic azul - 18px nítido com glow
   return `
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" style="margin-left:auto; vertical-align:middle;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style="display:block; filter:drop-shadow(0 2px 8px rgba(56,189,248,0.6));">
       <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
-      <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradBasicMini)" stroke="rgba(56,189,248,0.5)" stroke-width="1"/>
+      <rect x="4" y="10" width="16" height="12" rx="3.5" fill="url(#gradBasicSide)" stroke="rgba(186,230,253,0.6)" stroke-width="1.2"/>
       <circle cx="12" cy="15" r="1.5" fill="#bae6fd"/>
       <path d="M12 16.5V18.5" stroke="#bae6fd" stroke-width="2" stroke-linecap="round"/>
       <defs>
-        <linearGradient id="gradBasicMini" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+        <linearGradient id="gradBasicSide" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
           <stop stop-color="#0284c7"/>
           <stop offset="1" stop-color="#38bdf8"/>
         </linearGradient>
@@ -67,7 +72,7 @@ function renderIconeCadeadoMini(ordem) {
 }
 
 /**
- * Aplica os cadeados na sidebar de acordo com o plano do usuário logado.
+ * Aplica os fundos 3D e cadeados limpos na sidebar de acordo com o plano do usuário logado.
  */
 export async function aplicarCadeadosSidebar(userId) {
   const { data: perfil, error } = await supabase
@@ -89,9 +94,10 @@ export async function aplicarCadeadosSidebar(userId) {
     if (!ordemNecessaria || ordemUsuario >= ordemNecessaria) return;
 
     item.classList.add('nav-item-bloqueado');
+    item.classList.add(PLANO_CLASSES[ordemNecessaria]);
 
     const span = document.createElement('span');
-    span.className = `cadeado-mini ${CADEADO_CLASSE[ordemNecessaria]}`;
+    span.className = 'cadeado-mini';
     span.innerHTML = renderIconeCadeadoMini(ordemNecessaria);
     span.title = `Disponível a partir do plano ${CADEADO_LABEL[ordemNecessaria]}`;
     item.appendChild(span);
