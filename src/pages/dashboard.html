@@ -14,10 +14,37 @@
   .sidebar .logo .dot { width: 32px; height: 32px; border-radius: 9px; background: var(--gradient-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; }
 
   .main { padding: 24px 4%; }
-  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 12px; }
-  .search-box { flex: 1; max-width: 380px; position: relative; }
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+  .search-box { flex: 0 1 320px; position: relative; }
   .search-box input { padding-left: 40px; }
   .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; }
+
+  /* Widgets Centrais da Topbar */
+  .topbar-center-widgets { display: flex; align-items: center; gap: 12px; }
+  .topbar-pill {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--radius-full);
+    font-size: .84rem; font-weight: 600; cursor: pointer; text-decoration: none;
+    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.09);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.06);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;
+  }
+  .topbar-pill:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  }
+  .widget-streak {
+    color: #fef08a; border-color: rgba(234, 179, 8, 0.25);
+    background: linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(249, 115, 22, 0.15) 100%);
+  }
+  .widget-streak:hover { border-color: rgba(234, 179, 8, 0.5); box-shadow: 0 4px 16px rgba(234, 179, 8, 0.25); }
+  .widget-countdown {
+    color: #e0e7ff; border-color: rgba(99, 102, 241, 0.28);
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.14) 100%);
+  }
+  .widget-countdown:hover { border-color: rgba(99, 102, 241, 0.5); box-shadow: 0 4px 16px rgba(99, 102, 241, 0.25); }
+  @media (max-width: 1050px) { .topbar-center-widgets { display: none; } }
   .topbar-actions { display: flex; align-items: center; gap: 14px; }
   .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; position: relative; flex-shrink: 0; }
   .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
@@ -203,6 +230,17 @@
         <div class="search-box">
           <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questões, flashcards, vestibulares..." />
           <div class="busca-dropdown" id="busca-dropdown"></div>
+        </div>
+
+        <div class="topbar-center-widgets">
+          <div class="topbar-pill widget-streak" title="Sua ofensiva diária de estudos">
+            <span>🔥</span>
+            <span id="topbar-streak">1 dia seguido</span>
+          </div>
+          <a href="./vestibulares.html" class="topbar-pill widget-countdown" title="Ver calendário de vestibulares">
+            <span>📅</span>
+            <span id="topbar-countdown">Carregando prova...</span>
+          </a>
         </div>
         <div class="topbar-actions">
           <button id="theme-toggle" class="icon-btn">🌙</button>

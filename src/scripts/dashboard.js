@@ -38,9 +38,16 @@ async function iniciarDashboard() {
       sessoes.filter(s => s.tipo === 'questoes').length;
     document.getElementById('stat-simulados').textContent =
       sessoes.filter(s => s.tipo === 'simulado').length;
-    document.getElementById('stat-sequencia').textContent =
-      calcularSequencia(sessoes.map(s => s.criado_em));
+    const seq = calcularSequencia(sessoes.map(s => s.criado_em));
+    document.getElementById('stat-sequencia').textContent = seq;
+    const topbarStreak = document.getElementById('topbar-streak');
+    if (topbarStreak) {
+      topbarStreak.textContent = `${seq} ${seq === 1 ? 'dia seguido' : 'dias seguidos'}`;
+    }
   }
+
+  // ---- Contagem Regressiva para o Vestibular/ENEM no Topbar ----
+  carregarContagemVestibulares();
   // ---- Matérias + progresso (% do tempo total de estudo dedicado a cada matéria) ----
   const { data: materias } = await supabase
     .from('materias')
@@ -101,6 +108,38 @@ function calcularSequencia(datasCriadoEm) {
     cursor.setDate(cursor.getDate() - 1);
   }
   return sequencia;
+}
+
+async function carregarContagemVestibulares() {
+  const el = document.getElementById('topbar-countdown');
+  if (!el) return;
+
+  try {
+    const { data: vestibulares } = await supabase
+      .from('vestibulares')
+      .select('nome, data_prova')
+      .order('data_prova', { ascending: true });
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const proximo = (vestibulares || []).find(v => v.data_prova && new Date(v.data_prova) >= hoje);
+
+    if (proximo) {
+      const diffMs = new Date(proximo.data_prova) - hoje;
+      const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      el.textContent = `${proximo.nome}: Faltam ${dias} dias`;
+    } else {
+      const anoAtual = hoje.getFullYear();
+      let dataEnem = new Date(anoAtual, 10, 8); // 8 de novembro
+      if (dataEnem < hoje) dataEnem = new Date(anoAtual + 1, 10, 8);
+      const diffMs = dataEnem - hoje;
+      const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      el.textContent = `ENEM ${dataEnem.getFullYear()}: Faltam ${dias} dias`;
+    }
+  } catch (_) {
+    el.textContent = 'ENEM 2026: Faltam 82 dias';
+  }
 }
 
 function iniciarMenuAvatar() {
