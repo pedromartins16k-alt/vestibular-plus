@@ -128,57 +128,84 @@ a { color: inherit; text-decoration: none; }
   transition: transform 0.25s ease;
 }
 
-/* ===== Itens do Menu com Fundo 3D e Movimento ===== */
-.nav-item-bloqueado {
-  position: relative;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+/* ===== Estrutura e Efeito 3D para TODOS os Itens do Menu ===== */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: .92rem;
   cursor: pointer;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
+  position: relative;
+  /* Fundo 3D sutil/discreto para opções normais */
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.06) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-.nav-item-bloqueado:hover {
+/* Movimento 3D ao passar o mouse em opções comuns */
+.nav-item:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.1) 100%) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: var(--text-primary) !important;
   transform: translateX(4px) translateY(-1px);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
 }
 
+/* Item Ativo (Página Atual) */
+.nav-item.active {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.22) 0%, rgba(99, 102, 241, 0.28) 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.45) !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.15) !important;
+}
+
+/* ===== Itens Bloqueados (Cores Vivas e Exclusivas por Plano) ===== */
 .nav-item-bloqueado:hover .cadeado-mini {
-  transform: scale(1.15) rotate(-3deg);
+  transform: scale(1.18) rotate(-4deg);
 }
 
 /* Basic: Fundo 3D Azul Escuro */
 .nav-bloqueado-basic {
-  background: linear-gradient(135deg, rgba(2, 132, 199, 0.12) 0%, rgba(14, 165, 233, 0.2) 100%) !important;
-  border: 1px solid rgba(56, 189, 248, 0.3) !important;
-  box-shadow: 0 3px 10px rgba(2, 132, 199, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.12) 0%, rgba(14, 165, 233, 0.22) 100%) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  box-shadow: 0 3px 10px rgba(2, 132, 199, 0.18), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
   color: #e0f2fe !important;
 }
 .nav-bloqueado-basic:hover {
-  background: linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(14, 165, 233, 0.32) 100%) !important;
-  border-color: rgba(56, 189, 248, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.3), inset 0 1px 2px rgba(255, 255, 255, 0.15) !important;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.22) 0%, rgba(14, 165, 233, 0.35) 100%) !important;
+  border-color: rgba(56, 189, 248, 0.6) !important;
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.18) !important;
 }
 
 /* PRO: Fundo 3D Roxo Escuro */
 .nav-bloqueado-pro {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.14) 0%, rgba(168, 85, 247, 0.22) 100%) !important;
-  border: 1px solid rgba(168, 85, 247, 0.32) !important;
-  box-shadow: 0 3px 10px rgba(124, 58, 237, 0.18), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(168, 85, 247, 0.25) 100%) !important;
+  border: 1px solid rgba(168, 85, 247, 0.38) !important;
+  box-shadow: 0 3px 10px rgba(124, 58, 237, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
   color: #f3e8ff !important;
 }
 .nav-bloqueado-pro:hover {
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.24) 0%, rgba(168, 85, 247, 0.36) 100%) !important;
-  border-color: rgba(168, 85, 247, 0.55) !important;
-  box-shadow: 0 6px 18px rgba(124, 58, 237, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.15) !important;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.26) 0%, rgba(168, 85, 247, 0.4) 100%) !important;
+  border-color: rgba(168, 85, 247, 0.65) !important;
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.18) !important;
 }
 
 /* Ultimate: Fundo 3D Holográfico Escuro */
 .nav-bloqueado-ultimate {
-  background: linear-gradient(135deg, rgba(244, 114, 182, 0.15) 0%, rgba(192, 132, 252, 0.22) 50%, rgba(96, 165, 250, 0.18) 100%) !important;
-  border: 1px solid rgba(244, 114, 182, 0.38) !important;
-  box-shadow: 0 4px 14px rgba(244, 114, 182, 0.22), inset 0 1px 1px rgba(255, 255, 255, 0.12) !important;
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.16) 0%, rgba(192, 132, 252, 0.24) 50%, rgba(96, 165, 250, 0.2) 100%) !important;
+  border: 1px solid rgba(244, 114, 182, 0.42) !important;
+  box-shadow: 0 4px 14px rgba(244, 114, 182, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.12) !important;
   color: #ffffff !important;
 }
 .nav-bloqueado-ultimate:hover {
-  background: linear-gradient(135deg, rgba(244, 114, 182, 0.25) 0%, rgba(192, 132, 252, 0.35) 50%, rgba(96, 165, 250, 0.3) 100%) !important;
-  border-color: rgba(244, 114, 182, 0.65) !important;
-  box-shadow: 0 8px 22px rgba(244, 114, 182, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.2) !important;
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.28) 0%, rgba(192, 132, 252, 0.38) 50%, rgba(96, 165, 250, 0.32) 100%) !important;
+  border-color: rgba(244, 114, 182, 0.75) !important;
+  box-shadow: 0 8px 24px rgba(244, 114, 182, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.22) !important;
 }
