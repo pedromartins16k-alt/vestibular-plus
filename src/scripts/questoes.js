@@ -10,25 +10,96 @@ const container = document.getElementById('questao-container');
 const filtroContainer = document.getElementById('filtro-materias');
 const progressInfo = document.getElementById('progress-info');
 
-const NIVEIS_DIFICULDADE = ['facil', 'medio', 'dificil', 'genio'];
-const PLANO_PADRAO = { dificuldade_maxima: 'medio', percentual_banco_liberado: 30 };
-
 let questoesCache = [];
 let materiasCache = [];
 let aulasCache = [];
 
-let materiaAtiva = 'todas';   // 'todas' ou id da matéria
-let mostrandoTemas = false;   // true quando estamos na tela de seleção de tema
-let temaAtivo = null;         // null (ainda não escolheu), 'todos' (todos os temas da matéria) ou id da aula
+let materiaAtiva = 'todas';
+let mostrandoTemas = false;
+let temaAtivo = null;
 
 let indiceAtual = 0;
 let respondida = false;
 let acertos = 0;
 let sessionUserId = null;
 let favoritosSet = new Set();
+let nomePlanoUsuario = 'free';
+let questaoAtualContada = false;
 
-let planoUsuario = PLANO_PADRAO;
-let questaoAtualContada = false; // evita contar a mesma questão 2x em re-renders
+function getPlanoExclusivo(dificuldade) {
+  if (dificuldade === 'genio') {
+    return {
+      nome: 'Ultimate',
+      classe: 'ultimate',
+      gradiente: 'linear-gradient(135deg, #f472b6, #c084fc, #60a5fa)',
+      desc: 'no nível Gênio'
+    };
+  }
+  if (dificuldade === 'dificil') {
+    return {
+      nome: 'PRO',
+      classe: 'pro',
+      gradiente: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+      desc: 'no nível Difícil'
+    };
+  }
+  return {
+    nome: 'Basic',
+    classe: 'basic',
+    gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)',
+    desc: 'no nível Médio'
+  };
+}
+
+function renderIconeCadeado(tipo) {
+  if (tipo === 'ultimate') {
+    return `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="display:inline-block; vertical-align:middle;">
+        <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradUltPadlockQ)" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
+        <circle cx="12" cy="15" r="1.5" fill="#34d399"/>
+        <path d="M12 16.5V18.5" stroke="#34d399" stroke-width="2" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="gradUltPadlockQ" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#f472b6"/>
+            <stop offset="0.5" stop-color="#c084fc"/>
+            <stop offset="1" stop-color="#60a5fa"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    `;
+  }
+  if (tipo === 'basic') {
+    return `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="display:inline-block; vertical-align:middle;">
+        <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradBasicPadlockQ)" stroke="rgba(56,189,248,0.5)" stroke-width="1"/>
+        <circle cx="12" cy="15" r="1.5" fill="#bae6fd"/>
+        <path d="M12 16.5V18.5" stroke="#bae6fd" stroke-width="2" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="gradBasicPadlockQ" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#0284c7"/>
+            <stop offset="1" stop-color="#38bdf8"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    `;
+  }
+  return `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="display:inline-block; vertical-align:middle;">
+      <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradProPadlockQ)" stroke="rgba(168,85,247,0.5)" stroke-width="1"/>
+      <circle cx="12" cy="15" r="1.5" fill="#e9d5ff"/>
+      <path d="M12 16.5V18.5" stroke="#e9d5ff" stroke-width="2" stroke-linecap="round"/>
+      <defs>
+        <linearGradient id="gradProPadlockQ" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#7c3aed"/>
+          <stop offset="1" stop-color="#a855f7"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  `;
+}
 
 async function buscarTodasQuestoes() {
   const TAMANHO_PAGINA = 1000;
@@ -50,7 +121,6 @@ async function buscarTodasQuestoes() {
     }
 
     todas = todas.concat(data || []);
-
     if (!data || data.length < TAMANHO_PAGINA) break;
     pagina++;
   }
@@ -58,64 +128,161 @@ async function buscarTodasQuestoes() {
   return todas;
 }
 
-function nivelPermitido(dificuldadeQuestao, maxPermitido) {
-  const idxQuestao = NIVEIS_DIFICULDADE.indexOf(dificuldadeQuestao || 'facil');
-  const idxMax = NIVEIS_DIFICULDADE.indexOf(maxPermitido || 'medio');
-  return idxQuestao <= idxMax;
-}
+function marcarQuestoesLiberadasEBloqueadas(lista, nomePlano) {
+  const plano = (nomePlano || 'free').toLowerCase();
 
-function aplicarPercentualBanco(lista, percentual) {
-  const pct = Number(percentual);
-  if (!pct || pct >= 100) return lista;
-
-  const porMateria = new Map();
+  // Mapeia médios por matéria para liberar 50% no Free
+  const mediosPorMateria = new Map();
   lista.forEach(q => {
-    if (!porMateria.has(q.materia_id)) porMateria.set(q.materia_id, []);
-    porMateria.get(q.materia_id).push(q);
+    if ((q.dificuldade || 'facil') === 'medio') {
+      if (!mediosPorMateria.has(q.materia_id)) mediosPorMateria.set(q.materia_id, []);
+      mediosPorMateria.get(q.materia_id).push(q.id);
+    }
   });
 
-  let resultado = [];
-  porMateria.forEach(qs => {
-    const qtd = Math.max(1, Math.ceil(qs.length * pct / 100));
-    resultado = resultado.concat(qs.slice(0, qtd));
+  const idsMediosLiberadosFree = new Set();
+  mediosPorMateria.forEach(ids => {
+    const qtdLiberada = Math.max(1, Math.ceil(ids.length * 0.5));
+    ids.slice(0, qtdLiberada).forEach(id => idsMediosLiberadosFree.add(id));
   });
-  return resultado;
+
+  return lista.map(q => {
+    const nivel = q.dificuldade || 'facil';
+    let bloqueada = false;
+
+    if (plano === 'premium' || plano === 'ultimate') {
+      bloqueada = false;
+    } else if (plano === 'pro') {
+      bloqueada = (nivel === 'genio');
+    } else if (plano === 'basic') {
+      bloqueada = (nivel === 'dificil' || nivel === 'genio');
+    } else {
+      // Plano Free:
+      if (nivel === 'facil') {
+        bloqueada = false; // 100% dos fáceis liberados
+      } else if (nivel === 'medio') {
+        bloqueada = !idsMediosLiberadosFree.has(q.id); // 50% liberados, 50% para Basic
+      } else {
+        bloqueada = true; // Difícil e Gênio bloqueados
+      }
+    }
+
+    return {
+      ...q,
+      bloqueada
+    };
+  });
 }
 
-async function buscarPlanoUsuario() {
+async function buscarNomePlanoUsuario() {
   const { data: perfil, error } = await supabase
     .from('profiles')
-    .select('planos(dificuldade_maxima, percentual_banco_liberado)')
+    .select('planos(nome)')
     .eq('id', sessionUserId)
     .single();
 
-  if (error || !perfil?.planos) {
-    console.error('Erro ao buscar plano do usuário, aplicando limites do Free:', error);
-    return PLANO_PADRAO;
+  if (error || !perfil?.planos?.nome) {
+    return 'free';
   }
-  return perfil.planos;
+  return perfil.planos.nome;
 }
 
-// Checa e registra o uso via função central do banco (mesma usada em resumos.js),
-// que faz a checagem+incremento de forma atômica direto no Postgres.
 async function checarELimitarQuestao() {
   const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'questao' });
 
   if (error) {
     console.error('[uso questao]', error);
-    return { permitido: true }; // erro de rede não deve travar o aluno
+    return { permitido: true };
   }
   return uso;
+}
+
+function mostrarModalUpgrade(mensagem, infoPlano = { nome: 'Basic', gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)' }) {
+  let modalUpgrade = document.getElementById('modal-upgrade-alerta');
+  if (!modalUpgrade) {
+    modalUpgrade = document.createElement('div');
+    modalUpgrade.id = 'modal-upgrade-alerta';
+    modalUpgrade.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;backdrop-filter:blur(6px);animation:fadeIn .2s ease;';
+    document.body.appendChild(modalUpgrade);
+  }
+
+  const isUltimate = infoPlano.nome === 'Ultimate';
+  const isBasic = infoPlano.nome === 'Basic';
+
+  let iconeHtml = `<div style="font-size:3rem;margin-bottom:12px;">🔒</div>`;
+  let bordaCor = 'rgba(168,85,247,.4)';
+
+  if (isUltimate) {
+    bordaCor = 'rgba(244,114,182,.5)';
+    iconeHtml = `
+      <div style="margin-bottom:14px;">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 6px 16px rgba(244,114,182,.5));">
+          <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+          <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradPadlockModalQ)" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
+          <circle cx="12" cy="15" r="1.5" fill="#34d399"/>
+          <path d="M12 16.5V18.5" stroke="#34d399" stroke-width="2" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="gradPadlockModalQ" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#f472b6"/>
+              <stop offset="0.5" stop-color="#c084fc"/>
+              <stop offset="1" stop-color="#60a5fa"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>`;
+  } else if (isBasic) {
+    bordaCor = 'rgba(56,189,248,.5)';
+    iconeHtml = `
+      <div style="margin-bottom:14px;">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 6px 16px rgba(56,189,248,.5));">
+          <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+          <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradBasicModalQ)" stroke="rgba(56,189,248,0.5)" stroke-width="1"/>
+          <circle cx="12" cy="15" r="1.5" fill="#bae6fd"/>
+          <path d="M12 16.5V18.5" stroke="#bae6fd" stroke-width="2" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="gradBasicModalQ" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#0284c7"/>
+              <stop offset="1" stop-color="#38bdf8"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>`;
+  }
+
+  modalUpgrade.innerHTML = `
+    <div style="background:var(--bg-card, #13111c);border:1px solid ${bordaCor};border-radius:20px;max-width:440px;width:100%;padding:32px 24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6);position:relative;">
+      <button id="fechar-modal-upgrade" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-secondary,#a1a1aa);font-size:1.2rem;cursor:pointer;">✕</button>
+      ${iconeHtml}
+      <h3 style="font-size:1.35rem;font-family:'Sora',sans-serif;margin-bottom:10px;color:#fff;">
+        Exclusivo Plano <span style="background:${infoPlano.gradiente};-webkit-background-clip:text;-webkit-text-fill-color:transparent;">${infoPlano.nome}</span>
+      </h3>
+      <p style="font-size:.92rem;color:var(--text-secondary,#a1a1aa);line-height:1.6;margin-bottom:24px;">${mensagem}</p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <a href="./precos.html?plano=${infoPlano.nome.toLowerCase()}" style="display:inline-block;padding:12px 20px;border-radius:12px;background:${infoPlano.gradiente};color:#fff;text-decoration:none;font-weight:700;font-size:.95rem;box-shadow:0 4px 18px rgba(0,0,0,.4);transition:transform .2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+          🚀 Desbloquear no Plano ${infoPlano.nome}
+        </a>
+        <button id="cancelar-upgrade" style="background:none;border:none;color:var(--text-secondary,#71717a);font-size:.85rem;cursor:pointer;padding:6px;">Continuar no plano Free</button>
+      </div>
+    </div>
+  `;
+
+  const fechar = () => { modalUpgrade.style.display = 'none'; };
+  document.getElementById('fechar-modal-upgrade').onclick = fechar;
+  document.getElementById('cancelar-upgrade').onclick = fechar;
+  modalUpgrade.onclick = (e) => { if (e.target === modalUpgrade) fechar(); };
+
+  modalUpgrade.style.display = 'flex';
 }
 
 function renderLimiteAtingido(limite) {
   container.innerHTML = `
     <div class="card questao-card" style="text-align:center;">
-      <h2>🔒 Limite diário atingido</h2>
+      <div style="font-size:3rem; margin-bottom:10px;">🔒</div>
+      <h2>Limite diário atingido</h2>
       <p style="color:var(--text-secondary); margin-top:10px;">
-        Seu plano permite ${limite} questões por dia. Volte amanhã ou faça upgrade pra continuar agora.
+        Seu plano permite ${limite} questões por dia. Faça upgrade pra continuar praticando sem limites.
       </p>
-      <a class="btn btn-primary" style="margin-top:18px; display:inline-flex;" href="./precos.html?upgrade=questoes">Ver planos</a>
+      <a class="btn btn-primary" style="margin-top:18px; display:inline-flex;" href="./precos.html?plano=basic">Ver planos</a>
     </div>`;
   progressInfo.textContent = '';
 }
@@ -125,7 +292,7 @@ async function iniciar() {
   if (!session) return;
   sessionUserId = session.user.id;
 
-  planoUsuario = await buscarPlanoUsuario();
+  nomePlanoUsuario = await buscarNomePlanoUsuario();
 
   const { data: materias } = await supabase
     .from('materias')
@@ -138,12 +305,10 @@ async function iniciar() {
     .order('ordem');
 
   const questoesBrutas = await buscarTodasQuestoes();
-  const dentroDaDificuldade = questoesBrutas.filter(q => nivelPermitido(q.dificuldade, planoUsuario.dificuldade_maxima));
-  const questoes = aplicarPercentualBanco(dentroDaDificuldade, planoUsuario.percentual_banco_liberado);
+  questoesCache = marcarQuestoesLiberadasEBloqueadas(questoesBrutas, nomePlanoUsuario);
 
   materiasCache = materias || [];
   aulasCache = aulas || [];
-  questoesCache = questoes;
   favoritosSet = await buscarFavoritos('questao');
 
   renderFiltros(materiasCache);
@@ -179,11 +344,8 @@ function renderFiltros(materias) {
 
 function questoesFiltradas() {
   if (materiaAtiva === 'todas') return questoesCache;
-
   const daMateria = questoesCache.filter(q => q.materia_id === materiaAtiva);
-
   if (!temaAtivo || temaAtivo === 'todos') return daMateria;
-
   return daMateria.filter(q => q.aula_id === temaAtivo);
 }
 
@@ -258,6 +420,10 @@ function renderTemas(materiaId) {
   });
 }
 
+function traduzDificuldade(nivel) {
+  return { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', genio: 'Gênio' }[nivel] || '—';
+}
+
 async function renderQuestaoAtual() {
   if (materiaAtiva !== 'todas' && mostrandoTemas) {
     renderTemas(materiaAtiva);
@@ -293,8 +459,10 @@ async function renderQuestaoAtual() {
   }
 
   const q = lista[indiceAtual];
+  const estaBloqueada = q.bloqueada;
+  const infoPlano = getPlanoExclusivo(q.dificuldade);
 
-  if (!questaoAtualContada) {
+  if (!estaBloqueada && !questaoAtualContada) {
     questaoAtualContada = true;
     const uso = await checarELimitarQuestao();
     if (!uso.permitido) {
@@ -306,10 +474,47 @@ async function renderQuestaoAtual() {
   const cor = q.materias?.cor || '#7c3aed';
   const favoritado = favoritosSet.has(q.id);
   const temaTitulo = q.treineiro_aulas?.titulo;
-  const tagTexto = `${q.materias?.nome || 'Geral'}${temaTitulo ? ' · ' + temaTitulo : ''}${q.fonte ? ' · ' + q.fonte : ''}`;
+  const tagTexto = `${q.materias?.nome || 'Geral'}${temaTitulo ? ' · ' + temaTitulo : ''}${q.fonte ? ' · ' + q.fonte : ''} · 📊 ${traduzDificuldade(q.dificuldade)}`;
 
   progressInfo.innerHTML = `<span>Questão ${indiceAtual + 1} de ${lista.length}</span><span>✅ ${acertos} acertos</span>`;
 
+  if (estaBloqueada) {
+    container.innerHTML = `
+      ${voltarTemasHtml}
+      <div class="card questao-card fade-up bloqueada">
+        <div class="questao-topo">
+          <span class="questao-tag" style="background:${cor}22; color:${cor};">${tagTexto}</span>
+          <span class="cadeado-badge ${infoPlano.classe}">
+            ${renderIconeCadeado(infoPlano.classe)} Exclusivo ${infoPlano.nome}
+          </span>
+        </div>
+        <p class="questao-enunciado">${q.enunciado}</p>
+        <div class="bloqueio-overlay-card">
+          <div style="margin-bottom:8px;">${renderIconeCadeado(infoPlano.classe)}</div>
+          <h3 style="font-size:1.15rem; margin-bottom:8px;">Esta questão é exclusiva para assinantes ${infoPlano.nome}</h3>
+          <p style="color:var(--text-secondary); font-size:.88rem; margin-bottom:18px;">
+            Desbloqueie todo o banco de questões ${infoPlano.desc} para turbinar seus estudos.
+          </p>
+          <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+            <a href="./precos.html?plano=${infoPlano.nome.toLowerCase()}" class="btn" style="background:${infoPlano.gradiente}; color:#fff; font-weight:700;">
+              🚀 Desbloquear no Plano ${infoPlano.nome}
+            </a>
+            <button class="btn btn-ghost" id="proxima-bloqueada-btn">Pular questão →</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('proxima-bloqueada-btn').addEventListener('click', () => {
+      indiceAtual++;
+      renderQuestaoAtual();
+    });
+
+    ligarVoltarTemas();
+    return;
+  }
+
+  // Questão Liberada:
   container.innerHTML = `
     ${voltarTemasHtml}
     <div class="card questao-card fade-up">
@@ -318,7 +523,7 @@ async function renderQuestaoAtual() {
         <button class="favorito-btn ${favoritado ? 'ativo' : ''}" id="favorito-btn" title="Salvar para revisar depois">${favoritado ? '♥' : '♡'}</button>
       </div>
       <p class="questao-enunciado">${q.enunciado}</p>
-      <div id="alternativas-list"></div>
+      <div class="alternativas-container" id="alternativas-list"></div>
       <div class="feedback-box" id="feedback-box"></div>
       <div class="actions-row">
         <span></span>

@@ -8,69 +8,103 @@ const studyArea = document.getElementById('study-area');
 const filtroContainer = document.getElementById('filtro-materias');
 const assuntoContainer = document.getElementById('assunto-tabs');
 const modoTabsContainer = document.getElementById('modo-tabs');
+const statsBar = document.getElementById('stats-bar');
+const progressoTrack = document.querySelector('.progresso-track');
 const statRestantes = document.getElementById('stat-restantes');
 const statRevisados = document.getElementById('stat-revisados');
 const progressoFill = document.getElementById('progresso-fill');
 
-const INTERVALOS_DIAS = [1, 1, 3, 7, 15, 30]; // índice = nível de memorização após avaliar
+const INTERVALOS_DIAS = [1, 1, 3, 7, 15, 30];
 
 let userId = null;
 let todosFlashcards = [];
 let materiaAtiva = 'todas';
 let assuntoAtivo = 'todos';
-let modoAtivo = 'revisar'; // 'revisar' = pendentes | 'sei' = já lembrados antes
+let modoAtivo = 'revisar';
 let fila = [];
 let totalSessao = 0;
 let cardAtual = null;
 let virado = false;
 let revisadosHoje = 0;
-let ultimoCardContadoId = null; // evita contar o mesmo card 2x em re-renders
+let ultimoCardContadoId = null;
 
-// Checa e registra o uso via função central do banco (mesma de questoes.js/resumos.js).
-async function checarELimitarFlashcard() {
-  const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'flashcard' });
-
-  if (error) {
-    console.error('[uso flashcard]', error);
-    return { permitido: true }; // erro de rede não deve travar o aluno
-  }
-  return uso;
+function renderIconeCadeadoBasic() {
+  return `
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 6px 16px rgba(56,189,248,.4));">
+      <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+      <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradBasicPadlockFc)" stroke="rgba(56,189,248,0.5)" stroke-width="1"/>
+      <circle cx="12" cy="15" r="1.5" fill="#bae6fd"/>
+      <path d="M12 16.5V18.5" stroke="#bae6fd" stroke-width="2" stroke-linecap="round"/>
+      <defs>
+        <linearGradient id="gradBasicPadlockFc" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#0284c7"/>
+          <stop offset="1" stop-color="#38bdf8"/>
+        </linearGradient>
+      </defs>
+    </svg>
+  `;
 }
 
 function renderBloqueado() {
+  if (statsBar) statsBar.style.display = 'none';
+  if (progressoTrack) progressoTrack.style.display = 'none';
+  if (modoTabsContainer) modoTabsContainer.style.display = 'none';
+
   studyArea.innerHTML = `
-    <div class="empty-state">
-      🔒 Flashcards não estão disponíveis no seu plano atual.<br>
-      Faça upgrade pra desbloquear.
-      <br><br>
-      <a class="btn btn-primary" style="display:inline-flex; text-decoration:none;" href="./precos.html?upgrade=flashcards">Ver planos</a>
+    <div class="card fade-up" style="max-width:520px; width:100%; text-align:center; padding:40px 24px; border:1px solid rgba(56,189,248,.4); box-shadow:0 12px 35px rgba(0,0,0,.4);">
+      <div style="margin-bottom:14px;">${renderIconeCadeadoBasic()}</div>
+      <h2 style="font-size:1.4rem; margin-bottom:10px;">Exclusivo a partir do Plano <span style="background:linear-gradient(135deg, #0284c7, #38bdf8); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Basic</span></h2>
+      <p style="color:var(--text-secondary); font-size:.92rem; line-height:1.6; margin-bottom:24px;">
+        O método de repetição espaçada com Flashcards inteligentes é um recurso exclusivo para assinantes dos planos Basic, Pro e Ultimate.
+      </p>
+      <a class="btn" style="background:linear-gradient(135deg, #0284c7, #38bdf8); color:#fff; font-weight:700; font-size:.95rem; box-shadow:0 4px 18px rgba(14,165,233,.4);" href="./precos.html?plano=basic">
+        🚀 Desbloquear Flashcards no Plano Basic
+      </a>
     </div>
   `;
 }
 
 function renderLimiteAtingido(limite) {
   studyArea.innerHTML = `
-    <div class="empty-state">
-      🔒 Você atingiu o limite de ${limite} flashcards por dia do seu plano.<br>
-      Volte amanhã ou faça upgrade pra continuar agora.
-      <br><br>
-      <a class="btn btn-primary" style="display:inline-flex; text-decoration:none;" href="./precos.html?upgrade=flashcards">Ver planos</a>
+    <div class="card fade-up" style="max-width:520px; width:100%; text-align:center; padding:36px 24px; border:1px solid rgba(56,189,248,.4);">
+      <div style="margin-bottom:10px;">${renderIconeCadeadoBasic()}</div>
+      <h3 style="font-size:1.25rem; margin-bottom:8px;">Limite diário atingido</h3>
+      <p style="color:var(--text-secondary); font-size:.9rem; line-height:1.6; margin-bottom:20px;">
+        Você atingiu o limite de ${limite} flashcards por dia do seu plano. Faça upgrade para revisar sem limites.
+      </p>
+      <a class="btn" style="background:linear-gradient(135deg, #0284c7, #38bdf8); color:#fff; font-weight:700;" href="./precos.html?plano=basic">
+        Ver Planos
+      </a>
     </div>
   `;
+}
+
+async function checarELimitarFlashcard() {
+  const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'flashcard' });
+
+  if (error) {
+    console.error('[uso flashcard]', error);
+    return { permitido: true };
+  }
+  return uso;
 }
 
 async function buscarAcessoFlashcards() {
   const { data: perfil, error } = await supabase
     .from('profiles')
-    .select('planos(acesso_flashcards)')
+    .select('planos(acesso_flashcards, nome)')
     .eq('id', userId)
     .single();
 
   if (error || !perfil?.planos) {
-    console.error('Erro ao buscar plano do usuário, bloqueando por segurança:', error);
+    console.error('Erro ao buscar plano do usuário:', error);
     return false;
   }
-  return perfil.planos.acesso_flashcards;
+  // Se for plano free, flashcards são bloqueados
+  if ((perfil.planos.nome || 'free').toLowerCase() === 'free') {
+    return false;
+  }
+  return perfil.planos.acesso_flashcards ?? true;
 }
 
 async function iniciar() {
@@ -180,7 +214,7 @@ function renderAssuntos() {
 }
 
 function estaPendente(card) {
-  if (!card.progresso) return true; // nunca estudado ainda
+  if (!card.progresso) return true;
   return new Date(card.progresso.proxima_revisao) <= new Date();
 }
 
@@ -336,7 +370,6 @@ async function avaliar(acertou) {
   if (acertou) {
     revisadosHoje++;
   } else {
-    // não lembrou: volta pro fim da fila e repete na mesma sessão até acertar
     fila.push(cardResolvido);
   }
 
