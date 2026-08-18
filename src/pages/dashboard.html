@@ -82,7 +82,19 @@
   .notif-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
   .notif-ver-todas { display: block; text-align: center; padding: 10px; font-size: .82rem; font-weight: 600; color: var(--color-primary-500); border-top: 1px solid var(--border-color); margin-top: 4px; }
 
-  .welcome-card { padding: 28px; border-radius: var(--radius-lg); background: var(--gradient-primary); color: #fff; margin-bottom: 24px; position: relative; overflow: hidden; }
+  .welcome-card {
+    padding: 28px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.78) 0%, rgba(59, 130, 246, 0.72) 100%) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.35);
+    color: #fff;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
   .welcome-card h2 { font-size: 1.4rem; margin-bottom: 6px; }
   .welcome-card p { opacity: .9; font-size: .92rem; }
   .xp-bar-track { background: rgba(255,255,255,.25); border-radius: var(--radius-full); height: 10px; margin-top: 16px; overflow: hidden; }
