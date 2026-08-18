@@ -32,6 +32,26 @@
   }
   .favorito-btn:hover { transform: scale(1.15); }
   .favorito-btn.ativo { color: #ef4444; }
+
+  /* Cadeado por plano */
+  .resumo-card.bloqueado { opacity: .8; }
+  .resumo-card.bloqueado:hover { opacity: 1; }
+  .resumo-card.bloqueado p {
+    filter: blur(3px);
+    user-select: none;
+  }
+  .cadeado-badge {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(0,0,0,.55); color: #fff;
+    font-size: .72rem; font-weight: 700;
+    padding: 4px 10px; border-radius: var(--radius-full);
+    display: flex; align-items: center; gap: 4px;
+    backdrop-filter: blur(4px);
+    z-index: 2;
+    max-width: 65%;
+    text-align: right;
+  }
+
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
     align-items: center; justify-content: center; z-index: 50; padding: 20px;
