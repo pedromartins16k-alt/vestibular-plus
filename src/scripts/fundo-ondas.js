@@ -1,163 +1,126 @@
 /**
- * Fundo de Ondas Diagonais — Vista Aérea do Mar (Top-Down Ocean Waves)
- * Efeito visual de ondas oceânicas calmas descendo do topo direito em direção ao fundo esquerdo,
- * reagindo com ondulações dinâmicas ao movimento do mouse.
+ * Fundo de Ondas Oceânicas — GPU Acellerated (Zero Lag / Ultra Leve)
+ * Utiliza gradientes e transforms via aceleração por hardware da GPU,
+ * garantindo 60fps cravados sem travar a CPU ou o navegador.
  */
 
 function iniciarFundoOndas() {
-  if (document.getElementById('fundo-ondas-canvas')) return;
+  if (document.getElementById('fundo-ondas-container')) return;
 
-  const canvas = document.createElement('canvas');
-  canvas.id = 'fundo-ondas-canvas';
-  canvas.style.cssText = `
+  const container = document.createElement('div');
+  container.id = 'fundo-ondas-container';
+  container.style.cssText = `
     position: fixed;
-    top: 0;
-    left: 0;
+    inset: 0;
     width: 100vw;
     height: 100vh;
     pointer-events: none;
     z-index: -999;
-    opacity: 0.85;
-    transition: opacity 0.5s ease;
+    overflow: hidden;
+    background: #07060d;
   `;
-  document.body.appendChild(canvas);
 
-  const ctx = canvas.getContext('2d');
-  let width, height, diagonalLength;
-  let animationFrameId;
+  container.innerHTML = `
+    <!-- Camada de Gradiente Base Diagonal -->
+    <div id="onda-base" style="
+      position: absolute;
+      inset: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 80% 10%, rgba(124, 58, 237, 0.22) 0%, transparent 45%),
+                  radial-gradient(circle at 20% 90%, rgba(59, 130, 246, 0.18) 0%, transparent 50%),
+                  radial-gradient(circle at 60% 60%, rgba(236, 72, 153, 0.12) 0%, transparent 40%);
+      transform: rotate(-25deg);
+      animation: derivaOndas 22s ease-in-out infinite alternate;
+      will-change: transform;
+    "></div>
 
-  // Interpolação suave do mouse (smooth lerp)
-  let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-  let targetMouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    <!-- Ondas Fluidas em Linhas Diagonais (Vista Aérea) -->
+    <svg style="position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.45;" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="gradMar" x1="100%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#a855f7" stop-opacity="0.3"/>
+          <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="#ec4899" stop-opacity="0.1"/>
+        </linearGradient>
+      </defs>
+      <g id="ondas-grupo" style="transform: rotate(25deg); transform-origin: center; transition: transform 0.2s cubic-bezier(0.1, 0.9, 0.2, 1);">
+        <path d="M-200,100 Q400,250 1200,80 T2600,150" fill="none" stroke="url(#gradMar)" stroke-width="45" stroke-linecap="round" />
+        <path d="M-200,320 Q500,460 1300,280 T2600,360" fill="none" stroke="url(#gradMar)" stroke-width="60" stroke-linecap="round" />
+        <path d="M-200,560 Q450,700 1250,520 T2600,600" fill="none" stroke="url(#gradMar)" stroke-width="50" stroke-linecap="round" />
+        <path d="M-200,800 Q550,950 1350,760 T2600,850" fill="none" stroke="url(#gradMar)" stroke-width="65" stroke-linecap="round" />
+        <path d="M-200,1040 Q480,1200 1280,1000 T2600,1100" fill="none" stroke="url(#gradMar)" stroke-width="55" stroke-linecap="round" />
+      </g>
+    </svg>
 
-  function redimensionar() {
-    width = canvas.width = window.innerWidth;
-    height = canvas.height = window.innerHeight;
-    diagonalLength = Math.hypot(width, height);
+    <!-- Ponto de Luz Dinâmico que segue o Mouse com Aceleração GPU -->
+    <div id="luz-cursor" style="
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.18) 0%, rgba(56, 189, 248, 0.08) 40%, transparent 70%);
+      transform: translate3d(-50%, -50%, 0);
+      pointer-events: none;
+      will-change: transform;
+      opacity: 0.8;
+    "></div>
+  `;
+
+  // Adiciona a animação CSS leve nas tags
+  if (!document.getElementById('estilo-ondas-css')) {
+    const style = document.createElement('style');
+    style.id = 'estilo-ondas-css';
+    style.textContent = `
+      @keyframes derivaOndas {
+        0% { transform: rotate(-25deg) translateY(-2%) translateX(2%); }
+        100% { transform: rotate(-25deg) translateY(4%) translateX(-4%); }
+      }
+    `;
+    document.head.appendChild(style);
   }
 
-  window.addEventListener('resize', redimensionar);
-  redimensionar();
+  document.body.appendChild(container);
+
+  const luzCursor = document.getElementById('luz-cursor');
+  const ondasGrupo = document.getElementById('ondas-grupo');
+
+  let mouseX = window.innerWidth / 2;
+  let mouseY = window.innerHeight / 2;
+  let curX = mouseX;
+  let curY = mouseY;
+  let ticking = false;
 
   window.addEventListener('mousemove', (e) => {
-    targetMouse.x = e.clientX;
-    targetMouse.y = e.clientY;
-  });
+    mouseX = e.clientX;
+    mouseY = e.clientY;
 
-  let tempo = 0;
+    if (!ticking) {
+      requestAnimationFrame(atualizarPosicao);
+      ticking = true;
+    }
+  }, { passive: true });
 
-  // Configuração de ondas com fluxo diagonal do topo-direito (TR) para fundo-esquerdo (BL)
-  const ondas = [
-    { freq: 0.0035, vel: 0.012, amp: 28, cor: 'rgba(124, 58, 237, 0.16)', largura: 90 },
-    { freq: 0.0045, vel: 0.016, amp: 38, cor: 'rgba(59, 130, 246, 0.14)', largura: 110 },
-    { freq: 0.0028, vel: 0.010, amp: 48, cor: 'rgba(236, 72, 153, 0.12)', largura: 130 },
-    { freq: 0.0055, vel: 0.019, amp: 22, cor: 'rgba(6, 182, 212, 0.15)', largura: 75 },
-    { freq: 0.0038, vel: 0.014, amp: 32, cor: 'rgba(168, 85, 247, 0.15)', largura: 95 },
-  ];
+  function atualizarPosicao() {
+    curX += (mouseX - curX) * 0.08;
+    curY += (mouseY - curY) * 0.08;
 
-  function desenharFundoBase() {
-    // Gradiente base suave e profundo
-    const gradBase = ctx.createLinearGradient(width, 0, 0, height);
-    gradBase.addColorStop(0, '#0f0c1b');
-    gradBase.addColorStop(0.5, '#0b0914');
-    gradBase.addColorStop(1, '#07060d');
-    ctx.fillStyle = gradBase;
-    ctx.fillRect(0, 0, width, height);
-  }
-
-  function desenharOndasVistaAerea() {
-    ctx.save();
-
-    // Rotação para criar a perspectiva diagonal exata (topo direito -> fundo esquerdo)
-    // Ângulo de ~45 graus
-    const angulo = Math.PI / 4;
-    ctx.translate(width / 2, height / 2);
-    ctx.rotate(angulo);
-
-    const metadeDiag = diagonalLength * 0.85;
-    const passoX = 16;
-    const passoY = 38;
-
-    for (let y = -metadeDiag; y <= metadeDiag; y += passoY) {
-      for (let i = 0; i < ondas.length; i++) {
-        const o = ondas[i];
-        
-        // Fase da onda se movendo em direção ao fundo-esquerdo (tempo positivo)
-        const faseTempo = tempo * o.vel;
-        const offsetOnda = (y + faseTempo * 120) % (metadeDiag * 2) - metadeDiag;
-
-        ctx.beginPath();
-        let primeiro = true;
-
-        for (let x = -metadeDiag; x <= metadeDiag; x += passoX) {
-          // Transformação de volta para coordenadas da tela para interação com mouse
-          const cosA = Math.cos(-angulo);
-          const sinA = Math.sin(-angulo);
-          const screenX = x * cosA - offsetOnda * sinA + width / 2;
-          const screenY = x * sinA + offsetOnda * cosA + height / 2;
-
-          // Efeito de ondulação interativa ao passar o mouse
-          const distMouse = Math.hypot(screenX - mouse.x, screenY - mouse.y);
-          const deformacaoMouse = Math.exp(-distMouse / 280) * 45 * Math.sin(distMouse * 0.025 - tempo * 0.08);
-
-          // Ondulações fluidas com ruído harmônico
-          const sen1 = Math.sin(x * o.freq + faseTempo);
-          const sen2 = Math.cos(x * o.freq * 0.5 - faseTempo * 0.6);
-          const deslocamento = (sen1 + sen2) * o.amp + deformacaoMouse;
-
-          const posY = offsetOnda + deslocamento;
-
-          if (primeiro) {
-            ctx.moveTo(x, posY);
-            primeiro = false;
-          } else {
-            ctx.lineTo(x, posY);
-          }
-        }
-
-        ctx.strokeStyle = o.cor;
-        ctx.lineWidth = o.largura * 0.4;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-
-        // Linha de crista fina e brilhante (espuma / reflexo de luz cósmico na água)
-        ctx.strokeStyle = o.cor.replace(/[\d\.]+\)$/, '0.35)');
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-      }
+    if (luzCursor) {
+      luzCursor.style.transform = `translate3d(${curX - 300}px, ${curY - 300}px, 0)`;
     }
 
-    ctx.restore();
+    if (ondasGrupo) {
+      const offsetX = (curX - window.innerWidth / 2) * 0.02;
+      const offsetY = (curY - window.innerHeight / 2) * 0.02;
+      ondasGrupo.style.transform = `rotate(25deg) translate3d(${offsetX}px, ${offsetY}px, 0)`;
+    }
+
+    if (Math.abs(mouseX - curX) > 0.5 || Math.abs(mouseY - curY) > 0.5) {
+      requestAnimationFrame(atualizarPosicao);
+    } else {
+      ticking = false;
+    }
   }
-
-  function desenharLuzCursor() {
-    ctx.save();
-    // Reflexo de bioluminescência suave onde o mouse navega
-    const rad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 380);
-    rad.addColorStop(0, 'rgba(168, 85, 247, 0.16)');
-    rad.addColorStop(0.35, 'rgba(56, 189, 248, 0.08)');
-    rad.addColorStop(0.7, 'rgba(236, 72, 153, 0.04)');
-    rad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-    ctx.fillStyle = rad;
-    ctx.fillRect(0, 0, width, height);
-    ctx.restore();
-  }
-
-  function animar() {
-    // Suavização do movimento do mouse
-    mouse.x += (targetMouse.x - mouse.x) * 0.045;
-    mouse.y += (targetMouse.y - mouse.y) * 0.045;
-
-    desenharFundoBase();
-    desenharOndasVistaAerea();
-    desenharLuzCursor();
-
-    tempo += 1;
-    animationFrameId = requestAnimationFrame(animar);
-  }
-
-  animar();
 }
 
 if (document.readyState === 'loading') {
