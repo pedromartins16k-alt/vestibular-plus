@@ -9,19 +9,10 @@ const grid = document.getElementById('resumo-grid');
 const filtroContainer = document.getElementById('filtro-materias');
 const modalOverlay = document.getElementById('modal-overlay');
 
-const NIVEIS_RESUMO = ['facil', 'medio', 'dificil', 'genio'];
-const PLANO_PADRAO = { dificuldade_maxima: 'medio', percentual_banco_liberado: 30 };
-
 let resumosCache = [];
 let materiaAtiva = 'todas';
 let favoritosSet = new Set();
 let resumoModalAtual = null;
-
-function nivelPermitido(nivelResumo, maxPlano) {
-  const idxResumo = NIVEIS_RESUMO.indexOf(nivelResumo || 'facil');
-  const idxMax = NIVEIS_RESUMO.indexOf(maxPlano || 'medio');
-  return idxResumo <= idxMax;
-}
 
 function getPlanoExclusivo(resumo) {
   if (resumo.nivel_dificuldade === 'genio') {
@@ -42,12 +33,21 @@ function getPlanoExclusivo(resumo) {
       desc: 'no nível Difícil'
     };
   }
+  if (resumo.nivel_dificuldade === 'medio') {
+    return {
+      nome: 'Basic',
+      classe: 'basic',
+      gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)',
+      corTexto: '#bae6fd',
+      desc: 'no nível Médio'
+    };
+  }
   return {
-    nome: 'PRO',
-    classe: 'pro',
-    gradiente: 'linear-gradient(135deg, #7c3aed, #a855f7)',
-    corTexto: '#e9d5ff',
-    desc: 'do banco completo'
+    nome: 'Basic',
+    classe: 'basic',
+    gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)',
+    corTexto: '#bae6fd',
+    desc: 'do catálogo completo'
   };
 }
 
@@ -69,6 +69,22 @@ function renderIconeCadeado(tipo) {
       </svg>
     `;
   }
+  if (tipo === 'basic') {
+    return `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="display:inline-block; vertical-align:middle;">
+        <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+        <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradBasicPadlock)" stroke="rgba(56,189,248,0.5)" stroke-width="1"/>
+        <circle cx="12" cy="15" r="1.5" fill="#bae6fd"/>
+        <path d="M12 16.5V18.5" stroke="#bae6fd" stroke-width="2" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="gradBasicPadlock" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#0284c7"/>
+            <stop offset="1" stop-color="#38bdf8"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    `;
+  }
   return `
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="display:inline-block; vertical-align:middle;">
       <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#a855f7" stroke-width="2.5" stroke-linecap="round"/>
@@ -85,51 +101,75 @@ function renderIconeCadeado(tipo) {
   `;
 }
 
-// Identifica quais resumos estão liberados e quais estão bloqueados pelo plano
-function marcarResumosLiberadosEBloqueados(lista, plano) {
-  const pct = Number(plano.percentual_banco_liberado) || 30;
-  const maxDificuldade = plano.dificuldade_maxima || 'medio';
+// Aplica regras de liberação:
+// - Fácil: 100% liberado para todos
+// - Médio: 50% liberado no Free, 100% liberado no Basic, Pro e Ultimate
+// - Difícil: 100% liberado no Pro e Ultimate (bloqueado no Free/Basic com "Exclusivo PRO")
+// - Gênio: 100% liberado no Ultimate (bloqueado no Free/Basic/Pro com "Exclusivo Ultimate")
+function marcarResumosLiberadosEBloqueados(lista, nomePlano) {
+  const plano = (nomePlano || 'free').toLowerCase();
 
-  const porMateria = new Map();
+  // Mapeia médios por matéria para liberar exatamente 50% no plano Free
+  const mediosPorMateria = new Map();
   lista.forEach(r => {
-    if (!porMateria.has(r.materia_id)) porMateria.set(r.materia_id, []);
-    porMateria.get(r.materia_id).push(r);
+    if ((r.nivel_dificuldade || 'facil') === 'medio') {
+      if (!mediosPorMateria.has(r.materia_id)) mediosPorMateria.set(r.materia_id, []);
+      mediosPorMateria.get(r.materia_id).push(r.id);
+    }
   });
 
-  const idsLiberados = new Set();
-
-  porMateria.forEach(rs => {
-    // Apenas dentro da dificuldade permitida contam para a cota liberada
-    const dentroDificuldade = rs.filter(r => nivelPermitido(r.nivel_dificuldade, maxDificuldade));
-    const qtdLiberada = pct >= 100 ? rs.length : Math.max(1, Math.ceil(rs.length * pct / 100));
-    dentroDificuldade.slice(0, qtdLiberada).forEach(r => idsLiberados.add(r.id));
+  const idsMediosLiberadosFree = new Set();
+  mediosPorMateria.forEach(ids => {
+    const qtdLiberada = Math.max(1, Math.ceil(ids.length * 0.5)); // Metade liberada
+    ids.slice(0, qtdLiberada).forEach(id => idsMediosLiberadosFree.add(id));
   });
 
-  return lista.map(r => ({
-    ...r,
-    bloqueado: !idsLiberados.has(r.id)
-  }));
+  return lista.map(r => {
+    const nivel = r.nivel_dificuldade || 'facil';
+    let bloqueado = false;
+
+    if (plano === 'premium' || plano === 'ultimate') {
+      bloqueado = false;
+    } else if (plano === 'pro') {
+      bloqueado = (nivel === 'genio');
+    } else if (plano === 'basic') {
+      bloqueado = (nivel === 'dificil' || nivel === 'genio');
+    } else {
+      // Plano Free:
+      if (nivel === 'facil') {
+        bloqueado = false; // Todos os fáceis desbloqueados!
+      } else if (nivel === 'medio') {
+        bloqueado = !idsMediosLiberadosFree.has(r.id); // Metade liberada, metade bloqueada para Basic
+      } else {
+        bloqueado = true; // Difícil e Gênio bloqueados
+      }
+    }
+
+    return {
+      ...r,
+      bloqueado
+    };
+  });
 }
 
-async function buscarPlanoUsuario(userId) {
+async function buscarNomePlanoUsuario(userId) {
   const { data: perfil, error } = await supabase
     .from('profiles')
-    .select('planos(dificuldade_maxima, percentual_banco_liberado)')
+    .select('planos(nome)')
     .eq('id', userId)
     .single();
 
-  if (error || !perfil?.planos) {
-    console.error('Erro ao buscar plano do usuário, aplicando limites do Free:', error);
-    return PLANO_PADRAO;
+  if (error || !perfil?.planos?.nome) {
+    return 'free';
   }
-  return perfil.planos;
+  return perfil.planos.nome;
 }
 
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
 
-  const plano = await buscarPlanoUsuario(session.user.id);
+  const nomePlano = await buscarNomePlanoUsuario(session.user.id);
 
   const { data: materias } = await supabase
     .from('materias')
@@ -141,8 +181,7 @@ async function iniciar() {
     .select('id, titulo, conteudo, fonte, nivel_dificuldade, materia_id, materias(nome, cor)')
     .order('criado_em', { ascending: false });
 
-  // Marca liberados e bloqueados mantendo todos na lista
-  resumosCache = marcarResumosLiberadosEBloqueados(resumos || [], plano);
+  resumosCache = marcarResumosLiberadosEBloqueados(resumos || [], nomePlano);
 
   favoritosSet = await buscarFavoritos('resumo');
 
@@ -210,7 +249,7 @@ function renderResumos() {
       if (resumo.bloqueado) {
         const info = getPlanoExclusivo(resumo);
         mostrarModalUpgrade(
-          `Este resumo ${info.desc} é exclusivo para assinantes do plano ${info.nome}.`,
+          `Este resumo ${info.desc} é exclusivo para assinantes a partir do plano ${info.nome}.`,
           info
         );
       } else {
@@ -241,7 +280,7 @@ async function handleAbrirResumo(resumo) {
     const msg = uso.motivo === 'limite_diario'
       ? `Você atingiu o limite de ${uso.limite} resumos por dia do seu plano atual.`
       : 'Não foi possível verificar seu acesso agora. Tenta de novo em instantes.';
-    mostrarModalUpgrade(msg, { nome: 'PRO', gradiente: 'linear-gradient(135deg, #7c3aed, #ec4899)' });
+    mostrarModalUpgrade(msg, { nome: 'Basic', gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)' });
     return;
   }
 
@@ -303,7 +342,7 @@ function traduzDificuldade(nivel) {
 }
 
 // Modal/aviso de conversão para a página de planos
-function mostrarModalUpgrade(mensagem, infoPlano = { nome: 'PRO', gradiente: 'linear-gradient(135deg, #7c3aed, #ec4899)' }) {
+function mostrarModalUpgrade(mensagem, infoPlano = { nome: 'Basic', gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)' }) {
   let modalUpgrade = document.getElementById('modal-upgrade-alerta');
   if (!modalUpgrade) {
     modalUpgrade = document.createElement('div');
@@ -313,8 +352,15 @@ function mostrarModalUpgrade(mensagem, infoPlano = { nome: 'PRO', gradiente: 'li
   }
 
   const isUltimate = infoPlano.nome === 'Ultimate';
-  const iconeHtml = isUltimate
-    ? `<div style="margin-bottom:14px;">
+  const isBasic = infoPlano.nome === 'Basic';
+  
+  let iconeHtml = `<div style="font-size:3rem;margin-bottom:12px;">🔒</div>`;
+  let bordaCor = 'rgba(168,85,247,.4)';
+
+  if (isUltimate) {
+    bordaCor = 'rgba(244,114,182,.5)';
+    iconeHtml = `
+      <div style="margin-bottom:14px;">
         <svg width="46" height="46" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 6px 16px rgba(244,114,182,.5));">
           <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
           <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradPadlockModal)" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
@@ -328,11 +374,28 @@ function mostrarModalUpgrade(mensagem, infoPlano = { nome: 'PRO', gradiente: 'li
             </linearGradient>
           </defs>
         </svg>
-      </div>`
-    : `<div style="font-size:3rem;margin-bottom:12px;">🔒</div>`;
+      </div>`;
+  } else if (isBasic) {
+    bordaCor = 'rgba(56,189,248,.5)';
+    iconeHtml = `
+      <div style="margin-bottom:14px;">
+        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 6px 16px rgba(56,189,248,.5));">
+          <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
+          <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradBasicModal)" stroke="rgba(56,189,248,0.5)" stroke-width="1"/>
+          <circle cx="12" cy="15" r="1.5" fill="#bae6fd"/>
+          <path d="M12 16.5V18.5" stroke="#bae6fd" stroke-width="2" stroke-linecap="round"/>
+          <defs>
+            <linearGradient id="gradBasicModal" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#0284c7"/>
+              <stop offset="1" stop-color="#38bdf8"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>`;
+  }
 
   modalUpgrade.innerHTML = `
-    <div style="background:var(--bg-card, #13111c);border:1px solid ${isUltimate ? 'rgba(244,114,182,.5)' : 'rgba(168,85,247,.4)'};border-radius:20px;max-width:440px;width:100%;padding:32px 24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6);position:relative;">
+    <div style="background:var(--bg-card, #13111c);border:1px solid ${bordaCor};border-radius:20px;max-width:440px;width:100%;padding:32px 24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6);position:relative;">
       <button id="fechar-modal-upgrade" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-secondary,#a1a1aa);font-size:1.2rem;cursor:pointer;">✕</button>
       ${iconeHtml}
       <h3 style="font-size:1.35rem;font-family:'Sora',sans-serif;margin-bottom:10px;color:#fff;">
@@ -340,7 +403,7 @@ function mostrarModalUpgrade(mensagem, infoPlano = { nome: 'PRO', gradiente: 'li
       </h3>
       <p style="font-size:.92rem;color:var(--text-secondary,#a1a1aa);line-height:1.6;margin-bottom:24px;">${mensagem}</p>
       <div style="display:flex;flex-direction:column;gap:10px;">
-        <a href="./precos.html?plano=${infoPlano.nome.toLowerCase()}" style="display:inline-block;padding:12px 20px;border-radius:12px;background:${infoPlano.gradiente};color:#fff;text-decoration:none;font-weight:700;font-size:.95rem;box-shadow:0 4px 18px rgba(124,58,237,.4);transition:transform .2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        <a href="./precos.html?plano=${infoPlano.nome.toLowerCase()}" style="display:inline-block;padding:12px 20px;border-radius:12px;background:${infoPlano.gradiente};color:#fff;text-decoration:none;font-weight:700;font-size:.95rem;box-shadow:0 4px 18px rgba(0,0,0,.4);transition:transform .2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
           🚀 Desbloquear no Plano ${infoPlano.nome}
         </a>
         <button id="cancelar-upgrade" style="background:none;border:none;color:var(--text-secondary,#71717a);font-size:.85rem;cursor:pointer;padding:6px;">Continuar no plano Free</button>
