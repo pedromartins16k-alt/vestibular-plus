@@ -20,15 +20,15 @@ let resumoModalAtual = null;
 
 function nivelPermitido(nivelResumo, maxPlano) {
   const idxResumo = NIVEIS_RESUMO.indexOf(nivelResumo || 'facil');
-  // dificuldade_maxima do plano pode ser 'genio', que não existe em resumos — trata como 'dificil'.
   const maxEquivalente = maxPlano === 'genio' ? 'dificil' : (maxPlano || 'medio');
   const idxMax = NIVEIS_RESUMO.indexOf(maxEquivalente);
   return idxResumo <= idxMax;
 }
 
-function aplicarPercentualBanco(lista, percentual) {
-  const pct = Number(percentual);
-  if (!pct || pct >= 100) return lista;
+// Identifica quais resumos estão liberados e quais estão bloqueados pelo plano
+function marcarResumosLiberadosEBloqueados(lista, plano) {
+  const pct = Number(plano.percentual_banco_liberado) || 30;
+  const maxDificuldade = plano.dificuldade_maxima || 'medio';
 
   const porMateria = new Map();
   lista.forEach(r => {
@@ -36,12 +36,19 @@ function aplicarPercentualBanco(lista, percentual) {
     porMateria.get(r.materia_id).push(r);
   });
 
-  let resultado = [];
+  const idsLiberados = new Set();
+
   porMateria.forEach(rs => {
-    const qtd = Math.max(1, Math.ceil(rs.length * pct / 100));
-    resultado = resultado.concat(rs.slice(0, qtd));
+    // Apenas dentro da dificuldade permitida contam para a cota liberada
+    const dentroDificuldade = rs.filter(r => nivelPermitido(r.nivel_dificuldade, maxDificuldade));
+    const qtdLiberada = pct >= 100 ? rs.length : Math.max(1, Math.ceil(rs.length * pct / 100));
+    dentroDificuldade.slice(0, qtdLiberada).forEach(r => idsLiberados.add(r.id));
   });
-  return resultado;
+
+  return lista.map(r => ({
+    ...r,
+    bloqueado: !idsLiberados.has(r.id)
+  }));
 }
 
 async function buscarPlanoUsuario(userId) {
@@ -74,8 +81,8 @@ async function iniciar() {
     .select('id, titulo, conteudo, fonte, nivel_dificuldade, materia_id, materias(nome, cor)')
     .order('criado_em', { ascending: false });
 
-  const dentroDaDificuldade = (resumos || []).filter(r => nivelPermitido(r.nivel_dificuldade, plano.dificuldade_maxima));
-  resumosCache = aplicarPercentualBanco(dentroDaDificuldade, plano.percentual_banco_liberado);
+  // Marca liberados e bloqueados mantendo todos na lista
+  resumosCache = marcarResumosLiberadosEBloqueados(resumos || [], plano);
 
   favoritosSet = await buscarFavoritos('resumo');
 
@@ -114,22 +121,37 @@ function renderResumos() {
     const nomeMateria = r.materias?.nome || 'Geral';
     const previa = r.conteudo.replace(/[#*\n]/g, ' ').slice(0, 110) + '...';
     const favoritado = favoritosSet.has(r.id);
+    const estaBloqueado = r.bloqueado;
+
     return `
-      <div class="card resumo-card fade-up" data-index="${i}">
-        <button class="favorito-btn ${favoritado ? 'ativo' : ''}" data-id="${r.id}" title="Favoritar">${favoritado ? '♥' : '♡'}</button>
+      <div class="card resumo-card fade-up ${estaBloqueado ? 'bloqueado' : ''}" data-index="${i}">
+        ${estaBloqueado 
+          ? `<span class="cadeado-badge">🔒 Exclusivo PRO</span>`
+          : `<button class="favorito-btn ${favoritado ? 'ativo' : ''}" data-id="${r.id}" title="Favoritar">${favoritado ? '♥' : '♡'}</button>`
+        }
         <span class="resumo-tag" style="background:${cor}22; color:${cor};">${nomeMateria}</span>
         <h3>${r.titulo}</h3>
         <p>${previa}</p>
         <div class="resumo-meta">
           <span>📊 ${traduzDificuldade(r.nivel_dificuldade)}</span>
-          <span>Ler resumo →</span>
+          ${estaBloqueado 
+            ? `<span style="color:#a855f7; font-weight:600;">🔒 Desbloquear →</span>`
+            : `<span>Ler resumo →</span>`
+          }
         </div>
       </div>
     `;
   }).join('');
 
   grid.querySelectorAll('.resumo-card').forEach(card => {
-    card.addEventListener('click', () => handleAbrirResumo(filtrados[card.dataset.index]));
+    const resumo = filtrados[card.dataset.index];
+    card.addEventListener('click', () => {
+      if (resumo.bloqueado) {
+        mostrarModalUpgrade('Este resumo faz parte do banco completo exclusivo para assinantes dos planos pagos.');
+      } else {
+        handleAbrirResumo(resumo);
+      }
+    });
   });
 
   grid.querySelectorAll('.favorito-btn').forEach(btn => {
@@ -146,15 +168,15 @@ async function handleAbrirResumo(resumo) {
 
   if (error) {
     console.error('[uso resumo]', error);
-    abrirModal(resumo); // se der erro de rede, não trava o aluno por causa disso
+    abrirModal(resumo);
     return;
   }
 
   if (!uso.permitido) {
     const msg = uso.motivo === 'limite_diario'
-      ? `Você atingiu o limite de ${uso.limite} resumos por dia do seu plano atual. Volte amanhã ou faça upgrade pra continuar estudando hoje.`
+      ? `Você atingiu o limite de ${uso.limite} resumos por dia do seu plano atual.`
       : 'Não foi possível verificar seu acesso agora. Tenta de novo em instantes.';
-    mostrarAvisoLimite(msg);
+    mostrarModalUpgrade(msg);
     return;
   }
 
@@ -215,19 +237,37 @@ function traduzDificuldade(nivel) {
   return { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' }[nivel] || '—';
 }
 
-// Aviso visual reutilizável quando o aluno bate no limite do plano.
-function mostrarAvisoLimite(mensagem) {
-  let aviso = document.getElementById('aviso-limite');
-  if (!aviso) {
-    aviso = document.createElement('div');
-    aviso.id = 'aviso-limite';
-    aviso.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:100;max-width:420px;width:90%;padding:14px 18px;border-radius:12px;background:rgba(239,68,68,.18);border:1px solid #ef4444;color:#fff;font-size:.88rem;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.35);backdrop-filter:blur(6px);';
-    document.body.appendChild(aviso);
+// Modal/aviso de conversão para a página de planos
+function mostrarModalUpgrade(mensagem) {
+  let modalUpgrade = document.getElementById('modal-upgrade-alerta');
+  if (!modalUpgrade) {
+    modalUpgrade = document.createElement('div');
+    modalUpgrade.id = 'modal-upgrade-alerta';
+    modalUpgrade.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;backdrop-filter:blur(6px);';
+    modalUpgrade.innerHTML = `
+      <div style="background:var(--bg-card, #13111c);border:1px solid rgba(168,85,247,.4);border-radius:20px;max-width:440px;width:100%;padding:32px 24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6);position:relative;">
+        <button id="fechar-modal-upgrade" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-secondary,#a1a1aa);font-size:1.2rem;cursor:pointer;">✕</button>
+        <div style="font-size:3rem;margin-bottom:12px;">🔒</div>
+        <h3 style="font-size:1.35rem;font-family:'Sora',sans-serif;margin-bottom:10px;color:#fff;">Conteúdo Exclusivo</h3>
+        <p id="msg-upgrade-texto" style="font-size:.92rem;color:var(--text-secondary,#a1a1aa);line-height:1.6;margin-bottom:24px;"></p>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <a href="./precos.html" style="display:inline-block;padding:12px 20px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#ec4899);color:#fff;text-decoration:none;font-weight:700;font-size:.95rem;box-shadow:0 4px 15px rgba(124,58,237,.4);transition:transform .2s;">
+            🚀 Ver Planos e Desbloquear
+          </a>
+          <button id="cancelar-upgrade" style="background:none;border:none;color:var(--text-secondary,#71717a);font-size:.85rem;cursor:pointer;padding:6px;">Continuar no plano Free</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalUpgrade);
+
+    const fechar = () => { modalUpgrade.style.display = 'none'; };
+    document.getElementById('fechar-modal-upgrade').onclick = fechar;
+    document.getElementById('cancelar-upgrade').onclick = fechar;
+    modalUpgrade.onclick = (e) => { if (e.target === modalUpgrade) fechar(); };
   }
-  aviso.textContent = mensagem;
-  aviso.style.display = 'block';
-  clearTimeout(aviso._timeout);
-  aviso._timeout = setTimeout(() => { aviso.style.display = 'none'; }, 6000);
+
+  document.getElementById('msg-upgrade-texto').textContent = mensagem;
+  modalUpgrade.style.display = 'flex';
 }
 
 document.getElementById('modal-close').addEventListener('click', () => {
