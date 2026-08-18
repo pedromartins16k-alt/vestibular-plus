@@ -1,6 +1,7 @@
 /**
- * Fundo de Ondas Suaves e Interativas (Calm Waves)
- * Efeito visual moderno, fluído e leve que reage suavemente ao movimento do mouse.
+ * Fundo de Ondas Diagonais — Vista Aérea do Mar (Top-Down Ocean Waves)
+ * Efeito visual de ondas oceânicas calmas descendo do topo direito em direção ao fundo esquerdo,
+ * reagindo com ondulações dinâmicas ao movimento do mouse.
  */
 
 function iniciarFundoOndas() {
@@ -16,22 +17,23 @@ function iniciarFundoOndas() {
     height: 100vh;
     pointer-events: none;
     z-index: -999;
-    opacity: 0.75;
+    opacity: 0.85;
     transition: opacity 0.5s ease;
   `;
   document.body.appendChild(canvas);
 
   const ctx = canvas.getContext('2d');
-  let width, height;
+  let width, height, diagonalLength;
   let animationFrameId;
 
-  // Posição do mouse com amortecimento suave (lerp)
+  // Interpolação suave do mouse (smooth lerp)
   let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   let targetMouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
   function redimensionar() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
+    diagonalLength = Math.hypot(width, height);
   }
 
   window.addEventListener('resize', redimensionar);
@@ -44,96 +46,112 @@ function iniciarFundoOndas() {
 
   let tempo = 0;
 
-  // Definição das camadas de ondas calmantes nas cores da identidade visual
-  const camadas = [
-    {
-      comprimentoOnda: 0.0018,
-      velocidade: 0.006,
-      amplitude: 55,
-      yOffset: 0.65,
-      cor1: 'rgba(124, 58, 237, 0.28)', // Roxo vibrante
-      cor2: 'rgba(59, 130, 246, 0.15)',  // Azul
-    },
-    {
-      comprimentoOnda: 0.0024,
-      velocidade: 0.008,
-      amplitude: 70,
-      yOffset: 0.75,
-      cor1: 'rgba(236, 72, 153, 0.22)', // Rosa Neon / Aurora
-      cor2: 'rgba(124, 58, 237, 0.12)', // Violeta
-    },
-    {
-      comprimentoOnda: 0.0014,
-      velocidade: 0.005,
-      amplitude: 45,
-      yOffset: 0.85,
-      cor1: 'rgba(6, 182, 212, 0.20)',  // Ciano / Azul claro
-      cor2: 'rgba(147, 51, 234, 0.10)', // Púrpura
-    }
+  // Configuração de ondas com fluxo diagonal do topo-direito (TR) para fundo-esquerdo (BL)
+  const ondas = [
+    { freq: 0.0035, vel: 0.012, amp: 28, cor: 'rgba(124, 58, 237, 0.16)', largura: 90 },
+    { freq: 0.0045, vel: 0.016, amp: 38, cor: 'rgba(59, 130, 246, 0.14)', largura: 110 },
+    { freq: 0.0028, vel: 0.010, amp: 48, cor: 'rgba(236, 72, 153, 0.12)', largura: 130 },
+    { freq: 0.0055, vel: 0.019, amp: 22, cor: 'rgba(6, 182, 212, 0.15)', largura: 75 },
+    { freq: 0.0038, vel: 0.014, amp: 32, cor: 'rgba(168, 85, 247, 0.15)', largura: 95 },
   ];
 
-  function desenharOnda(camada, index) {
+  function desenharFundoBase() {
+    // Gradiente base suave e profundo
+    const gradBase = ctx.createLinearGradient(width, 0, 0, height);
+    gradBase.addColorStop(0, '#0f0c1b');
+    gradBase.addColorStop(0.5, '#0b0914');
+    gradBase.addColorStop(1, '#07060d');
+    ctx.fillStyle = gradBase;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  function desenharOndasVistaAerea() {
     ctx.save();
 
-    const mouseInfluenciaX = (mouse.x - width / 2) * 0.0003 * (index + 1);
-    const mouseInfluenciaY = (mouse.y - height / 2) * 0.08 * (index + 1);
+    // Rotação para criar a perspectiva diagonal exata (topo direito -> fundo esquerdo)
+    // Ângulo de ~45 graus
+    const angulo = Math.PI / 4;
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(angulo);
 
-    const gradiente = ctx.createLinearGradient(0, 0, width, height);
-    gradiente.addColorStop(0, camada.cor1);
-    gradiente.addColorStop(1, camada.cor2);
+    const metadeDiag = diagonalLength * 0.85;
+    const passoX = 16;
+    const passoY = 38;
 
-    ctx.fillStyle = gradiente;
-    ctx.beginPath();
+    for (let y = -metadeDiag; y <= metadeDiag; y += passoY) {
+      for (let i = 0; i < ondas.length; i++) {
+        const o = ondas[i];
+        
+        // Fase da onda se movendo em direção ao fundo-esquerdo (tempo positivo)
+        const faseTempo = tempo * o.vel;
+        const offsetOnda = (y + faseTempo * 120) % (metadeDiag * 2) - metadeDiag;
 
-    const baseY = height * camada.yOffset + mouseInfluenciaY;
-    ctx.moveTo(0, height);
-    ctx.lineTo(0, baseY);
+        ctx.beginPath();
+        let primeiro = true;
 
-    for (let x = 0; x <= width; x += 12) {
-      const seno1 = Math.sin(x * camada.comprimentoOnda + tempo * camada.velocidade + mouseInfluenciaX);
-      const seno2 = Math.cos(x * camada.comprimentoOnda * 0.5 - tempo * camada.velocidade * 0.8);
-      
-      // Deformação suave ao redor do cursor
-      const distMouse = Math.hypot(x - mouse.x, baseY - mouse.y);
-      const ondaMouse = Math.exp(-distMouse / 260) * 35 * Math.sin(distMouse * 0.03 - tempo * 0.05);
+        for (let x = -metadeDiag; x <= metadeDiag; x += passoX) {
+          // Transformação de volta para coordenadas da tela para interação com mouse
+          const cosA = Math.cos(-angulo);
+          const sinA = Math.sin(-angulo);
+          const screenX = x * cosA - offsetOnda * sinA + width / 2;
+          const screenY = x * sinA + offsetOnda * cosA + height / 2;
 
-      const y = baseY + (seno1 + seno2) * (camada.amplitude * 0.5) + ondaMouse;
-      ctx.lineTo(x, y);
+          // Efeito de ondulação interativa ao passar o mouse
+          const distMouse = Math.hypot(screenX - mouse.x, screenY - mouse.y);
+          const deformacaoMouse = Math.exp(-distMouse / 280) * 45 * Math.sin(distMouse * 0.025 - tempo * 0.08);
+
+          // Ondulações fluidas com ruído harmônico
+          const sen1 = Math.sin(x * o.freq + faseTempo);
+          const sen2 = Math.cos(x * o.freq * 0.5 - faseTempo * 0.6);
+          const deslocamento = (sen1 + sen2) * o.amp + deformacaoMouse;
+
+          const posY = offsetOnda + deslocamento;
+
+          if (primeiro) {
+            ctx.moveTo(x, posY);
+            primeiro = false;
+          } else {
+            ctx.lineTo(x, posY);
+          }
+        }
+
+        ctx.strokeStyle = o.cor;
+        ctx.lineWidth = o.largura * 0.4;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // Linha de crista fina e brilhante (espuma / reflexo de luz cósmico na água)
+        ctx.strokeStyle = o.cor.replace(/[\d\.]+\)$/, '0.35)');
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+      }
     }
 
-    ctx.lineTo(width, height);
-    ctx.closePath();
-    ctx.fill();
     ctx.restore();
   }
 
-  function desenharGlowCursor() {
+  function desenharLuzCursor() {
     ctx.save();
-    // Brilho suave sob o cursor
-    const radial = ctx.createRadialGradient(mouse.x, mouse.y, 10, mouse.x, mouse.y, 320);
-    radial.addColorStop(0, 'rgba(168, 85, 247, 0.18)');
-    radial.addColorStop(0.5, 'rgba(59, 130, 246, 0.08)');
-    radial.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    // Reflexo de bioluminescência suave onde o mouse navega
+    const rad = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 380);
+    rad.addColorStop(0, 'rgba(168, 85, 247, 0.16)');
+    rad.addColorStop(0.35, 'rgba(56, 189, 248, 0.08)');
+    rad.addColorStop(0.7, 'rgba(236, 72, 153, 0.04)');
+    rad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
-    ctx.fillStyle = radial;
+    ctx.fillStyle = rad;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
   }
 
   function animar() {
-    // Interpolação suave do mouse (easing)
-    mouse.x += (targetMouse.x - mouse.x) * 0.04;
-    mouse.y += (targetMouse.y - mouse.y) * 0.04;
+    // Suavização do movimento do mouse
+    mouse.x += (targetMouse.x - mouse.x) * 0.045;
+    mouse.y += (targetMouse.y - mouse.y) * 0.045;
 
-    ctx.clearRect(0, 0, width, height);
-
-    // Efeito de iluminação que acompanha o mouse
-    desenharGlowCursor();
-
-    // Renderiza cada camada de onda fluída
-    for (let i = 0; i < camadas.length; i++) {
-      desenharOnda(camadas[i], i);
-    }
+    desenharFundoBase();
+    desenharOndasVistaAerea();
+    desenharLuzCursor();
 
     tempo += 1;
     animationFrameId = requestAnimationFrame(animar);

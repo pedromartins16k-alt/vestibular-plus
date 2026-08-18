@@ -2,15 +2,16 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; background: var(--bg-base); }
 
 body {
   font-family: var(--font-body);
-  background: var(--bg-base);
+  background: transparent;
   color: var(--text-primary);
-  transition: background var(--transition-base), color var(--transition-base);
+  transition: color var(--transition-base);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  position: relative;
 }
 
 h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.02em; }
