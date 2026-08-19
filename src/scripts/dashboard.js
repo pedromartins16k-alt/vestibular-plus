@@ -6,10 +6,13 @@ import { iniciarBusca } from './busca-global.js';
 import { verificarConquistas } from './conquistas.js';
 import { aplicarCadeadosSidebar } from './plano-sidebar.js';
 
+let currentUserId = null;
+
 async function iniciarDashboard() {
   const session = await exigirAutenticacao();
   if (!session) return;
   const userId = session.user.id;
+  currentUserId = userId;
 
   // ---- Perfil (nome, nível, XP) ----
   const { data: profile } = await supabase
@@ -42,16 +45,19 @@ async function iniciarDashboard() {
       sessoes.filter(s => s.tipo === 'questoes').length;
     document.getElementById('stat-simulados').textContent =
       sessoes.filter(s => s.tipo === 'simulado').length;
+
+    // Atualiza a ofensiva no topo
     const seq = calcularSequencia(sessoes.map(s => s.criado_em));
-    document.getElementById('stat-sequencia').textContent = seq;
     const topbarStreak = document.getElementById('topbar-streak');
     if (topbarStreak) {
       topbarStreak.textContent = `${seq} ${seq === 1 ? 'dia seguido' : 'dias seguidos'}`;
     }
   }
 
+  // ---- Carrega as cotas/limites restantes de funções ----
+  await carregarCotasDisponiveis(userId);
+
   // ---- Contagem Regressiva para o Vestibular/ENEM no Topbar ----
-  carregarCotasDisponiveis(userId);
   carregarContagemVestibulares();
 
   // ---- Matérias + progresso ----
@@ -105,6 +111,70 @@ async function iniciarDashboard() {
 
   verificarConquistas(userId);
   aplicarCadeadosSidebar(userId);
+  iniciarSincronizacaoRealtime(userId);
+}
+
+// Carrega a quantidade restante de cada função diretamente via RPC do banco
+async function carregarCotasDisponiveis(userId) {
+  if (!userId) return;
+
+  try {
+    const [usoQ, usoR, usoC, usoS] = await Promise.all([
+      supabase.rpc('consultar_uso_diario', { p_tipo: 'questao' }),
+      supabase.rpc('consultar_uso_diario', { p_tipo: 'resumo' }),
+      supabase.rpc('consultar_uso_diario', { p_tipo: 'chat' }),
+      supabase.rpc('consultar_uso_diario', { p_tipo: 'simulado' })
+    ]);
+
+    const formatarCota = (res, fallbackLimite) => {
+      if (res?.error || !res?.data) return fallbackLimite;
+      const d = res.data;
+      if (d.plano && ['pro', 'premium', 'ultimate'].includes(d.plano.toLowerCase())) return '∞';
+      const lim = d.limite ?? fallbackLimite;
+      const usado = d.usado ?? 0;
+      return Math.max(0, lim - usado);
+    };
+
+    const elQ = document.getElementById('cota-questoes');
+    const elR = document.getElementById('cota-resumos');
+    const elC = document.getElementById('cota-chat');
+    const elS = document.getElementById('cota-simulados');
+
+    if (elQ) elQ.textContent = formatarCota(usoQ, 15);
+    if (elR) elR.textContent = formatarCota(usoR, 10);
+    if (elC) elC.textContent = formatarCota(usoC, 10);
+    if (elS) elS.textContent = formatarCota(usoS, 5);
+  } catch (err) {
+    console.error('Erro ao carregar cotas:', err);
+  }
+}
+
+// Atualização em tempo real (mudança de aba, foco e canal Supabase Realtime)
+function iniciarSincronizacaoRealtime(userId) {
+  window.addEventListener('focus', () => carregarCotasDisponiveis(userId));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      carregarCotasDisponiveis(userId);
+    }
+  });
+
+  // Atualiza automaticamente a cada 10 segundos
+  setInterval(() => carregarCotasDisponiveis(userId), 10000);
+
+  // Escuta no Supabase Realtime para atualizar instantaneamente quando o banco registrar uso
+  try {
+    supabase
+      .channel('cotas-realtime-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'uso_recursos' }, () => {
+        carregarCotasDisponiveis(userId);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'sessoes_estudo' }, () => {
+        carregarCotasDisponiveis(userId);
+      })
+      .subscribe();
+  } catch (e) {
+    console.warn('Realtime channel warning:', e);
+  }
 }
 
 // Conta os dias seguidos no fuso horário local correto
@@ -123,7 +193,6 @@ function calcularSequencia(datasCriadoEm) {
   const cursor = new Date();
   const hojeStr = formatLocalDate(cursor);
 
-  // Se não estudou hoje ainda, checa a partir de ontem para manter a sequência ativa
   if (!dias.has(hojeStr)) {
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -172,63 +241,3 @@ async function carregarContagemVestibulares() {
 iniciarDashboard();
 iniciarBusca();
 iniciarNotificacoes();
-// Carrega a quantidade restante de cada função (questões, resumos, IA, simulados)
-async function carregarCotasDisponiveis(userId) {
-  try {
-    const hojeStr = new Date().toLocaleDateString('en-CA');
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('planos(nome, limite_questoes_dia, limite_resumos_dia, limite_chat_dia, limite_simulados_semana)')
-      .eq('id', userId)
-      .single();
-
-    const plano = profile?.planos;
-    const nomePlano = (plano?.nome || 'free').toLowerCase();
-
-    if (nomePlano === 'pro' || nomePlano === 'premium' || nomePlano === 'ultimate') {
-      const elQ = document.getElementById('cota-questoes');
-      const elR = document.getElementById('cota-resumos');
-      const elC = document.getElementById('cota-chat');
-      const elS = document.getElementById('cota-simulados');
-      if (elQ) elQ.textContent = '∞';
-      if (elR) elR.textContent = '∞';
-      if (elC) elC.textContent = '∞';
-      if (elS) elS.textContent = '∞';
-      return;
-    }
-
-    const limQuestoes = plano?.limite_questoes_dia || 15;
-    const limResumos = plano?.limite_resumos_dia || 10;
-    const limChat = plano?.limite_chat_dia || 10;
-    const limSimulados = plano?.limite_simulados_semana || 5;
-
-    const { data: usos } = await supabase
-      .from('uso_recursos')
-      .select('tipo, quantidade')
-      .eq('user_id', userId)
-      .eq('data', hojeStr);
-
-    const usoMap = {};
-    (usos || []).forEach(u => {
-      usoMap[u.tipo] = u.quantidade || 0;
-    });
-
-    const restQuestoes = Math.max(0, limQuestoes - (usoMap['questao'] || 0));
-    const restResumos = Math.max(0, limResumos - (usoMap['resumo'] || 0));
-    const restChat = Math.max(0, limChat - (usoMap['chat'] || 0));
-    const restSimulados = Math.max(0, limSimulados - (usoMap['simulado'] || 0));
-
-    const elQ = document.getElementById('cota-questoes');
-    const elR = document.getElementById('cota-resumos');
-    const elC = document.getElementById('cota-chat');
-    const elS = document.getElementById('cota-simulados');
-
-    if (elQ) elQ.textContent = restQuestoes;
-    if (elR) elR.textContent = restResumos;
-    if (elC) elC.textContent = restChat;
-    if (elS) elS.textContent = restSimulados;
-  } catch (err) {
-    console.error('Erro ao carregar cotas:', err);
-  }
-}
