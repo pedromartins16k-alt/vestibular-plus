@@ -1,4 +1,4 @@
-﻿import { iniciarNotificacoes } from './notificacoes-global.js';
+import { iniciarNotificacoes } from './notificacoes-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao, sair } from '../lib/authGuard.js';
 import { calcularProgressoNivel } from '../utils/xp.js';
@@ -42,19 +42,16 @@ async function iniciarDashboard() {
       sessoes.filter(s => s.tipo === 'questoes').length;
     document.getElementById('stat-simulados').textContent =
       sessoes.filter(s => s.tipo === 'simulado').length;
-
-    // Atualiza o contador de ofensiva no topo
     const seq = calcularSequencia(sessoes.map(s => s.criado_em));
+    document.getElementById('stat-sequencia').textContent = seq;
     const topbarStreak = document.getElementById('topbar-streak');
     if (topbarStreak) {
       topbarStreak.textContent = `${seq} ${seq === 1 ? 'dia seguido' : 'dias seguidos'}`;
     }
   }
 
-  // ---- Carrega as cotas/limites restantes de funções ----
-  carregarCotasDisponiveis(userId);
-
   // ---- Contagem Regressiva para o Vestibular/ENEM no Topbar ----
+  carregarCotasDisponiveis(userId);
   carregarContagemVestibulares();
 
   // ---- Matérias + progresso ----
@@ -110,6 +107,71 @@ async function iniciarDashboard() {
   aplicarCadeadosSidebar(userId);
 }
 
+// Conta os dias seguidos no fuso horário local correto
+function calcularSequencia(datasCriadoEm) {
+  if (!datasCriadoEm || !datasCriadoEm.length) return 0;
+
+  const formatLocalDate = (d) => {
+    const date = new Date(d);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const dias = new Set(datasCriadoEm.map(formatLocalDate));
+  const cursor = new Date();
+  const hojeStr = formatLocalDate(cursor);
+
+  // Se não estudou hoje ainda, checa a partir de ontem para manter a sequência ativa
+  if (!dias.has(hojeStr)) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  let sequencia = 0;
+  while (dias.has(formatLocalDate(cursor))) {
+    sequencia++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return sequencia;
+}
+
+async function carregarContagemVestibulares() {
+  const el = document.getElementById('topbar-countdown');
+  if (!el) return;
+
+  try {
+    const { data: vestibulares } = await supabase
+      .from('vestibulares')
+      .select('nome, data_prova')
+      .order('data_prova', { ascending: true });
+
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const proximo = (vestibulares || []).find(v => v.data_prova && new Date(v.data_prova) >= hoje);
+
+    if (proximo) {
+      const diffMs = new Date(proximo.data_prova) - hoje;
+      const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      el.textContent = `${proximo.nome}: Faltam ${dias} dias`;
+    } else {
+      const anoAtual = hoje.getFullYear();
+      let dataEnem = new Date(anoAtual, 10, 8);
+      if (dataEnem < hoje) dataEnem = new Date(anoAtual + 1, 10, 8);
+      const diffMs = dataEnem - hoje;
+      const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      el.textContent = `ENEM ${dataEnem.getFullYear()}: Faltam ${dias} dias`;
+    }
+  } catch (_) {
+    el.textContent = 'ENEM 2026: Faltam 82 dias';
+  }
+}
+
+iniciarDashboard();
+iniciarBusca();
+iniciarNotificacoes();
 // Carrega a quantidade restante de cada função (questões, resumos, IA, simulados)
 async function carregarCotasDisponiveis(userId) {
   try {
@@ -170,68 +232,3 @@ async function carregarCotasDisponiveis(userId) {
     console.error('Erro ao carregar cotas:', err);
   }
 }
-
-// Conta os dias seguidos no fuso horário local correto
-function calcularSequencia(datasCriadoEm) {
-  if (!datasCriadoEm || !datasCriadoEm.length) return 0;
-
-  const formatLocalDate = (d) => {
-    const date = new Date(d);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const dias = new Set(datasCriadoEm.map(formatLocalDate));
-  const cursor = new Date();
-  const hojeStr = formatLocalDate(cursor);
-
-  if (!dias.has(hojeStr)) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  let sequencia = 0;
-  while (dias.has(formatLocalDate(cursor))) {
-    sequencia++;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  return sequencia;
-}
-
-async function carregarContagemVestibulares() {
-  const el = document.getElementById('topbar-countdown');
-  if (!el) return;
-
-  try {
-    const { data: vestibulares } = await supabase
-      .from('vestibulares')
-      .select('nome, data_prova')
-      .order('data_prova', { ascending: true });
-
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
-    const proximo = (vestibulares || []).find(v => v.data_prova && new Date(v.data_prova) >= hoje);
-
-    if (proximo) {
-      const diffMs = new Date(proximo.data_prova) - hoje;
-      const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      el.textContent = `${proximo.nome}: Faltam ${dias} dias`;
-    } else {
-      const anoAtual = hoje.getFullYear();
-      let dataEnem = new Date(anoAtual, 10, 8);
-      if (dataEnem < hoje) dataEnem = new Date(anoAtual + 1, 10, 8);
-      const diffMs = dataEnem - hoje;
-      const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      el.textContent = `ENEM ${dataEnem.getFullYear()}: Faltam ${dias} dias`;
-    }
-  } catch (_) {
-    el.textContent = 'ENEM 2026: Faltam 82 dias';
-  }
-}
-
-iniciarDashboard();
-iniciarBusca();
-iniciarNotificacoes();
