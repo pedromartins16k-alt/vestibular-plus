@@ -1,4 +1,4 @@
-import { iniciarNotificacoes } from './notificacoes-global.js';
+﻿import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
@@ -24,7 +24,6 @@ let acertos = 0;
 let sessionUserId = null;
 let favoritosSet = new Set();
 let nomePlanoUsuario = 'free';
-let questaoAtualContada = false;
 
 function getPlanoExclusivo(dificuldade) {
   if (dificuldade === 'genio') {
@@ -131,7 +130,6 @@ async function buscarTodasQuestoes() {
 function marcarQuestoesLiberadasEBloqueadas(lista, nomePlano) {
   const plano = (nomePlano || 'free').toLowerCase();
 
-  // Mapeia médios por matéria para liberar 50% no Free
   const mediosPorMateria = new Map();
   lista.forEach(q => {
     if ((q.dificuldade || 'facil') === 'medio') {
@@ -157,13 +155,12 @@ function marcarQuestoesLiberadasEBloqueadas(lista, nomePlano) {
     } else if (plano === 'basic') {
       bloqueada = (nivel === 'dificil' || nivel === 'genio');
     } else {
-      // Plano Free:
       if (nivel === 'facil') {
-        bloqueada = false; // 100% dos fáceis liberados
+        bloqueada = false;
       } else if (nivel === 'medio') {
-        bloqueada = !idsMediosLiberadosFree.has(q.id); // 50% liberados, 50% para Basic
+        bloqueada = !idsMediosLiberadosFree.has(q.id);
       } else {
-        bloqueada = true; // Difícil e Gênio bloqueados
+        bloqueada = true;
       }
     }
 
@@ -187,94 +184,23 @@ async function buscarNomePlanoUsuario() {
   return perfil.planos.nome;
 }
 
-async function checarELimitarQuestao() {
-  const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'questao' });
+async function checarLimiteQuestao() {
+  const { data: uso, error } = await supabase.rpc('consultar_uso_diario', { p_tipo: 'questao' });
+  if (error) {
+    return { permitido: true };
+  }
+  return uso || { permitido: true };
+}
 
+async function registrarConsumoQuestao() {
+  const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'questao' });
   if (error) {
     console.error('[uso questao]', error);
-    return { permitido: true };
   }
   return uso;
 }
 
-function mostrarModalUpgrade(mensagem, infoPlano = { nome: 'Basic', gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)' }) {
-  let modalUpgrade = document.getElementById('modal-upgrade-alerta');
-  if (!modalUpgrade) {
-    modalUpgrade = document.createElement('div');
-    modalUpgrade.id = 'modal-upgrade-alerta';
-    modalUpgrade.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;backdrop-filter:blur(6px);animation:fadeIn .2s ease;';
-    document.body.appendChild(modalUpgrade);
-  }
-
-  const isUltimate = infoPlano.nome === 'Ultimate';
-  const isBasic = infoPlano.nome === 'Basic';
-
-  let iconeHtml = `<div style="font-size:3rem;margin-bottom:12px;">🔒</div>`;
-  let bordaCor = 'rgba(168,85,247,.4)';
-
-  if (isUltimate) {
-    bordaCor = 'rgba(244,114,182,.5)';
-    iconeHtml = `
-      <div style="margin-bottom:14px;">
-        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 6px 16px rgba(244,114,182,.5));">
-          <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
-          <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradPadlockModalQ)" stroke="rgba(255,255,255,0.5)" stroke-width="1"/>
-          <circle cx="12" cy="15" r="1.5" fill="#34d399"/>
-          <path d="M12 16.5V18.5" stroke="#34d399" stroke-width="2" stroke-linecap="round"/>
-          <defs>
-            <linearGradient id="gradPadlockModalQ" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#f472b6"/>
-              <stop offset="0.5" stop-color="#c084fc"/>
-              <stop offset="1" stop-color="#60a5fa"/>
-            </linearGradient>
-          </defs>
-        </svg>
-      </div>`;
-  } else if (isBasic) {
-    bordaCor = 'rgba(56,189,248,.5)';
-    iconeHtml = `
-      <div style="margin-bottom:14px;">
-        <svg width="46" height="46" viewBox="0 0 24 24" fill="none" style="filter:drop-shadow(0 6px 16px rgba(56,189,248,.5));">
-          <path d="M7 10V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V10" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/>
-          <rect x="4" y="10" width="16" height="12" rx="3" fill="url(#gradBasicModalQ)" stroke="rgba(56,189,248,0.5)" stroke-width="1"/>
-          <circle cx="12" cy="15" r="1.5" fill="#bae6fd"/>
-          <path d="M12 16.5V18.5" stroke="#bae6fd" stroke-width="2" stroke-linecap="round"/>
-          <defs>
-            <linearGradient id="gradBasicModalQ" x1="4" y1="10" x2="20" y2="22" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#0284c7"/>
-              <stop offset="1" stop-color="#38bdf8"/>
-            </linearGradient>
-          </defs>
-        </svg>
-      </div>`;
-  }
-
-  modalUpgrade.innerHTML = `
-    <div style="background:var(--bg-card, #13111c);border:1px solid ${bordaCor};border-radius:20px;max-width:440px;width:100%;padding:32px 24px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.6);position:relative;">
-      <button id="fechar-modal-upgrade" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-secondary,#a1a1aa);font-size:1.2rem;cursor:pointer;">✕</button>
-      ${iconeHtml}
-      <h3 style="font-size:1.35rem;font-family:'Sora',sans-serif;margin-bottom:10px;color:#fff;">
-        Exclusivo Plano <span style="background:${infoPlano.gradiente};-webkit-background-clip:text;-webkit-text-fill-color:transparent;">${infoPlano.nome}</span>
-      </h3>
-      <p style="font-size:.92rem;color:var(--text-secondary,#a1a1aa);line-height:1.6;margin-bottom:24px;">${mensagem}</p>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <a href="./precos.html?plano=${infoPlano.nome.toLowerCase()}" style="display:inline-block;padding:12px 20px;border-radius:12px;background:${infoPlano.gradiente};color:#fff;text-decoration:none;font-weight:700;font-size:.95rem;box-shadow:0 4px 18px rgba(0,0,0,.4);transition:transform .2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-          🚀 Desbloquear no Plano ${infoPlano.nome}
-        </a>
-        <button id="cancelar-upgrade" style="background:none;border:none;color:var(--text-secondary,#71717a);font-size:.85rem;cursor:pointer;padding:6px;">Continuar no plano Free</button>
-      </div>
-    </div>
-  `;
-
-  const fechar = () => { modalUpgrade.style.display = 'none'; };
-  document.getElementById('fechar-modal-upgrade').onclick = fechar;
-  document.getElementById('cancelar-upgrade').onclick = fechar;
-  modalUpgrade.onclick = (e) => { if (e.target === modalUpgrade) fechar(); };
-
-  modalUpgrade.style.display = 'flex';
-}
-
-function renderLimiteAtingido(limite) {
+function renderLimiteAtingido(limite = 15) {
   container.innerHTML = `
     <div class="card questao-card" style="text-align:center;">
       <div style="font-size:3rem; margin-bottom:10px;">🔒</div>
@@ -343,10 +269,17 @@ function renderFiltros(materias) {
 }
 
 function questoesFiltradas() {
-  if (materiaAtiva === 'todas') return questoesCache;
-  const daMateria = questoesCache.filter(q => q.materia_id === materiaAtiva);
-  if (!temaAtivo || temaAtivo === 'todos') return daMateria;
-  return daMateria.filter(q => q.aula_id === temaAtivo);
+  let lista = questoesCache;
+
+  if (materiaAtiva !== 'todas') {
+    lista = lista.filter(q => q.materia_id === materiaAtiva);
+  }
+
+  if (temaAtivo && temaAtivo !== 'todos') {
+    lista = lista.filter(q => q.aula_id === temaAtivo);
+  }
+
+  return lista;
 }
 
 function renderTemas(materiaId) {
@@ -432,7 +365,6 @@ async function renderQuestaoAtual() {
 
   const lista = questoesFiltradas();
   respondida = false;
-  questaoAtualContada = false;
 
   const voltarTemasHtml = materiaAtiva !== 'todas'
     ? `<span class="back-link" id="voltar-temas-link" style="display:block; margin-bottom:12px;">← Voltar aos temas</span>`
@@ -462,11 +394,10 @@ async function renderQuestaoAtual() {
   const estaBloqueada = q.bloqueada;
   const infoPlano = getPlanoExclusivo(q.dificuldade);
 
-  if (!estaBloqueada && !questaoAtualContada) {
-    questaoAtualContada = true;
-    const uso = await checarELimitarQuestao();
+  if (!estaBloqueada) {
+    const uso = await checarLimiteQuestao();
     if (!uso.permitido) {
-      renderLimiteAtingido(uso.limite);
+      renderLimiteAtingido(uso.limite || 15);
       return;
     }
   }
@@ -514,7 +445,6 @@ async function renderQuestaoAtual() {
     return;
   }
 
-  // Questão Liberada:
   container.innerHTML = `
     ${voltarTemasHtml}
     <div class="card questao-card fade-up">
@@ -580,6 +510,8 @@ async function toggleFavoritoQuestao(id) {
 async function selecionarResposta(el, questao) {
   if (respondida) return;
   respondida = true;
+
+  await registrarConsumoQuestao();
 
   const letraEscolhida = el.dataset.letra;
   const acertou = letraEscolhida === questao.resposta_correta;
