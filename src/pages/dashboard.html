@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Dashboard · Vestibular+</title>
+<title>Dashboard Â· Vestibular+</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles/base.css" />
 <style>
@@ -17,7 +17,7 @@
   .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
   .search-box { flex: 0 1 320px; position: relative; }
   .search-box input { padding-left: 40px; }
-  .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; }
+  .search-box::before { content: 'ðŸ”Ž'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; }
 
   /* Widgets Centrais da Topbar */
   .topbar-center-widgets { display: flex; align-items: center; gap: 12px; }
@@ -84,7 +84,7 @@
   .busca-item:hover { background: var(--glass-bg); }
   .busca-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
 
-  /* Sininho de notificações */
+  /* Sininho de notificaÃ§Ãµes */
   .notif-btn-wrap { position: relative; }
   .notif-badge {
     position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 3px;
@@ -129,6 +129,55 @@
 
   .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
   .stat-card { text-align: center; }
+  .stat-card-cotas {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 12px 14px;
+    text-align: left;
+  }
+  .cotas-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .cotas-titulo {
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .cotas-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 8px;
+  }
+  .cota-mini {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: .78rem;
+  }
+  .cota-icone {
+    font-size: .85rem;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .cota-num {
+    font-weight: 800;
+    font-size: .88rem;
+    color: #38bdf8;
+    font-family: var(--font-display, sans-serif);
+  }
+  .cota-rotulo {
+    color: var(--text-secondary);
+    font-size: .72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .stat-card strong { font-size: 1.6rem; font-family: var(--font-display); display: block; }
   .stat-card span { color: var(--text-secondary); font-size: .82rem; }
 
@@ -154,10 +203,10 @@
 
   .empty-state { text-align: center; padding: 30px 10px; color: var(--text-secondary); font-size: .88rem; }
 
-  /* ===== Menu hambúrguer (só aparece no celular) ===== */
+  /* ===== Menu hambÃºrguer (sÃ³ aparece no celular) ===== */
   .menu-toggle { display: none; }
 
-  /* ===== Fundo escuro atrás do menu, quando ele está aberto no celular ===== */
+  /* ===== Fundo escuro atrÃ¡s do menu, quando ele estÃ¡ aberto no celular ===== */
   .sidebar-backdrop {
     position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 55;
     opacity: 0; pointer-events: none; transition: opacity var(--transition-base);
@@ -167,7 +216,7 @@
   @media (max-width: 900px) {
     .app-layout { grid-template-columns: 1fr; }
 
-    /* O menu vira uma gaveta que fica fora da tela (à esquerda) até ser aberto */
+    /* O menu vira uma gaveta que fica fora da tela (Ã  esquerda) atÃ© ser aberto */
     .sidebar {
       position: fixed; top: 0; left: 0; height: 100vh; width: 260px; max-width: 82vw;
       z-index: 60; border-radius: 0;
@@ -182,7 +231,7 @@
     .section-row { grid-template-columns: 1fr; }
   }
 
-  /* Ajuste mobile: dropdowns fixos e limitados à largura da tela, evitando corte nas bordas */
+  /* Ajuste mobile: dropdowns fixos e limitados Ã  largura da tela, evitando corte nas bordas */
   @media (max-width: 600px) {
     .notif-dropdown,
     .busca-dropdown {
@@ -207,83 +256,109 @@
   <div class="app-layout">
     <aside class="sidebar glass" id="sidebar">
       <div class="logo"><div class="dot">V+</div>Vestibular+</div>
-      <div class="nav-item active">🏠 Dashboard</div>
-      <a class="nav-item" href="./resumos.html">📚 Resumos</a>
-      <a class="nav-item" href="./questoes.html">✅ Questões</a>
-      <a class="nav-item" href="./simulados.html">⏱️ Simulados</a>
-      <a class="nav-item" href="./flashcards.html">🧠 Flashcards</a>
-      <a class="nav-item" href="./cronograma.html" data-recurso="cronograma">📅 Cronograma</a>
-      <a class="nav-item" href="./metas.html" data-recurso="metas">🎯 Metas</a>
-      <a class="nav-item" href="./ranking.html">🏆 Ranking</a>
-      <a class="nav-item" href="./vestibulares.html">🎓 Vestibulares</a>
-      <a class="nav-item" href="./favoritos.html" data-recurso="favoritos">⭐ Favoritos</a>
-      <a class="nav-item" href="./chat.html">💬 Chat com IA</a>
-      <a class="nav-item" href="./estatisticas.html" data-recurso="estatisticas">📊 Estatísticas</a>
-      <a class="nav-item" href="./precos.html">💎 Planos</a>
+      <div class="nav-item active">ðŸ  Dashboard</div>
+      <a class="nav-item" href="./resumos.html">ðŸ“š Resumos</a>
+      <a class="nav-item" href="./questoes.html">âœ… QuestÃµes</a>
+      <a class="nav-item" href="./simulados.html">â±ï¸ Simulados</a>
+      <a class="nav-item" href="./flashcards.html">ðŸ§  Flashcards</a>
+      <a class="nav-item" href="./cronograma.html" data-recurso="cronograma">ðŸ“… Cronograma</a>
+      <a class="nav-item" href="./metas.html" data-recurso="metas">ðŸŽ¯ Metas</a>
+      <a class="nav-item" href="./ranking.html">ðŸ† Ranking</a>
+      <a class="nav-item" href="./vestibulares.html">ðŸŽ“ Vestibulares</a>
+      <a class="nav-item" href="./favoritos.html" data-recurso="favoritos">â­ Favoritos</a>
+      <a class="nav-item" href="./chat.html">ðŸ’¬ Chat com IA</a>
+      <a class="nav-item" href="./estatisticas.html" data-recurso="estatisticas">ðŸ“Š EstatÃ­sticas</a>
+      <a class="nav-item" href="./precos.html">ðŸ’Ž Planos</a>
     </aside>
 
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
     <main class="main">
       <div class="topbar">
-        <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Abrir menu">☰</button>
+        <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Abrir menu">â˜°</button>
         <div class="search-box">
-          <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questões, flashcards, vestibulares..." />
+          <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questÃµes, flashcards, vestibulares..." />
           <div class="busca-dropdown" id="busca-dropdown"></div>
         </div>
 
         <div class="topbar-center-widgets">
-          <div class="topbar-pill widget-streak" title="Sua ofensiva diária de estudos">
-            <span>🔥</span>
+          <div class="topbar-pill widget-streak" title="Sua ofensiva diÃ¡ria de estudos">
+            <span>ðŸ”¥</span>
             <span id="topbar-streak">1 dia seguido</span>
           </div>
-          <a href="./vestibulares.html" class="topbar-pill widget-countdown" title="Ver calendário de vestibulares">
-            <span>📅</span>
+          <a href="./vestibulares.html" class="topbar-pill widget-countdown" title="Ver calendÃ¡rio de vestibulares">
+            <span>ðŸ“…</span>
             <span id="topbar-countdown">Carregando prova...</span>
           </a>
         </div>
         <div class="topbar-actions">
-          <button id="theme-toggle" class="icon-btn">🌙</button>
-          <a href="./precos.html" class="btn btn-primary" style="display:flex; align-items:center; gap:6px; height:40px; padding:0 16px; border-radius:var(--radius-full); text-decoration:none; font-size:.88rem; font-weight:600; white-space:nowrap;">💎 Planos</a>
+          <button id="theme-toggle" class="icon-btn">ðŸŒ™</button>
+          <a href="./precos.html" class="btn btn-primary" style="display:flex; align-items:center; gap:6px; height:40px; padding:0 16px; border-radius:var(--radius-full); text-decoration:none; font-size:.88rem; font-weight:600; white-space:nowrap;">ðŸ’Ž Planos</a>
           <div class="notif-btn-wrap">
-            <button id="notif-btn" class="icon-btn">🔔<span class="notif-badge" id="notif-badge"></span></button>
+            <button id="notif-btn" class="icon-btn">ðŸ””<span class="notif-badge" id="notif-badge"></span></button>
             <div class="notif-dropdown" id="notif-dropdown"></div>
           </div>
           <div class="user-menu">
             <div class="avatar" id="avatar-inicial">A</div>
             <div class="user-dropdown" id="user-dropdown">
-              <a class="dropdown-item" href="./perfil.html">👤 Perfil</a>
-              <div class="dropdown-item" id="logout-btn">🚪 Sair</div>
+              <a class="dropdown-item" href="./perfil.html">ðŸ‘¤ Perfil</a>
+              <div class="dropdown-item" id="logout-btn">ðŸšª Sair</div>
             </div>
           </div>
         </div>
       </div>
 
       <div class="welcome-card fade-up">
-        <h2 id="saudacao">Olá! 👋</h2>
+        <h2 id="saudacao">OlÃ¡! ðŸ‘‹</h2>
         <p id="nivel-info">Carregando seu progresso...</p>
         <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar" style="width:0%"></div></div>
       </div>
 
       <div class="stats-grid fade-up">
         <div class="card stat-card"><strong id="stat-horas">0h</strong><span>Horas estudadas</span></div>
-        <div class="card stat-card"><strong id="stat-questoes">0</strong><span>Questões resolvidas</span></div>
+        <div class="card stat-card"><strong id="stat-questoes">0</strong><span>QuestÃµes resolvidas</span></div>
         <div class="card stat-card"><strong id="stat-simulados">0</strong><span>Simulados feitos</span></div>
-        <div class="card stat-card"><strong id="stat-sequencia">0</strong><span>Dias seguidos</span></div>
+                <div class="card stat-card stat-card-cotas">
+          <div class="cotas-header">
+            <span class="cotas-titulo">⚡ Disponível</span>
+          </div>
+          <div class="cotas-grid">
+            <div class="cota-mini" title="Questões diárias restantes">
+              <span class="cota-icone">✅</span>
+              <span class="cota-num" id="cota-questoes">15</span>
+              <span class="cota-rotulo">questões</span>
+            </div>
+            <div class="cota-mini" title="Resumos diários restantes">
+              <span class="cota-icone">📚</span>
+              <span class="cota-num" id="cota-resumos">10</span>
+              <span class="cota-rotulo">resumos</span>
+            </div>
+            <div class="cota-mini" title="Perguntas com IA restantes hoje">
+              <span class="cota-icone">🤖</span>
+              <span class="cota-num" id="cota-chat">10</span>
+              <span class="cota-rotulo">IA chat</span>
+            </div>
+            <div class="cota-mini" title="Simulados semanais restantes">
+              <span class="cota-icone">⏱️</span>
+              <span class="cota-num" id="cota-simulados">5</span>
+              <span class="cota-rotulo">simulados</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="section-row">
         <div class="card fade-up">
-          <div class="panel-title"><h3>Progresso por matéria</h3><a class="see-all" href="./progresso.html">ver tudo</a></div>
+          <div class="panel-title"><h3>Progresso por matÃ©ria</h3><a class="see-all" href="./progresso.html">ver tudo</a></div>
           <div class="materia-list" id="materia-list">
-            <div class="empty-state">Assim que houver matérias cadastradas, seu progresso aparece aqui.</div>
+            <div class="empty-state">Assim que houver matÃ©rias cadastradas, seu progresso aparece aqui.</div>
           </div>
         </div>
 
         <div class="card fade-up">
           <div class="panel-title"><h3>Ranking</h3><a class="see-all" href="./ranking.html">ver tudo</a></div>
           <div id="ranking-list">
-            <div class="empty-state">O ranking aparece assim que outros alunos começarem a estudar 🚀</div>
+            <div class="empty-state">O ranking aparece assim que outros alunos comeÃ§arem a estudar ðŸš€</div>
           </div>
         </div>
       </div>
@@ -293,7 +368,7 @@
   <script type="module" src="../scripts/theme.js"></script>
   <script type="module" src="../scripts/dashboard.js"></script>
 
-  <!-- Controla abrir/fechar o menu no celular. Não mexe em dashboard.js. -->
+  <!-- Controla abrir/fechar o menu no celular. NÃ£o mexe em dashboard.js. -->
   <script type="module">
     const sidebar = document.getElementById('sidebar');
     const backdrop = document.getElementById('sidebar-backdrop');
@@ -310,7 +385,7 @@
 
     botaoMenu?.addEventListener('click', abrirMenu);
     backdrop?.addEventListener('click', fecharMenu);
-    // Fecha o menu automaticamente ao clicar em qualquer item (útil no celular)
+    // Fecha o menu automaticamente ao clicar em qualquer item (Ãºtil no celular)
     sidebar?.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', fecharMenu);
     });

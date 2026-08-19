@@ -42,13 +42,17 @@ async function iniciarDashboard() {
       sessoes.filter(s => s.tipo === 'questoes').length;
     document.getElementById('stat-simulados').textContent =
       sessoes.filter(s => s.tipo === 'simulado').length;
+
+    // Atualiza o contador de ofensiva no topo
     const seq = calcularSequencia(sessoes.map(s => s.criado_em));
-    document.getElementById('stat-sequencia').textContent = seq;
     const topbarStreak = document.getElementById('topbar-streak');
     if (topbarStreak) {
       topbarStreak.textContent = `${seq} ${seq === 1 ? 'dia seguido' : 'dias seguidos'}`;
     }
   }
+
+  // ---- Carrega as cotas/limites restantes de funções ----
+  carregarCotasDisponiveis(userId);
 
   // ---- Contagem Regressiva para o Vestibular/ENEM no Topbar ----
   carregarContagemVestibulares();
@@ -106,6 +110,67 @@ async function iniciarDashboard() {
   aplicarCadeadosSidebar(userId);
 }
 
+// Carrega a quantidade restante de cada função (questões, resumos, IA, simulados)
+async function carregarCotasDisponiveis(userId) {
+  try {
+    const hojeStr = new Date().toLocaleDateString('en-CA');
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('planos(nome, limite_questoes_dia, limite_resumos_dia, limite_chat_dia, limite_simulados_semana)')
+      .eq('id', userId)
+      .single();
+
+    const plano = profile?.planos;
+    const nomePlano = (plano?.nome || 'free').toLowerCase();
+
+    if (nomePlano === 'pro' || nomePlano === 'premium' || nomePlano === 'ultimate') {
+      const elQ = document.getElementById('cota-questoes');
+      const elR = document.getElementById('cota-resumos');
+      const elC = document.getElementById('cota-chat');
+      const elS = document.getElementById('cota-simulados');
+      if (elQ) elQ.textContent = '∞';
+      if (elR) elR.textContent = '∞';
+      if (elC) elC.textContent = '∞';
+      if (elS) elS.textContent = '∞';
+      return;
+    }
+
+    const limQuestoes = plano?.limite_questoes_dia || 15;
+    const limResumos = plano?.limite_resumos_dia || 10;
+    const limChat = plano?.limite_chat_dia || 10;
+    const limSimulados = plano?.limite_simulados_semana || 5;
+
+    const { data: usos } = await supabase
+      .from('uso_recursos')
+      .select('tipo, quantidade')
+      .eq('user_id', userId)
+      .eq('data', hojeStr);
+
+    const usoMap = {};
+    (usos || []).forEach(u => {
+      usoMap[u.tipo] = u.quantidade || 0;
+    });
+
+    const restQuestoes = Math.max(0, limQuestoes - (usoMap['questao'] || 0));
+    const restResumos = Math.max(0, limResumos - (usoMap['resumo'] || 0));
+    const restChat = Math.max(0, limChat - (usoMap['chat'] || 0));
+    const restSimulados = Math.max(0, limSimulados - (usoMap['simulado'] || 0));
+
+    const elQ = document.getElementById('cota-questoes');
+    const elR = document.getElementById('cota-resumos');
+    const elC = document.getElementById('cota-chat');
+    const elS = document.getElementById('cota-simulados');
+
+    if (elQ) elQ.textContent = restQuestoes;
+    if (elR) elR.textContent = restResumos;
+    if (elC) elC.textContent = restChat;
+    if (elS) elS.textContent = restSimulados;
+  } catch (err) {
+    console.error('Erro ao carregar cotas:', err);
+  }
+}
+
 // Conta os dias seguidos no fuso horário local correto
 function calcularSequencia(datasCriadoEm) {
   if (!datasCriadoEm || !datasCriadoEm.length) return 0;
@@ -122,7 +187,6 @@ function calcularSequencia(datasCriadoEm) {
   const cursor = new Date();
   const hojeStr = formatLocalDate(cursor);
 
-  // Se não estudou hoje ainda, checa a partir de ontem para manter a sequência ativa
   if (!dias.has(hojeStr)) {
     cursor.setDate(cursor.getDate() - 1);
   }
