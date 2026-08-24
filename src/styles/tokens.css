@@ -16,21 +16,21 @@
   --color-neon-blue: #38bdf8;
 
   --gradient-primary: linear-gradient(135deg, #7c3aed 0%, #3b82f6 100%);
-  --gradient-neon: linear-gradient(135deg, #a855f7 0%, #38bdf8 100%);
-  --gradient-glow: radial-gradient(circle at top left, rgba(124,58,237,0.35), transparent 60%);
+  --gradient-neon: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  --gradient-glow: radial-gradient(circle at top left, rgba(124,58,237,0.12), transparent 60%);
 
-  --color-success: #22c55e;
-  --color-warning: #f59e0b;
+  --color-success: #16a34a;
+  --color-warning: #d97706;
   --color-danger: #ef4444;
 
   /* Tema claro */
-  --bg-base: #f7f7fb;
-  --bg-elevated: rgba(255, 255, 255, 0.75);
-  --text-primary: #14121f;
-  --text-secondary: #5c5871;
-  --border-color: rgba(20, 18, 31, 0.08);
-  --glass-bg: rgba(255, 255, 255, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.4);
+  --bg-base: #f6f8fc;
+  --bg-elevated: rgba(255, 255, 255, 0.88);
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(15, 23, 42, 0.09);
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.8);
 
   /* Tipografia */
   --font-display: 'Sora', sans-serif;
@@ -42,20 +42,28 @@
   --radius-lg: 24px;
   --radius-full: 999px;
 
-  --shadow-soft: 0 8px 30px rgba(20, 18, 31, 0.08);
-  --shadow-glow: 0 0 40px rgba(124, 58, 237, 0.25);
+  --shadow-soft: 0 8px 28px rgba(15, 23, 42, 0.06);
+  --shadow-glow: 0 0 35px rgba(124, 58, 237, 0.15);
 
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 [data-theme='dark'] {
+  --gradient-neon: linear-gradient(135deg, #a855f7 0%, #38bdf8 100%);
+  --gradient-glow: radial-gradient(circle at top left, rgba(124,58,237,0.35), transparent 60%);
+
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
   --bg-base: #06050b;
-  --bg-elevated: rgba(18, 15, 28, 0.62);
+  --bg-elevated: rgba(18, 15, 28, 0.65);
   --text-primary: #f4f3f9;
   --text-secondary: #a29dc2;
   --border-color: rgba(255, 255, 255, 0.09);
   --glass-bg: rgba(18, 15, 28, 0.55);
   --glass-border: rgba(255, 255, 255, 0.1);
   --shadow-soft: 0 8px 30px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 40px rgba(124, 58, 237, 0.25);
 }

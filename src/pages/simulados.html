@@ -26,11 +26,17 @@
     display: inline-flex; align-items: center; padding: 4px 12px; border-radius: var(--radius-full);
     font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em;
   }
-  .badge-facil { background: rgba(34,197,94,.15); color: #22c55e; }
-  .badge-medio { background: rgba(124,58,237,.15); color: #a78bfa; }
-  .badge-dificil { background: rgba(245,158,11,.15); color: #f59e0b; }
-  .badge-genio { background: rgba(239,68,68,.15); color: #ef4444; }
-  .badge-vestibular { background: rgba(255,255,255,.08); color: var(--text-secondary); }
+  .badge-facil { background: rgba(34,197,94,.15); color: #16a34a; }
+  .badge-medio { background: rgba(124,58,237,.12); color: #7c3aed; }
+  .badge-dificil { background: rgba(245,158,11,.15); color: #d97706; }
+  .badge-genio { background: rgba(239,68,68,.15); color: #dc2626; }
+  .badge-vestibular { background: rgba(15,23,42,.06); color: var(--text-secondary); }
+  
+  [data-theme='dark'] .badge-facil { color: #22c55e; }
+  [data-theme='dark'] .badge-medio { color: #a78bfa; background: rgba(124,58,237,.15); }
+  [data-theme='dark'] .badge-dificil { color: #f59e0b; }
+  [data-theme='dark'] .badge-genio { color: #ef4444; }
+  [data-theme='dark'] .badge-vestibular { background: rgba(255,255,255,.08); }
   .simulado-meta { display: flex; gap: 16px; font-size: .82rem; color: var(--text-secondary); margin-bottom: 16px; }
   .timer-badge {
     display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-full);
