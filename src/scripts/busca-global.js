@@ -44,7 +44,7 @@ async function buscarTudo(termo, dropdown) {
 
   const grupos = [
     { titulo: '📚 Resumos', dados: resumos.data, texto: r => r.titulo, href: './resumos.html' },
-    { titulo: '✅ Questões', dados: questoes.data, texto: q => q.enunciado.slice(0, 70) + (q.enunciado.length > 70 ? '…' : ''), href: './questoes.html' },
+    { titulo: '✅ Questões', dados: questoes.data, texto: q => q.enunciado.slice(0, 110) + (q.enunciado.length > 110 ? '…' : ''), href: './questoes.html' },
     { titulo: '🧠 Flashcards', dados: flashcards.data, texto: f => f.frente, href: './flashcards.html' },
     { titulo: '🎓 Vestibulares', dados: vestibulares.data, texto: v => `${v.nome} — ${v.instituicao}`, href: './vestibulares.html' },
     { titulo: '📖 Assuntos do Treineiro', dados: assuntos.data, texto: a => a.titulo, href: './vestibulares.html' },

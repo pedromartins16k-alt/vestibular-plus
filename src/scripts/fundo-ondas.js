@@ -1,7 +1,7 @@
 /**
- * Fundo de Ondas e Luzes Cósmicas — Ultra Moderno & Leve (GPU Accelerated)
- * Cria um ambiente dinâmico com ondas fluidas e auroras vibrantes.
- * Totalmente compatível e otimizado para os Modos Claro (Light) e Escuro (Dark).
+ * Fundo de Ondas e Luzes Cósmicas — Alta Performance (Ultra Leve & 60 FPS)
+ * Cria um ambiente dinâmico, moderno e suave sem sobrecarregar GPU/CPU.
+ * Totalmente adaptado para os Modos Claro e Escuro.
  */
 
 function iniciarFundoOndas() {
@@ -11,13 +11,13 @@ function iniciarFundoOndas() {
   container.id = 'fundo-ondas-container';
 
   container.innerHTML = `
-    <!-- Auroras Vivas / Mesh Gradients com Movimento Orgânico 3D -->
+    <!-- Auroras Vivas com Gradientes Suaves Nativos (Sem filtro pesado) -->
     <div class="aurora-orb aurora-1"></div>
     <div class="aurora-orb aurora-2"></div>
     <div class="aurora-orb aurora-3"></div>
     <div class="aurora-orb aurora-4"></div>
 
-    <!-- Ondas Fluidas em Perspectiva Diagonal (Topo Direito -> Fundo Esquerdo) -->
+    <!-- Ondas Fluidas em Perspectiva Diagonal -->
     <div class="ondas-diagonais-wrap" id="ondas-diagonais">
       <svg class="onda-svg onda-svg-1" viewBox="0 0 1440 600" preserveAspectRatio="none">
         <path d="M0,160 C320,300 500,80 800,220 C1100,360 1280,180 1440,240 L1440,600 L0,600 Z" fill="url(#gradOnda1)"></path>
@@ -53,7 +53,7 @@ function iniciarFundoOndas() {
       </svg>
     </div>
 
-    <!-- Ponto de Iluminação Dinâmico que segue o Mouse suavemente -->
+    <!-- Ponto de Iluminação Sutil sob o Cursor -->
     <div id="luz-cursor-glow" class="cursor-glow"></div>
   `;
 
@@ -63,46 +63,44 @@ function iniciarFundoOndas() {
     style.textContent = `
       :root {
         --fundo-ondas-bg: #f6f8fc;
-        --aurora-opacity: 0.35;
-        --aurora-1-bg: radial-gradient(circle, rgba(124, 58, 237, 0.16) 0%, rgba(168, 85, 247, 0.08) 45%, transparent 70%);
-        --aurora-2-bg: radial-gradient(circle, rgba(2, 132, 199, 0.16) 0%, rgba(56, 189, 248, 0.08) 45%, transparent 70%);
-        --aurora-3-bg: radial-gradient(circle, rgba(236, 72, 153, 0.13) 0%, rgba(139, 92, 246, 0.07) 50%, transparent 70%);
-        --aurora-4-bg: radial-gradient(circle, rgba(6, 182, 212, 0.14) 0%, rgba(124, 58, 237, 0.06) 50%, transparent 70%);
-        --cursor-glow-bg: radial-gradient(circle, rgba(124, 58, 237, 0.07) 0%, rgba(56, 189, 248, 0.04) 35%, transparent 70%);
+        --aurora-1-bg: radial-gradient(circle, rgba(124, 58, 237, 0.14) 0%, rgba(168, 85, 247, 0.06) 45%, transparent 70%);
+        --aurora-2-bg: radial-gradient(circle, rgba(2, 132, 199, 0.14) 0%, rgba(56, 189, 248, 0.06) 45%, transparent 70%);
+        --aurora-3-bg: radial-gradient(circle, rgba(236, 72, 153, 0.11) 0%, rgba(139, 92, 246, 0.05) 50%, transparent 70%);
+        --aurora-4-bg: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, rgba(124, 58, 237, 0.05) 50%, transparent 70%);
+        --cursor-glow-bg: radial-gradient(circle, rgba(124, 58, 237, 0.06) 0%, rgba(56, 189, 248, 0.03) 40%, transparent 70%);
         
-        --stop-onda1-1: rgba(236, 72, 153, 0.12);
-        --stop-onda1-2: rgba(139, 92, 246, 0.10);
-        --stop-onda1-3: rgba(59, 130, 246, 0.05);
+        --stop-onda1-1: rgba(236, 72, 153, 0.10);
+        --stop-onda1-2: rgba(139, 92, 246, 0.08);
+        --stop-onda1-3: rgba(59, 130, 246, 0.04);
         
-        --stop-onda2-1: rgba(168, 85, 247, 0.11);
-        --stop-onda2-2: rgba(6, 182, 212, 0.08);
-        --stop-onda2-3: rgba(124, 58, 237, 0.04);
+        --stop-onda2-1: rgba(168, 85, 247, 0.09);
+        --stop-onda2-2: rgba(6, 182, 212, 0.06);
+        --stop-onda2-3: rgba(124, 58, 237, 0.03);
         
-        --stop-onda3-1: rgba(56, 189, 248, 0.12);
-        --stop-onda3-2: rgba(192, 132, 252, 0.08);
-        --stop-onda3-3: rgba(2, 132, 199, 0.03);
+        --stop-onda3-1: rgba(56, 189, 248, 0.10);
+        --stop-onda3-2: rgba(192, 132, 252, 0.06);
+        --stop-onda3-3: rgba(2, 132, 199, 0.02);
       }
 
       [data-theme='dark'] {
         --fundo-ondas-bg: #06050b;
-        --aurora-opacity: 0.6;
-        --aurora-1-bg: radial-gradient(circle, #7c3aed 0%, #a855f7 40%, transparent 70%);
-        --aurora-2-bg: radial-gradient(circle, #0284c7 0%, #38bdf8 40%, transparent 70%);
-        --aurora-3-bg: radial-gradient(circle, #ec4899 0%, #8b5cf6 50%, transparent 70%);
-        --aurora-4-bg: radial-gradient(circle, #06b6d4 0%, #7c3aed 50%, transparent 70%);
-        --cursor-glow-bg: radial-gradient(circle, rgba(168, 85, 247, 0.22) 0%, rgba(56, 189, 248, 0.12) 35%, transparent 70%);
+        --aurora-1-bg: radial-gradient(circle, rgba(124, 58, 237, 0.45) 0%, rgba(168, 85, 247, 0.2) 45%, transparent 70%);
+        --aurora-2-bg: radial-gradient(circle, rgba(2, 132, 199, 0.45) 0%, rgba(56, 189, 248, 0.2) 45%, transparent 70%);
+        --aurora-3-bg: radial-gradient(circle, rgba(236, 72, 153, 0.4) 0%, rgba(139, 92, 246, 0.2) 50%, transparent 70%);
+        --aurora-4-bg: radial-gradient(circle, rgba(6, 182, 212, 0.35) 0%, rgba(124, 58, 237, 0.18) 50%, transparent 70%);
+        --cursor-glow-bg: radial-gradient(circle, rgba(168, 85, 247, 0.16) 0%, rgba(56, 189, 248, 0.08) 40%, transparent 70%);
         
-        --stop-onda1-1: rgba(236, 72, 153, 0.35);
-        --stop-onda1-2: rgba(139, 92, 246, 0.25);
-        --stop-onda1-3: rgba(59, 130, 246, 0.15);
+        --stop-onda1-1: rgba(236, 72, 153, 0.30);
+        --stop-onda1-2: rgba(139, 92, 246, 0.20);
+        --stop-onda1-3: rgba(59, 130, 246, 0.10);
         
-        --stop-onda2-1: rgba(168, 85, 247, 0.30);
-        --stop-onda2-2: rgba(6, 182, 212, 0.20);
-        --stop-onda2-3: rgba(124, 58, 237, 0.10);
+        --stop-onda2-1: rgba(168, 85, 247, 0.25);
+        --stop-onda2-2: rgba(6, 182, 212, 0.16);
+        --stop-onda2-3: rgba(124, 58, 237, 0.08);
         
-        --stop-onda3-1: rgba(56, 189, 248, 0.25);
-        --stop-onda3-2: rgba(192, 132, 252, 0.20);
-        --stop-onda3-3: rgba(2, 132, 199, 0.05);
+        --stop-onda3-1: rgba(56, 189, 248, 0.20);
+        --stop-onda3-2: rgba(192, 132, 252, 0.16);
+        --stop-onda3-3: rgba(2, 132, 199, 0.04);
       }
 
       #fundo-ondas-container {
@@ -115,6 +113,8 @@ function iniciarFundoOndas() {
         overflow: hidden;
         background: var(--fundo-ondas-bg);
         transition: background var(--transition-base, 250ms ease);
+        contain: strict;
+        transform: translateZ(0);
       }
 
       .stop-onda1-1 { stop-color: var(--stop-onda1-1); }
@@ -132,53 +132,52 @@ function iniciarFundoOndas() {
       .aurora-orb {
         position: absolute;
         border-radius: 50%;
-        filter: blur(80px);
-        opacity: var(--aurora-opacity);
         will-change: transform;
         pointer-events: none;
-        transition: opacity 0.3s ease;
+        transform: translateZ(0);
       }
       .aurora-1 {
-        width: 650px;
-        height: 650px;
-        top: -15%;
-        right: -10%;
+        width: 600px;
+        height: 600px;
+        top: -10%;
+        right: -5%;
         background: var(--aurora-1-bg);
-        animation: orbMove1 18s ease-in-out infinite alternate;
+        animation: orbMove1 24s ease-in-out infinite alternate;
       }
       .aurora-2 {
-        width: 550px;
-        height: 550px;
-        bottom: -15%;
-        left: -10%;
-        background: var(--aurora-2-bg);
-        animation: orbMove2 22s ease-in-out infinite alternate;
-      }
-      .aurora-3 {
         width: 500px;
         height: 500px;
+        bottom: -10%;
+        left: -5%;
+        background: var(--aurora-2-bg);
+        animation: orbMove2 28s ease-in-out infinite alternate;
+      }
+      .aurora-3 {
+        width: 450px;
+        height: 450px;
         top: 35%;
         left: 45%;
         background: var(--aurora-3-bg);
-        animation: orbMove3 20s ease-in-out infinite alternate;
+        animation: orbMove3 26s ease-in-out infinite alternate;
       }
       .aurora-4 {
-        width: 420px;
-        height: 420px;
+        width: 380px;
+        height: 380px;
         top: 60%;
         right: 15%;
         background: var(--aurora-4-bg);
-        animation: orbMove1 16s ease-in-out infinite alternate-reverse;
+        animation: orbMove1 22s ease-in-out infinite alternate-reverse;
       }
 
       .ondas-diagonais-wrap {
         position: absolute;
-        inset: -40%;
-        width: 180%;
-        height: 180%;
-        transform: rotate(-25deg);
+        inset: -30%;
+        width: 160%;
+        height: 160%;
+        transform: rotate(-22deg);
         transform-origin: center;
-        will-change: transform;
+        pointer-events: none;
+        contain: strict;
       }
 
       .onda-svg {
@@ -186,58 +185,58 @@ function iniciarFundoOndas() {
         width: 100%;
         height: 100%;
         will-change: transform;
+        transform: translateZ(0);
       }
       .onda-svg-1 {
         top: 5%;
-        animation: ondaFlutua1 14s ease-in-out infinite alternate;
+        animation: ondaFlutua1 18s ease-in-out infinite alternate;
       }
       .onda-svg-2 {
         top: 25%;
-        animation: ondaFlutua2 18s ease-in-out infinite alternate;
+        animation: ondaFlutua2 22s ease-in-out infinite alternate;
       }
       .onda-svg-3 {
         top: 45%;
-        animation: ondaFlutua3 16s ease-in-out infinite alternate;
+        animation: ondaFlutua3 20s ease-in-out infinite alternate;
       }
 
       .cursor-glow {
         position: absolute;
-        width: 600px;
-        height: 600px;
+        width: 400px;
+        height: 400px;
         border-radius: 50%;
         background: var(--cursor-glow-bg);
         transform: translate3d(-50%, -50%, 0);
         pointer-events: none;
         will-change: transform;
-        filter: blur(30px);
       }
 
       @keyframes orbMove1 {
         0% { transform: translate3d(0, 0, 0) scale(1); }
-        50% { transform: translate3d(-80px, 60px, 0) scale(1.15); }
-        100% { transform: translate3d(40px, -70px, 0) scale(0.95); }
+        50% { transform: translate3d(-50px, 40px, 0) scale(1.08); }
+        100% { transform: translate3d(30px, -40px, 0) scale(0.96); }
       }
       @keyframes orbMove2 {
         0% { transform: translate3d(0, 0, 0) scale(1); }
-        50% { transform: translate3d(90px, -60px, 0) scale(1.2); }
-        100% { transform: translate3d(-50px, 80px, 0) scale(0.9); }
+        50% { transform: translate3d(50px, -40px, 0) scale(1.1); }
+        100% { transform: translate3d(-30px, 50px, 0) scale(0.94); }
       }
       @keyframes orbMove3 {
-        0% { transform: translate3d(0, 0, 0) scale(0.9); }
-        50% { transform: translate3d(-70px, -50px, 0) scale(1.25); }
-        100% { transform: translate3d(60px, 40px, 0) scale(1); }
+        0% { transform: translate3d(0, 0, 0) scale(0.96); }
+        50% { transform: translate3d(-40px, -30px, 0) scale(1.12); }
+        100% { transform: translate3d(40px, 30px, 0) scale(1); }
       }
       @keyframes ondaFlutua1 {
         0% { transform: translateY(0) translateX(0); }
-        100% { transform: translateY(-40px) translateX(-30px); }
+        100% { transform: translateY(-25px) translateX(-20px); }
       }
       @keyframes ondaFlutua2 {
         0% { transform: translateY(0) translateX(0); }
-        100% { transform: translateY(35px) translateX(25px); }
+        100% { transform: translateY(25px) translateX(18px); }
       }
       @keyframes ondaFlutua3 {
         0% { transform: translateY(0) translateX(0); }
-        100% { transform: translateY(-30px) translateX(20px); }
+        100% { transform: translateY(-20px) translateX(15px); }
       }
     `;
     document.head.appendChild(style);
@@ -246,12 +245,10 @@ function iniciarFundoOndas() {
   document.body.appendChild(container);
 
   const luzCursor = document.getElementById('luz-cursor-glow');
-  const ondasWrap = document.getElementById('ondas-diagonais');
+  if (!luzCursor) return;
 
-  let mouseX = window.innerWidth / 2;
-  let mouseY = window.innerHeight / 2;
-  let curX = mouseX;
-  let curY = mouseY;
+  let mouseX = -9999;
+  let mouseY = -9999;
   let ticking = false;
 
   window.addEventListener('mousemove', (e) => {
@@ -259,31 +256,13 @@ function iniciarFundoOndas() {
     mouseY = e.clientY;
 
     if (!ticking) {
-      requestAnimationFrame(atualizarCursor);
+      requestAnimationFrame(() => {
+        luzCursor.style.transform = `translate3d(${mouseX - 200}px, ${mouseY - 200}px, 0)`;
+        ticking = false;
+      });
       ticking = true;
     }
   }, { passive: true });
-
-  function atualizarCursor() {
-    curX += (mouseX - curX) * 0.08;
-    curY += (mouseY - curY) * 0.08;
-
-    if (luzCursor) {
-      luzCursor.style.transform = `translate3d(${curX - 300}px, ${curY - 300}px, 0)`;
-    }
-
-    if (ondasWrap) {
-      const offsetX = (curX - window.innerWidth / 2) * 0.025;
-      const offsetY = (curY - window.innerHeight / 2) * 0.025;
-      ondasWrap.style.transform = `rotate(-25deg) translate3d(${offsetX}px, ${offsetY}px, 0)`;
-    }
-
-    if (Math.abs(mouseX - curX) > 0.5 || Math.abs(mouseY - curY) > 0.5) {
-      requestAnimationFrame(atualizarCursor);
-    } else {
-      ticking = false;
-    }
-  }
 }
 
 if (document.readyState === 'loading') {
