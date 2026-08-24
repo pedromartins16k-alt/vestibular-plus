@@ -107,7 +107,7 @@ async function iniciarDashboard() {
     }).join('');
   }
 
-  document.getElementById('logout-btn').addEventListener('click', sair);
+  document.getElementById('logout-btn')?.addEventListener('click', sair);
 
   verificarConquistas(userId);
   aplicarCadeadosSidebar(userId);
@@ -238,6 +238,23 @@ async function carregarContagemVestibulares() {
   }
 }
 
+function iniciarMenuAvatar() {
+  const avatarBtn = document.getElementById('avatar-inicial');
+  const userDropdown = document.getElementById('user-dropdown');
+  if (avatarBtn && userDropdown) {
+    avatarBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      userDropdown.classList.toggle('open');
+    });
+    document.addEventListener('click', (e) => {
+      if (!userDropdown.contains(e.target) && e.target !== avatarBtn) {
+        userDropdown.classList.remove('open');
+      }
+    });
+  }
+}
+
 iniciarDashboard();
 iniciarBusca();
 iniciarNotificacoes();
+iniciarMenuAvatar();
