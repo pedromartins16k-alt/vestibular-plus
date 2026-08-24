@@ -17,7 +17,7 @@ export function iniciarBusca() {
       dropdown.innerHTML = '';
       return;
     }
-    timeoutId = setTimeout(() => buscarTudo(termo, dropdown), 300);
+    timeoutId = setTimeout(() => buscarTudo(termo, dropdown), 250);
   });
 
   input.addEventListener('keydown', (e) => {
@@ -35,16 +35,16 @@ async function buscarTudo(termo, dropdown) {
   const filtro = `%${termo}%`;
 
   const [resumos, questoes, flashcards, vestibulares, assuntos] = await Promise.all([
-    supabase.from('resumos').select('id, titulo').ilike('titulo', filtro).limit(4),
-    supabase.from('questoes').select('id, enunciado').ilike('enunciado', filtro).limit(4),
-    supabase.from('flashcards').select('id, frente').ilike('frente', filtro).limit(4),
-    supabase.from('vestibulares').select('id, nome, instituicao').or(`nome.ilike.${filtro},instituicao.ilike.${filtro}`).limit(4),
-    supabase.from('treineiro_aulas').select('id, titulo').ilike('titulo', filtro).limit(4),
+    supabase.from('resumos').select('id, titulo').ilike('titulo', filtro).limit(10),
+    supabase.from('questoes').select('id, enunciado').ilike('enunciado', filtro).limit(10),
+    supabase.from('flashcards').select('id, frente').ilike('frente', filtro).limit(10),
+    supabase.from('vestibulares').select('id, nome, instituicao').or(`nome.ilike.${filtro},instituicao.ilike.${filtro}`).limit(10),
+    supabase.from('treineiro_aulas').select('id, titulo').ilike('titulo', filtro).limit(10),
   ]);
 
   const grupos = [
     { titulo: '📚 Resumos', dados: resumos.data, texto: r => r.titulo, href: './resumos.html' },
-    { titulo: '✅ Questões', dados: questoes.data, texto: q => q.enunciado.slice(0, 110) + (q.enunciado.length > 110 ? '…' : ''), href: './questoes.html' },
+    { titulo: '✅ Questões', dados: questoes.data, texto: q => q.enunciado, href: './questoes.html' },
     { titulo: '🧠 Flashcards', dados: flashcards.data, texto: f => f.frente, href: './flashcards.html' },
     { titulo: '🎓 Vestibulares', dados: vestibulares.data, texto: v => `${v.nome} — ${v.instituicao}`, href: './vestibulares.html' },
     { titulo: '📖 Assuntos do Treineiro', dados: assuntos.data, texto: a => a.titulo, href: './vestibulares.html' },
