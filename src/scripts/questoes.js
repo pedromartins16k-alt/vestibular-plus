@@ -2,7 +2,6 @@ import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
-import { PONTOS_XP, xpParaProximoNivel } from '../utils/xp.js';
 import { verificarConquistas } from './conquistas.js';
 import { buscarFavoritos, alternarFavorito } from './favoritos-global.js';
 
@@ -536,8 +535,6 @@ async function selecionarResposta(el, questao) {
 }
 
 async function registrarResposta(materiaId, acertou) {
-  const xpGanho = acertou ? PONTOS_XP.questao_correta : PONTOS_XP.questao_errada;
-
   await supabase.from('sessoes_estudo').insert({
     user_id: sessionUserId,
     materia_id: materiaId,
@@ -546,25 +543,8 @@ async function registrarResposta(materiaId, acertou) {
     acertou,
   });
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('xp, nivel')
-    .eq('id', sessionUserId)
-    .single();
-
-  if (!profile) return;
-
-  let novoXp = profile.xp + xpGanho;
-  let novoNivel = profile.nivel;
-  while (novoXp >= xpParaProximoNivel(novoNivel)) {
-    novoXp -= xpParaProximoNivel(novoNivel);
-    novoNivel++;
-  }
-
-  await supabase
-    .from('profiles')
-    .update({ xp: novoXp, nivel: novoNivel })
-    .eq('id', sessionUserId);
+  const p_tipo = acertou ? 'questao_correta' : 'questao_errada';
+  await supabase.rpc('conceder_xp', { p_tipo });
 
   verificarConquistas(sessionUserId);
 }

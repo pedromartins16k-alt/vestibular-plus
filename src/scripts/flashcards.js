@@ -353,6 +353,8 @@ async function avaliar(acertou) {
     tipo: 'flashcards',
   });
 
+  await supabase.rpc('conceder_xp', { p_tipo: 'flashcard_revisado' });
+
   verificarConquistas(userId);
 
   cardAtual.progresso = {

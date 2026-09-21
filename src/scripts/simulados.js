@@ -2,8 +2,6 @@ import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
-import { PONTOS_XP, xpParaProximoNivel } from '../utils/xp.js';
-import { verificarConquistas } from './conquistas.js';
 
 const conteudo = document.getElementById('conteudo');
 const filtrosTabs = document.getElementById('filtros-tabs');
@@ -458,38 +456,22 @@ async function finalizarSimulado() {
     tipo: 'simulado',
   });
 
-  await concederXp(PONTOS_XP.simulado_finalizado);
-  await verificarConquistas(sessionUserId);
+  const { data: resultadoXp } = await supabase.rpc('conceder_xp', { p_tipo: 'simulado_finalizado' });
+  await supabase.rpc('verificar_conquistas', { p_user_id: sessionUserId });
 
   filtrosTabs.style.display = '';
+
+  const xpGanhoTexto = resultadoXp?.xp_ganho ? `+${resultadoXp.xp_ganho} XP ganhos 🎉` : 'Simulado finalizado 🎉';
 
   conteudo.innerHTML = `
     <div class="card resultado-card fade-up">
       <p style="color:var(--text-secondary); margin-bottom:6px;">Você finalizou o simulado!</p>
       <div class="resultado-nota">${nota}%</div>
       <p style="color:var(--text-secondary); margin-top:6px;">${acertos} de ${questoesDoSimulado.length} questões corretas</p>
-      <p style="margin-top:12px; color:var(--color-success); font-weight:600;">+${PONTOS_XP.simulado_finalizado} XP ganhos 🎉</p>
+      <p style="margin-top:12px; color:var(--color-success); font-weight:600;">${xpGanhoTexto}</p>
       <a class="btn btn-primary" href="./simulados.html" style="margin-top:20px; display:inline-flex;">Voltar aos simulados</a>
     </div>
   `;
-}
-
-async function concederXp(xpGanho) {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('xp, nivel')
-    .eq('id', sessionUserId)
-    .single();
-  if (!profile) return;
-
-  let novoXp = profile.xp + xpGanho;
-  let novoNivel = profile.nivel;
-  while (novoXp >= xpParaProximoNivel(novoNivel)) {
-    novoXp -= xpParaProximoNivel(novoNivel);
-    novoNivel++;
-  }
-
-  await supabase.from('profiles').update({ xp: novoXp, nivel: novoNivel }).eq('id', sessionUserId);
 }
 
 iniciar();

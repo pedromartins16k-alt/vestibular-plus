@@ -337,6 +337,7 @@ async function registrarLeitura(materiaId) {
     duracao_minutos: 3,
     tipo: 'resumo',
   });
+  await supabase.rpc('conceder_xp', { p_tipo: 'resumo_lido' });
   verificarConquistas(session.user.id);
 }
 
