@@ -82,6 +82,198 @@
   .empty-state { text-align: center; padding: 24px 10px; color: var(--text-secondary); font-size: .86rem; }
   .msg-ok { color: var(--color-success); font-size: .82rem; margin-top: 6px; }
   .msg-err { color: var(--color-danger); font-size: .82rem; margin-top: 6px; }
+
+  /* ===== Badges de Plano ===== */
+  .badge-plano {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: .74rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    letter-spacing: .02em;
+    white-space: nowrap;
+  }
+  .badge-plano.plano-free {
+    background: rgba(148, 163, 184, 0.14);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  }
+  .badge-plano.plano-basic {
+    background: rgba(2, 132, 199, 0.14);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+  }
+  .badge-plano.plano-pro {
+    background: rgba(124, 58, 237, 0.16);
+    color: #c084fc;
+    border: 1px solid rgba(168, 85, 247, 0.38);
+  }
+  .badge-plano.plano-ultimate, .badge-plano.plano-premium {
+    background: linear-gradient(135deg, rgba(244, 114, 182, 0.16), rgba(168, 85, 247, 0.18));
+    color: #f472b6;
+    border: 1px solid rgba(244, 114, 182, 0.4);
+    box-shadow: 0 0 10px rgba(244, 114, 182, 0.18);
+  }
+  .badge-plano.plano-desconhecido {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+  }
+
+  /* Botão de Alterar Plano */
+  .btn-action-plan {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(124, 58, 237, 0.12);
+    color: var(--color-primary-500);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+  }
+  .btn-action-plan:hover {
+    background: var(--gradient-primary);
+    color: #ffffff;
+    border-color: transparent;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.28);
+  }
+
+  /* Modal de Alteração de Plano */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(6px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+    opacity: 0;
+    transition: opacity var(--transition-base);
+  }
+  .modal-overlay.open {
+    display: flex;
+    opacity: 1;
+  }
+  .modal-content {
+    max-width: 480px;
+    width: 100%;
+    padding: 28px;
+    position: relative;
+    border-radius: var(--radius-lg);
+    transform: scale(0.96) translateY(8px);
+    transition: transform var(--transition-base);
+    box-shadow: var(--shadow-glow), 0 20px 40px rgba(0, 0, 0, 0.5);
+  }
+  .modal-overlay.open .modal-content {
+    transform: scale(1) translateY(0);
+  }
+  .modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 12px;
+  }
+  .modal-header h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.3rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast), background var(--transition-fast);
+  }
+  .modal-close:hover {
+    color: var(--text-primary);
+    background: var(--glass-bg);
+  }
+  .modal-user-info {
+    background: var(--glass-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .modal-user-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: .86rem;
+    gap: 12px;
+  }
+  .modal-user-label {
+    color: var(--text-secondary);
+    font-size: .8rem;
+    flex-shrink: 0;
+  }
+  .modal-user-val {
+    font-weight: 600;
+    word-break: break-all;
+    text-align: right;
+  }
+  .modal-field-group {
+    margin-bottom: 16px;
+  }
+  .modal-field-group label {
+    display: block;
+    font-size: .82rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--text-secondary);
+  }
+  .modal-field-group .helper-text {
+    font-size: .76rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+    display: block;
+  }
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  .modal-alert {
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: .82rem;
+    margin-top: 14px;
+    display: none;
+    line-height: 1.4;
+  }
+  .modal-alert.show {
+    display: block;
+  }
+  .modal-alert.error {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: var(--color-danger);
+  }
+  .modal-alert.success {
+    background: rgba(34, 197, 94, 0.12);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    color: var(--color-success);
+  }
 </style>
 </head>
 <body>
@@ -135,10 +327,21 @@
 
       <!-- ===== USUÁRIOS ===== -->
       <section class="admin-panel" id="panel-usuarios">
-        <div class="card">
+        <div class="card" style="overflow-x: auto;">
           <table class="admin-table">
-            <thead><tr><th>Nome</th><th>Apelido</th><th>E-mail</th><th>Nível</th><th>XP</th><th>Cadastrado em</th></tr></thead>
-            <tbody id="tbody-usuarios"><tr><td colspan="6" class="empty-state">Carregando...</td></tr></tbody>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Apelido</th>
+                <th>E-mail</th>
+                <th>Plano</th>
+                <th>Nível</th>
+                <th>XP</th>
+                <th>Cadastrado em</th>
+                <th>Ação</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-usuarios"><tr><td colspan="8" class="empty-state">Carregando...</td></tr></tbody>
           </table>
         </div>
       </section>
@@ -298,6 +501,60 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- Modal: Alterar Plano do Usuário -->
+  <div class="modal-overlay" id="modal-alterar-plano" aria-hidden="true" role="dialog" aria-labelledby="modal-plano-titulo">
+    <div class="modal-content card">
+      <div class="modal-header">
+        <h2 id="modal-plano-titulo">Alterar plano do usuário</h2>
+        <button type="button" class="modal-close" id="btn-fechar-modal-plano" aria-label="Fechar modal">✕</button>
+      </div>
+
+      <div class="modal-user-info">
+        <div class="modal-user-row">
+          <span class="modal-user-label">Nome:</span>
+          <span class="modal-user-val" id="modal-plano-nome">—</span>
+        </div>
+        <div class="modal-user-row">
+          <span class="modal-user-label">E-mail:</span>
+          <span class="modal-user-val" id="modal-plano-email">—</span>
+        </div>
+        <div class="modal-user-row">
+          <span class="modal-user-label">Plano atual:</span>
+          <span class="modal-user-val" id="modal-plano-atual">—</span>
+        </div>
+      </div>
+
+      <form id="form-alterar-plano" onsubmit="return false;">
+        <div class="modal-field-group">
+          <label for="modal-select-novo-plano">Novo plano</label>
+          <select class="input-field" id="modal-select-novo-plano" required>
+            <option value="">Carregando planos disponíveis...</option>
+          </select>
+        </div>
+
+        <div class="modal-field-group">
+          <label for="modal-input-senha-admin">Senha de confirmação administrativa</label>
+          <input
+            type="password"
+            class="input-field"
+            id="modal-input-senha-admin"
+            placeholder="Digite a senha do admin..."
+            autocomplete="current-password"
+            required
+          />
+          <span class="helper-text">🔒 Exigida para confirmar a alteração no nível administrativo.</span>
+        </div>
+
+        <div class="modal-alert" id="modal-plano-alerta"></div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" id="btn-cancelar-modal-plano">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-confirmar-alteracao-plano">Confirmar alteração</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script type="module" src="../scripts/theme.js"></script>

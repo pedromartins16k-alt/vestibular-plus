@@ -4,6 +4,16 @@ import { sair } from '../lib/authGuard.js';
 
 let MATERIAS = [];
 let AULAS = [];
+let PLANOS_DISPONIVEIS = [];
+let USUARIOS_CACHE = [];
+let usuarioSelecionadoModal = null;
+let alterandoPlano = false;
+
+// Proteção de interface de usuário (UX Guard / Confirmação Intencional).
+// NOTA DE SEGURANÇA: Esta validação no frontend previne ações acidentais na interface.
+// A segurança autoritativa e definitiva do sistema é delegada ao backend Supabase
+// (RLS e/ou RPC admin_alterar_plano_usuario com verificação no servidor).
+const SENHA_ADMIN_CONFIRMACAO_INTERFACE = 'pedro1020';
 
 async function iniciar() {
   const session = await exigirAdmin();
@@ -17,6 +27,7 @@ async function iniciar() {
   iniciarMenuAvatar();
   iniciarTabs();
   iniciarSubTabs();
+  iniciarModalPlano();
 
   const { data: materias } = await supabase.from('materias').select('id, nome, cor').order('ordem');
   MATERIAS = materias || [];
@@ -99,22 +110,392 @@ async function carregarVisaoGeral() {
   document.getElementById('stat-sessoes').textContent = sessoes;
 }
 
-// ===== Usuários =====
+// ===== Usuários & Gerenciamento de Planos =====
 async function carregarUsuarios() {
-  const { data, error } = await supabase.rpc('admin_listar_usuarios');
   const tbody = document.getElementById('tbody-usuarios');
-  if (error) { tbody.innerHTML = `<tr><td colspan="6" class="empty-state">Erro: ${escapeHtml(error.message)}</td></tr>`; return; }
-  if (!data || !data.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Nenhum usuário.</td></tr>'; return; }
-  tbody.innerHTML = data.map(u => `
-    <tr>
-      <td>${escapeHtml(u.nome || '—')}</td>
-      <td>${escapeHtml(u.nome_usuario || '—')}</td>
-      <td>${escapeHtml(u.email || '—')}</td>
-      <td>${u.nivel ?? '—'}</td>
-      <td>${u.xp ?? 0}</td>
-      <td>${new Date(u.criado_em).toLocaleDateString('pt-BR')}</td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Carregando usuários e planos...</td></tr>';
+
+  try {
+    // 1. Busca usuários via RPC, profiles com relação de planos e catálogo de planos em paralelo (zero N+1)
+    const [resRpc, resProfiles, resPlanos] = await Promise.all([
+      supabase.rpc('admin_listar_usuarios'),
+      supabase.from('profiles').select('id, plano_id, planos(id, nome, nome_exibicao, ordem)'),
+      supabase.from('planos').select('id, nome, nome_exibicao, ordem').order('ordem', { ascending: true })
+    ]);
+
+    // Armazena catálogo de planos do projeto
+    if (resPlanos.data && resPlanos.data.length > 0) {
+      PLANOS_DISPONIVEIS = resPlanos.data;
+    } else {
+      // Fallback seguro caso a tabela planos não retorne dados no momento
+      PLANOS_DISPONIVEIS = [
+        { id: 'free', nome: 'free', nome_exibicao: 'Free', ordem: 0 },
+        { id: 'basic', nome: 'basic', nome_exibicao: 'Basic', ordem: 1 },
+        { id: 'pro', nome: 'pro', nome_exibicao: 'Pro', ordem: 2 },
+        { id: 'ultimate', nome: 'ultimate', nome_exibicao: 'Ultimate', ordem: 3 }
+      ];
+    }
+    preencherSelectPlanosModal();
+
+    if (resRpc.error) {
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Erro ao carregar usuários: ${escapeHtml(resRpc.error.message)}</td></tr>`;
+      return;
+    }
+
+    const usuariosRaw = resRpc.data || [];
+    if (!usuariosRaw.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Nenhum usuário cadastrado.</td></tr>';
+      return;
+    }
+
+    // Mapa de profiles para lookup instantâneo O(1)
+    const profilesMap = new Map();
+    (resProfiles.data || []).forEach(p => {
+      profilesMap.set(p.id, p);
+    });
+
+    // Mescla dados do usuário com as informações de plano
+    USUARIOS_CACHE = usuariosRaw.map(u => {
+      const profile = profilesMap.get(u.id);
+
+      // Prioriza o join de profiles -> planos, ou campos do próprio RPC caso venha atualizado
+      let planoNome = u.plano_nome || u.plano || profile?.planos?.nome_exibicao || profile?.planos?.nome;
+      let planoId = u.plano_id || profile?.plano_id;
+
+      // Pela regra de negócio do Vestibular+, se não há plano associado (null), o plano é Free
+      if (!planoNome) {
+        const planoFree = PLANOS_DISPONIVEIS.find(p => p.nome.toLowerCase() === 'free');
+        planoNome = planoFree ? (planoFree.nome_exibicao || planoFree.nome) : 'Free';
+        if (!planoId && planoFree) {
+          planoId = planoFree.id;
+        }
+      }
+
+      return {
+        id: u.id,
+        nome: u.nome || '',
+        nome_usuario: u.nome_usuario || '',
+        email: u.email || '',
+        nivel: u.nivel ?? 1,
+        xp: u.xp ?? 0,
+        criado_em: u.criado_em,
+        planoId: planoId,
+        planoNome: planoNome
+      };
+    });
+
+    renderTabelaUsuarios();
+  } catch (err) {
+    console.error('Erro em carregarUsuarios:', err);
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">Erro inesperado ao carregar usuários: ${escapeHtml(err.message || String(err))}</td></tr>`;
+  }
+}
+
+function renderTabelaUsuarios() {
+  const tbody = document.getElementById('tbody-usuarios');
+  if (!USUARIOS_CACHE.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">Nenhum usuário encontrado.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = USUARIOS_CACHE.map(u => {
+    const badgeHtml = renderBadgePlano(u.planoNome);
+    return `
+      <tr data-user-row="${escapeHtml(u.id)}">
+        <td>${escapeHtml(u.nome || '—')}</td>
+        <td>${escapeHtml(u.nome_usuario || '—')}</td>
+        <td>${escapeHtml(u.email || '—')}</td>
+        <td class="coluna-plano">${badgeHtml}</td>
+        <td>${u.nivel ?? '—'}</td>
+        <td>${u.xp ?? 0}</td>
+        <td>${u.criado_em ? new Date(u.criado_em).toLocaleDateString('pt-BR') : '—'}</td>
+        <td>
+          <button type="button" class="btn-action-plan" data-user-id="${escapeHtml(u.id)}">
+            ✏️ Alterar plano
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Atribui listeners nos botões de alteração de plano
+  tbody.querySelectorAll('.btn-action-plan').forEach(btn => {
+    btn.addEventListener('click', () => {
+      abrirModalAlterarPlano(btn.dataset.userId);
+    });
+  });
+}
+
+function renderBadgePlano(nomePlano) {
+  if (!nomePlano) {
+    return `<span class="badge-plano plano-free">Free</span>`;
+  }
+  const limpo = String(nomePlano).trim().toLowerCase();
+  let classe = 'plano-desconhecido';
+  if (limpo.includes('free') || limpo.includes('grátis') || limpo.includes('gratis')) {
+    classe = 'plano-free';
+  } else if (limpo.includes('basic') || limpo.includes('básico') || limpo.includes('basico')) {
+    classe = 'plano-basic';
+  } else if (limpo === 'pro') {
+    classe = 'plano-pro';
+  } else if (limpo.includes('ultimate') || limpo.includes('premium')) {
+    classe = 'plano-ultimate';
+  }
+
+  return `<span class="badge-plano ${classe}">${escapeHtml(nomePlano)}</span>`;
+}
+
+function preencherSelectPlanosModal() {
+  const select = document.getElementById('modal-select-novo-plano');
+  if (!select) return;
+
+  if (!PLANOS_DISPONIVEIS.length) {
+    select.innerHTML = '<option value="">Nenhum plano disponível</option>';
+    return;
+  }
+
+  select.innerHTML = PLANOS_DISPONIVEIS.map(p => {
+    const rotulo = p.nome_exibicao || p.nome;
+    return `<option value="${escapeHtml(p.id)}">${escapeHtml(rotulo)}</option>`;
+  }).join('');
+}
+
+function abrirModalAlterarPlano(userId) {
+  const usuario = USUARIOS_CACHE.find(u => u.id === userId);
+  if (!usuario) {
+    alert('Usuário não encontrado na lista atual.');
+    return;
+  }
+
+  usuarioSelecionadoModal = usuario;
+
+  document.getElementById('modal-plano-nome').textContent = usuario.nome || usuario.nome_usuario || 'Aluno(a)';
+  document.getElementById('modal-plano-email').textContent = usuario.email || 'Não informado';
+  document.getElementById('modal-plano-atual').innerHTML = renderBadgePlano(usuario.planoNome);
+
+  // Limpa alerta e senha anterior
+  const alerta = document.getElementById('modal-plano-alerta');
+  alerta.className = 'modal-alert';
+  alerta.textContent = '';
+  alerta.style.display = 'none';
+
+  const inputSenha = document.getElementById('modal-input-senha-admin');
+  inputSenha.value = '';
+
+  // Seleciona o plano atual no select caso coincida
+  const select = document.getElementById('modal-select-novo-plano');
+  if (usuario.planoId) {
+    select.value = usuario.planoId;
+  } else {
+    const match = PLANOS_DISPONIVEIS.find(p => p.nome.toLowerCase() === usuario.planoNome.toLowerCase());
+    if (match) select.value = match.id;
+  }
+
+  const modal = document.getElementById('modal-alterar-plano');
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+
+  setTimeout(() => select.focus(), 80);
+}
+
+function fecharModalPlano() {
+  if (alterandoPlano) return; // Impede fechar durante operação em andamento
+  const modal = document.getElementById('modal-alterar-plano');
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  usuarioSelecionadoModal = null;
+}
+
+function mostrarAlertaModal(mensagem, tipo = 'error') {
+  const alerta = document.getElementById('modal-plano-alerta');
+  if (!alerta) return;
+  alerta.className = `modal-alert show ${tipo}`;
+  alerta.textContent = mensagem;
+  alerta.style.display = 'block';
+}
+
+async function confirmarAlteracaoPlano() {
+  if (!usuarioSelecionadoModal || alterandoPlano) return;
+
+  const select = document.getElementById('modal-select-novo-plano');
+  const inputSenha = document.getElementById('modal-input-senha-admin');
+  const btnSubmit = document.getElementById('btn-confirmar-alteracao-plano');
+  const btnCancelar = document.getElementById('btn-cancelar-modal-plano');
+
+  const novoPlanoId = select.value;
+  const senhaInformada = inputSenha.value.trim();
+
+  // 1. Validação de preenchimento
+  if (!novoPlanoId) {
+    mostrarAlertaModal('Selecione um plano válido para continuar.', 'error');
+    select.focus();
+    return;
+  }
+
+  if (!senhaInformada) {
+    mostrarAlertaModal('Informe a senha de confirmação administrativa.', 'error');
+    inputSenha.focus();
+    return;
+  }
+
+  // 2. Confirmação de interface (UX Guard / Confirmação Intencional)
+  if (senhaInformada !== SENHA_ADMIN_CONFIRMACAO_INTERFACE) {
+    mostrarAlertaModal('Senha de confirmação administrativa incorreta.', 'error');
+    inputSenha.focus();
+    inputSenha.select();
+    return;
+  }
+
+  // Objeto do plano selecionado
+  const planoObj = PLANOS_DISPONIVEIS.find(p => p.id === novoPlanoId);
+  const novoPlanoNome = planoObj ? (planoObj.nome_exibicao || planoObj.nome) : novoPlanoId;
+
+  // Evita alteração redundante
+  if (usuarioSelecionadoModal.planoId === novoPlanoId ||
+      usuarioSelecionadoModal.planoNome.toLowerCase() === novoPlanoNome.toLowerCase()) {
+    mostrarAlertaModal(`O usuário já possui o plano ${novoPlanoNome}. Escolha um plano diferente.`, 'error');
+    return;
+  }
+
+  // 3. Execução da alteração
+  alterandoPlano = true;
+  btnSubmit.disabled = true;
+  btnCancelar.disabled = true;
+  select.disabled = true;
+  inputSenha.disabled = true;
+  btnSubmit.textContent = 'Alterando plano...';
+
+  const alerta = document.getElementById('modal-plano-alerta');
+  alerta.className = 'modal-alert';
+  alerta.style.display = 'none';
+
+  try {
+    // Validação de sessão ativa
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      mostrarAlertaModal('Sessão expirada. Redirecionando para o login...', 'error');
+      setTimeout(() => { window.location.href = './login.html'; }, 1800);
+      return;
+    }
+
+    let alteradoComSucesso = false;
+    let mensagemRetorno = '';
+
+    // ESTRATÉGIA DUAL DE SEGURANÇA E COMPATIBILIDADE:
+    // Passo A: Tenta executar a RPC segura 'admin_alterar_plano_usuario' (passando a senha para verificação server-side)
+    const { data: rpcData, error: rpcError } = await supabase.rpc('admin_alterar_plano_usuario', {
+      p_user_id: usuarioSelecionadoModal.id,
+      p_novo_plano_id: novoPlanoId,
+      p_senha_admin: senhaInformada
+    });
+
+    if (!rpcError) {
+      alteradoComSucesso = true;
+      mensagemRetorno = rpcData?.mensagem || `Plano alterado para ${novoPlanoNome} via RPC segura!`;
+    } else {
+      // Se a RPC ainda não foi instalada no Supabase (código 42883 do Postgres: function does not exist)
+      const rpcNaoExiste = rpcError.code === '42883' || rpcError.message?.includes('does not exist');
+
+      if (rpcNaoExiste) {
+        // Passo B: Fallback para UPDATE direto na tabela profiles
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            plano_id: novoPlanoId,
+            atualizado_em: new Date().toISOString()
+          })
+          .eq('id', usuarioSelecionadoModal.id);
+
+        if (updateError) {
+          // Erro de RLS: o banco Supabase bloqueou o update direto
+          if (updateError.code === '42501' || updateError.message?.includes('row-level security')) {
+            throw new Error(
+              'A política RLS do Supabase bloqueou a edição de profiles por outro usuário. ' +
+              'Instale a RPC segura documentada no Supabase ou configure a policy de admin.'
+            );
+          }
+          throw updateError;
+        }
+
+        alteradoComSucesso = true;
+        mensagemRetorno = `Plano alterado para ${novoPlanoNome} com sucesso!`;
+      } else {
+        // Erro específico retornado pela RPC (ex: senha inválida no banco)
+        throw rpcError;
+      }
+    }
+
+    if (alteradoComSucesso) {
+      // Atualiza o cache local
+      usuarioSelecionadoModal.planoId = novoPlanoId;
+      usuarioSelecionadoModal.planoNome = novoPlanoNome;
+
+      // Atualiza a linha no DOM em tempo real
+      atualizarLinhaUsuarioNoDom(usuarioSelecionadoModal);
+
+      mostrarAlertaModal(`✅ ${mensagemRetorno}`, 'success');
+
+      setTimeout(() => {
+        fecharModalPlano();
+      }, 1400);
+    }
+  } catch (err) {
+    console.error('Erro ao alterar plano do usuário:', err);
+    mostrarAlertaModal(`Erro: ${err.message || 'Não foi possível alterar o plano.'}`, 'error');
+  } finally {
+    alterandoPlano = false;
+    btnSubmit.disabled = false;
+    btnCancelar.disabled = false;
+    select.disabled = false;
+    inputSenha.disabled = false;
+    btnSubmit.textContent = 'Confirmar alteração';
+  }
+}
+
+function atualizarLinhaUsuarioNoDom(usuario) {
+  const tr = document.querySelector(`tr[data-user-row="${usuario.id}"]`);
+  if (!tr) {
+    renderTabelaUsuarios();
+    return;
+  }
+
+  const celulaPlano = tr.querySelector('.coluna-plano');
+  if (celulaPlano) {
+    celulaPlano.innerHTML = renderBadgePlano(usuario.planoNome);
+  }
+}
+
+function iniciarModalPlano() {
+  const modal = document.getElementById('modal-alterar-plano');
+  const btnFechar = document.getElementById('btn-fechar-modal-plano');
+  const btnCancelar = document.getElementById('btn-cancelar-modal-plano');
+  const form = document.getElementById('form-alterar-plano');
+
+  if (btnFechar) btnFechar.addEventListener('click', fecharModalPlano);
+  if (btnCancelar) btnCancelar.addEventListener('click', fecharModalPlano);
+
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) fecharModalPlano();
+    });
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (modal && modal.classList.contains('open')) {
+        fecharModalPlano();
+      }
+    }
+  });
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      confirmarAlteracaoPlano();
+    });
+  }
 }
 
 // ===== Vestibulares =====
