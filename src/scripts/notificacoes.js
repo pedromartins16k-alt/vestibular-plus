@@ -10,15 +10,18 @@ async function iniciarPagina() {
   if (!session) return;
   const userId = session.user.id;
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('nome, nome_usuario')
-    .eq('id', userId)
-    .single();
+  // Carrega profile e notificações em paralelo
+  const [{ data: profile }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('nome, nome_usuario')
+      .eq('id', userId)
+      .single(),
+    carregarTodas(userId),
+  ]);
+
   const nomeExibicao = profile?.nome_usuario || profile?.nome?.split(' ')[0] || 'Aluno(a)';
   document.getElementById('avatar-inicial').textContent = nomeExibicao[0]?.toUpperCase() || 'A';
-
-  await carregarTodas(userId);
 
   document.getElementById('marcar-todas-btn').addEventListener('click', async () => {
     await supabase.from('notificacoes').update({ lida: true }).eq('user_id', userId).eq('lida', false);

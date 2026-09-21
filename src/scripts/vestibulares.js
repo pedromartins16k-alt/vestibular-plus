@@ -153,22 +153,29 @@ const ASSUNTOS_POR_VESTIBULAR = {
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
+  const userId = session.user.id;
 
-  treineiroNivelUsuario = await carregarNivelTreineiroUsuario(session.user.id);
+  // Carrega nível treineiro, matérias, vestibulares e aulas em paralelo.
+  // A query de nível usa join direto em vez de duas queries sequenciais.
+  const [nivelResult, materiasResult] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('planos(treineiro_nivel)')
+      .eq('id', userId)
+      .single(),
+    supabase.from('materias').select('id, nome, cor').order('ordem'),
+    carregarVestibulares(),
+    carregarAulas(),
+  ]);
+
+  treineiroNivelUsuario = nivelResult.data?.planos?.treineiro_nivel || 'sp';
   aplicarTravaAbas();
-
   configurarTabs();
   configurarModal();
 
-  const { data: materias } = await supabase
-    .from('materias')
-    .select('id, nome, cor')
-    .order('ordem');
-
-  renderFiltroTreineiro(materias || []);
-  await carregarVestibulares();
-  await carregarAulas();
+  renderFiltroTreineiro(materiasResult.data || []);
   renderPesquisaVestibulares();
+  iniciarNotificacoes(userId);
 }
 
 /* ===== Plano do usuário / trava de acesso ===== */
@@ -241,7 +248,7 @@ function renderBloqueioPlano(nomePlano) {
 async function carregarVestibulares() {
   const { data, error } = await supabase
     .from('vestibulares')
-    .select('*')
+    .select('id, nome, instituicao, cidade, estado, tipo_prova, inscricao_inicio, inscricao_fim, data_prova, descricao, link_oficial, link_edital, aceita_treineiro')
     .order('data_prova', { ascending: true, nullsFirst: false });
 
   if (error || !data || !data.length) {
@@ -608,4 +615,3 @@ function configurarModal() {
 
 iniciar();
 iniciarBusca();
-iniciarNotificacoes();

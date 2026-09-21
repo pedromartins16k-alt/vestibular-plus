@@ -18,14 +18,15 @@ let primeiraMensagem = true;
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
+  const userId = session.user.id;
 
-  const { data: materias } = await supabase
-    .from('materias')
-    .select('id, nome, cor')
-    .order('ordem');
+  const [{ data: materias }] = await Promise.all([
+    supabase.from('materias').select('id, nome, cor').order('ordem'),
+    atualizarBadgeInicial(userId),
+  ]);
 
   renderFiltros(materias || []);
-  atualizarBadgeInicial();
+  iniciarNotificacoes(userId);
 }
 
 function renderFiltros(materias) {
@@ -45,13 +46,12 @@ function renderFiltros(materias) {
 
 // Tenta mostrar quantas perguntas já foram feitas hoje, sem gastar uma pergunta pra isso.
 // Se não conseguir (RLS, erro de rede, etc.), só esconde o badge — não trava o chat.
-async function atualizarBadgeInicial() {
+async function atualizarBadgeInicial(userId) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
     const { data: perfil } = await supabase
       .from('profiles')
       .select('planos(limite_chat_dia)')
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .single();
 
     const limite = perfil?.planos?.limite_chat_dia;
@@ -59,7 +59,7 @@ async function atualizarBadgeInicial() {
     const { data: uso } = await supabase
       .from('uso_diario')
       .select('chat_perguntas')
-      .eq('user_id', session.user.id)
+      .eq('user_id', userId)
       .eq('data', hoje)
       .maybeSingle();
 
@@ -167,4 +167,3 @@ inputEl.addEventListener('keydown', (e) => {
 
 iniciar();
 iniciarBusca();
-iniciarNotificacoes();

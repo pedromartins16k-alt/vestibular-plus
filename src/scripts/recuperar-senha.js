@@ -5,6 +5,15 @@ const errorMsg = document.getElementById('error-msg');
 const submitBtn = document.getElementById('submit-btn');
 const authCard = document.getElementById('auth-card');
 
+function escaparHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   errorMsg.textContent = '';
@@ -27,7 +36,7 @@ form.addEventListener('submit', async (e) => {
   authCard.innerHTML = `
     <div class="auth-logo"><div class="dot">V+</div><strong>Vestibular+</strong></div>
     <h1 class="auth-title">E-mail enviado ✉️</h1>
-    <p class="success-msg">Se existir uma conta com o e-mail <strong>${email}</strong>,
+    <p class="success-msg">Se existir uma conta com o e-mail <strong>${escaparHtml(email)}</strong>,
     você vai receber um link para redefinir sua senha.</p>
     <p class="auth-footer" style="margin-top:24px;">
       <a href="./login.html" style="color:var(--color-primary-500); font-weight:600;">Voltar ao login</a>

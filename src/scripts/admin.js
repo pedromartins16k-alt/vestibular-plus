@@ -119,7 +119,10 @@ async function carregarUsuarios() {
 
 // ===== Vestibulares =====
 async function carregarVestibulares() {
-  const { data: vestibulares } = await supabase.from('vestibulares').select('*').order('criado_em', { ascending: false });
+  const { data: vestibulares } = await supabase
+    .from('vestibulares')
+    .select('id, nome, instituicao, cidade, estado, tipo_prova, data_prova, criado_em')
+    .order('criado_em', { ascending: false });
   const { data: vinculos } = await supabase.from('vestibular_conteudo').select('vestibular_id, tipo');
 
   const contagemPorVestibular = {};
