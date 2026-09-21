@@ -47,12 +47,7 @@ if (googleBtn) {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + window.location.pathname,
-          scopes: 'https://www.googleapis.com/auth/calendar.events',
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
+          redirectTo: window.location.origin + '/pages/dashboard.html',
         },
       });
 
@@ -70,24 +65,11 @@ if (googleBtn) {
   });
 }
 
-// Depois do redirect de volta do Google, o Supabase dispara SIGNED_IN aqui.
-// Se vier com token de calendário, salva antes de mandar pro dashboard.
-supabase.auth.onAuthStateChange(async (event, session) => {
-  if (event !== 'SIGNED_IN' || !session) return;
-  if (!session.provider_refresh_token) return; // login normal por e-mail/senha, nada a fazer aqui
-
-  try {
-    await supabase.from('google_calendar_conexoes').upsert({
-      user_id: session.user.id,
-      refresh_token: session.provider_refresh_token,
-      access_token: session.provider_token || null,
-      token_expira_em: new Date(Date.now() + 3500 * 1000).toISOString(),
-    });
-  } catch (e) {
-    console.warn('Erro ao salvar token do Google Calendar:', e);
+// Redireciona para o dashboard após login bem-sucedido
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN' && session) {
+    window.location.href = './dashboard.html';
   }
-
-  window.location.href = './dashboard.html';
 });
 
 function traduzErro(msg) {

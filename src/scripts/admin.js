@@ -79,14 +79,14 @@ function iniciarSubTabs() {
 // ===== Visão geral =====
 async function carregarVisaoGeral() {
   const contagens = await Promise.all([
-    supabase.from('profiles').select('*', { count: 'exact', head: true }),
-    supabase.from('resumos').select('*', { count: 'exact', head: true }),
-    supabase.from('questoes').select('*', { count: 'exact', head: true }),
-    supabase.from('flashcards').select('*', { count: 'exact', head: true }),
-    supabase.from('simulados').select('*', { count: 'exact', head: true }),
-    supabase.from('vestibulares').select('*', { count: 'exact', head: true }),
-    supabase.from('treineiro_aulas').select('*', { count: 'exact', head: true }),
-    supabase.from('sessoes_estudo').select('*', { count: 'exact', head: true }),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }),
+    supabase.from('resumos').select('id', { count: 'exact', head: true }),
+    supabase.from('questoes').select('id', { count: 'exact', head: true }),
+    supabase.from('flashcards').select('id', { count: 'exact', head: true }),
+    supabase.from('simulados').select('id', { count: 'exact', head: true }),
+    supabase.from('vestibulares').select('id', { count: 'exact', head: true }),
+    supabase.from('treineiro_aulas').select('id', { count: 'exact', head: true }),
+    supabase.from('sessoes_estudo').select('id', { count: 'exact', head: true }),
   ]);
   const [usuarios, resumos, questoes, flashcards, simulados, vestibulares, aulas, sessoes] = contagens.map(r => r.count ?? 0);
   document.getElementById('stat-usuarios').textContent = usuarios;

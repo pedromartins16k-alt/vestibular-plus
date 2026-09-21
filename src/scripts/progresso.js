@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 
+import { getCache, setCache } from '../lib/cache.js';
+
 const resumoEl = document.getElementById('progresso-resumo');
 const listaEl = document.getElementById('progresso-lista');
 
@@ -9,10 +11,29 @@ async function iniciar() {
   if (!session) return;
   const userId = session.user.id;
 
-  const { data: materias } = await supabase
-    .from('materias')
-    .select('id, nome, cor')
-    .order('ordem');
+  let materias = getCache('materias-catalogo');
+  let promessaMaterias = Promise.resolve({ data: materias });
+  if (!materias) {
+    promessaMaterias = supabase
+      .from('materias')
+      .select('id, nome, cor')
+      .order('ordem');
+  }
+
+  const promessaSessoes = supabase
+    .from('sessoes_estudo')
+    .select('materia_id, duracao_minutos, tipo')
+    .eq('user_id', userId);
+
+  const [resMaterias, resSessoes] = await Promise.all([
+    promessaMaterias,
+    promessaSessoes,
+  ]);
+
+  if (!materias && resMaterias?.data) {
+    materias = resMaterias.data;
+    setCache('materias-catalogo', materias, 300);
+  }
 
   if (!materias || !materias.length) {
     resumoEl.innerHTML = '';
@@ -20,12 +41,8 @@ async function iniciar() {
     return;
   }
 
-  const { data: sessoes } = await supabase
-    .from('sessoes_estudo')
-    .select('materia_id, duracao_minutos, tipo')
-    .eq('user_id', userId);
-
-  const totalMinutos = (sessoes || []).reduce((soma, s) => soma + (s.duracao_minutos || 0), 0);
+  const sessoes = resSessoes.data || [];
+  const totalMinutos = sessoes.reduce((soma, s) => soma + (s.duracao_minutos || 0), 0);
 
   resumoEl.innerHTML = `
     <div class="card resumo-card"><strong>${Math.round(totalMinutos / 60)}h</strong><span>Total estudado</span></div>

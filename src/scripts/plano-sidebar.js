@@ -73,20 +73,26 @@ function renderIconeCadeadoMini(ordem) {
 
 /**
  * Aplica os fundos 3D e cadeados limpos na sidebar de acordo com o plano do usuário logado.
+ * @param {string} userId
+ * @param {number|null} [ordemPredefinida] Ordem do plano já obtida anteriormente para evitar nova requisição ao Supabase.
  */
-export async function aplicarCadeadosSidebar(userId) {
-  const { data: perfil, error } = await supabase
-    .from('profiles')
-    .select('planos(ordem)')
-    .eq('id', userId)
-    .single();
+export async function aplicarCadeadosSidebar(userId, ordemPredefinida = null) {
+  let ordemUsuario = ordemPredefinida;
 
-  if (error) {
-    console.error('Erro ao verificar plano do usuário:', error);
-    return;
+  if (ordemUsuario === null || ordemUsuario === undefined) {
+    const { data: perfil, error } = await supabase
+      .from('profiles')
+      .select('planos(ordem)')
+      .eq('id', userId)
+      .single();
+
+    if (error) {
+      console.error('Erro ao verificar plano do usuário:', error);
+      return;
+    }
+
+    ordemUsuario = perfil?.planos?.ordem ?? 0;
   }
-
-  const ordemUsuario = perfil?.planos?.ordem ?? 0;
 
   document.querySelectorAll('.nav-item[data-recurso]').forEach(item => {
     const recurso = item.dataset.recurso;

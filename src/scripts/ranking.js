@@ -11,13 +11,15 @@ async function iniciar() {
   const { data: perfis } = await supabase
     .from('profiles')
     .select('id, nome, nome_usuario, nivel, xp')
-    .order('xp', { ascending: false });
+    .order('xp', { ascending: false })
+    .limit(50);
   if (!perfis || !perfis.length) {
     listaEl.innerHTML = `<p class="empty-state">O ranking aparece assim que os alunos começarem a estudar 🚀</p>`;
     return;
   }
   renderPodio(perfis.slice(0, 3));
   renderLista(perfis, userId);
+  iniciarNotificacoes(userId);
 }
 function nomeExibicao(p) {
   return p.nome_usuario || p.nome || 'Aluno';
@@ -52,4 +54,3 @@ function renderLista(perfis, userId) {
 }
 iniciar();
 iniciarBusca();
-iniciarNotificacoes();

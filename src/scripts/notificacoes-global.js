@@ -2,42 +2,66 @@ import { supabase } from '../lib/supabaseClient.js';
 
 // Notificações (sininho no topo com dropdown + badge de não lidas)
 // Chame iniciarNotificacoes() em qualquer página que tenha #notif-btn, #notif-badge e #notif-dropdown no HTML.
-export async function iniciarNotificacoes() {
+export async function iniciarNotificacoes(predefinedUserId = null) {
   const btn = document.getElementById('notif-btn');
   const badge = document.getElementById('notif-badge');
   const dropdown = document.getElementById('notif-dropdown');
   if (!btn || !dropdown) return; // página sem sininho: não faz nada
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return;
-  const userId = session.user.id;
+  let userId = predefinedUserId;
+  if (!userId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+    userId = session.user.id;
+  }
 
+  // Carregamento inicial: apenas o badge (1 consulta ultra leve HEAD count)
   await atualizarBadge(userId, badge);
-  await carregarLista(userId, dropdown, badge);
 
-  btn.addEventListener('click', (e) => {
+  let listaCarregada = false;
+
+  btn.addEventListener('click', async (e) => {
     e.stopPropagation();
+    const abrindo = !dropdown.classList.contains('open');
     dropdown.classList.toggle('open');
+
+    // Carrega a lista somente quando o usuário abre o dropdown pela 1ª vez ou quando houver novas notificações
+    if (abrindo && (!listaCarregada || dropdown.dataset.precisaAtualizar === 'true')) {
+      await carregarLista(userId, dropdown, badge);
+      listaCarregada = true;
+      dropdown.dataset.precisaAtualizar = 'false';
+    }
   });
+
   document.addEventListener('click', (e) => {
     if (!dropdown.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
       dropdown.classList.remove('open');
     }
   });
 
-  // Atualização em tempo real (opcional — depende do Realtime estar habilitado
-  // pra tabela public.notificacoes: painel do Supabase > Database > Replication).
-  // Se não estiver habilitado, essa parte simplesmente não faz nada, sem quebrar o resto.
-  supabase
-    .channel('notificacoes-' + userId)
-    .on('postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'notificacoes', filter: `user_id=eq.${userId}` },
-      () => {
-        atualizarBadge(userId, badge);
-        carregarLista(userId, dropdown, badge);
-      }
-    )
-    .subscribe();
+  // Atualização em tempo real (apenas para o usuário atual)
+  try {
+    const canalNotif = supabase
+      .channel('notificacoes-' + userId)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notificacoes', filter: `user_id=eq.${userId}` },
+        () => {
+          atualizarBadge(userId, badge);
+          if (dropdown.classList.contains('open')) {
+            carregarLista(userId, dropdown, badge);
+          } else {
+            dropdown.dataset.precisaAtualizar = 'true';
+          }
+        }
+      )
+      .subscribe();
+
+    window.addEventListener('beforeunload', () => {
+      supabase.removeChannel(canalNotif);
+    });
+  } catch (err) {
+    console.warn('Realtime notificações warning:', err);
+  }
 }
 
 async function atualizarBadge(userId, badge) {

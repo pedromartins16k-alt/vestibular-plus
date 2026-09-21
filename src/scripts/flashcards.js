@@ -118,24 +118,20 @@ async function iniciar() {
     return;
   }
 
-  const { data: materias } = await supabase
-    .from('materias')
-    .select('id, nome, cor')
-    .order('ordem');
+  const [resMaterias, resFlashcards, resProgresso] = await Promise.all([
+    supabase.from('materias').select('id, nome, cor').order('ordem'),
+    supabase.from('flashcards').select('id, frente, verso, materia_id, assunto, materias(nome, cor)'),
+    supabase.from('flashcards_progresso').select('flashcard_id, nivel_memorizacao, proxima_revisao').eq('user_id', userId),
+  ]);
 
-  const { data: flashcards } = await supabase
-    .from('flashcards')
-    .select('id, frente, verso, materia_id, assunto, materias(nome, cor)');
-
-  const { data: progresso } = await supabase
-    .from('flashcards_progresso')
-    .select('flashcard_id, nivel_memorizacao, proxima_revisao')
-    .eq('user_id', userId);
+  const materias = resMaterias.data || [];
+  const flashcards = resFlashcards.data || [];
+  const progresso = resProgresso.data || [];
 
   const progressoPorCard = {};
-  (progresso || []).forEach(p => { progressoPorCard[p.flashcard_id] = p; });
+  progresso.forEach(p => { progressoPorCard[p.flashcard_id] = p; });
 
-  todosFlashcards = (flashcards || []).map(c => ({
+  todosFlashcards = flashcards.map(c => ({
     ...c,
     progresso: progressoPorCard[c.id] || null,
   }));

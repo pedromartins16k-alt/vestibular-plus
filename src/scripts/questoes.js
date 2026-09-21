@@ -1,4 +1,4 @@
-﻿import { iniciarNotificacoes } from './notificacoes-global.js';
+import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
@@ -218,24 +218,25 @@ async function iniciar() {
   if (!session) return;
   sessionUserId = session.user.id;
 
-  nomePlanoUsuario = await buscarNomePlanoUsuario();
+  const [
+    planoUsuario,
+    resMaterias,
+    resAulas,
+    questoesBrutas,
+    favoritos
+  ] = await Promise.all([
+    buscarNomePlanoUsuario(),
+    supabase.from('materias').select('id, nome, cor').order('ordem'),
+    supabase.from('treineiro_aulas').select('id, titulo, materia_id, ordem').order('ordem'),
+    buscarTodasQuestoes(),
+    buscarFavoritos('questao'),
+  ]);
 
-  const { data: materias } = await supabase
-    .from('materias')
-    .select('id, nome, cor')
-    .order('ordem');
-
-  const { data: aulas } = await supabase
-    .from('treineiro_aulas')
-    .select('id, titulo, materia_id, ordem')
-    .order('ordem');
-
-  const questoesBrutas = await buscarTodasQuestoes();
+  nomePlanoUsuario = planoUsuario;
+  materiasCache = resMaterias.data || [];
+  aulasCache = resAulas.data || [];
   questoesCache = marcarQuestoesLiberadasEBloqueadas(questoesBrutas, nomePlanoUsuario);
-
-  materiasCache = materias || [];
-  aulasCache = aulas || [];
-  favoritosSet = await buscarFavoritos('questao');
+  favoritosSet = favoritos || new Set();
 
   renderFiltros(materiasCache);
   renderQuestaoAtual();

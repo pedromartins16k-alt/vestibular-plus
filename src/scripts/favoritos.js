@@ -22,8 +22,10 @@ async function iniciar() {
   const idsResumos = (favoritos || []).filter(f => f.tipo === 'resumo').map(f => f.referencia_id);
   const idsQuestoes = (favoritos || []).filter(f => f.tipo === 'questao').map(f => f.referencia_id);
 
-  await carregarResumos(idsResumos);
-  await carregarQuestoes(idsQuestoes);
+  await Promise.all([
+    carregarResumos(idsResumos),
+    carregarQuestoes(idsQuestoes)
+  ]);
 }
 
 async function carregarResumos(ids) {

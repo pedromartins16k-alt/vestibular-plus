@@ -168,24 +168,27 @@ async function buscarNomePlanoUsuario(userId) {
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
+  const userId = session.user.id;
 
-  const nomePlano = await buscarNomePlanoUsuario(session.user.id);
+  const [
+    nomePlano,
+    resMaterias,
+    resResumos,
+    favoritos
+  ] = await Promise.all([
+    buscarNomePlanoUsuario(userId),
+    supabase.from('materias').select('id, nome, cor').order('ordem'),
+    supabase.from('resumos').select('id, titulo, conteudo, fonte, nivel_dificuldade, materia_id, materias(nome, cor)').order('criado_em', { ascending: false }),
+    buscarFavoritos('resumo'),
+  ]);
 
-  const { data: materias } = await supabase
-    .from('materias')
-    .select('id, nome, cor')
-    .order('ordem');
+  const materias = resMaterias.data || [];
+  const resumos = resResumos.data || [];
 
-  const { data: resumos } = await supabase
-    .from('resumos')
-    .select('id, titulo, conteudo, fonte, nivel_dificuldade, materia_id, materias(nome, cor)')
-    .order('criado_em', { ascending: false });
+  resumosCache = marcarResumosLiberadosEBloqueados(resumos, nomePlano);
+  favoritosSet = favoritos || new Set();
 
-  resumosCache = marcarResumosLiberadosEBloqueados(resumos || [], nomePlano);
-
-  favoritosSet = await buscarFavoritos('resumo');
-
-  renderFiltros(materias || []);
+  renderFiltros(materias);
   renderResumos();
 }
 

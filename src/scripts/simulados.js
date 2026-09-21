@@ -231,14 +231,18 @@ async function iniciar() {
   if (!session) return;
   sessionUserId = session.user.id;
 
-  nomePlanoUsuario = await buscarNomePlanoUsuario();
+  const [planoUsuario, resSimulados] = await Promise.all([
+    buscarNomePlanoUsuario(),
+    supabase
+      .from('simulados')
+      .select('id, titulo, descricao, tempo_limite_minutos, dificuldade, vestibulares(nome)')
+      .order('criado_em', { ascending: false }),
+  ]);
 
-  const { data: simulados } = await supabase
-    .from('simulados')
-    .select('id, titulo, descricao, tempo_limite_minutos, dificuldade, vestibulares(nome)')
-    .order('criado_em', { ascending: false });
+  nomePlanoUsuario = planoUsuario;
+  const simulados = resSimulados.data || [];
 
-  const lista = marcarSimuladosLiberadosEBloqueados(simulados || [], nomePlanoUsuario);
+  const lista = marcarSimuladosLiberadosEBloqueados(simulados, nomePlanoUsuario);
 
   todosSimulados = lista.slice().sort((a, b) => {
     const da = ORDEM_DIFICULDADE[a.dificuldade] ?? 99;

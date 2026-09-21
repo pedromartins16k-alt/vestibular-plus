@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { xpParaProximoNivel } from '../utils/xp.js';
+import { getCache, setCache } from '../lib/cache.js';
 
 // Converte um timestamp para "YYYY-MM-DD" no fuso de São Paulo (pra agrupar por dia certo).
 function diaSP(dataIso) {
@@ -68,30 +69,63 @@ async function concederXpConquista(userId, xpGanho) {
  * Chamar depois de qualquer ação que gere progresso (responder questão, revisar
  * flashcard, terminar simulado, ler resumo) e também ao abrir o dashboard.
  * Retorna a lista de conquistas recém-desbloqueadas nesta chamada (pode ser vazia).
+ * @param {string} userId
+ * @param {Object} [dadosPrecarregados] Dados já obtidos pelo chamador para evitar consultas duplicadas.
  */
-export async function verificarConquistas(userId) {
+export async function verificarConquistas(userId, dadosPrecarregados = {}) {
   if (!userId) return [];
 
-  const [
-    { data: conquistas },
-    { data: jaConquistadas },
-    { data: sessoes },
-    { data: simulados },
-    { data: profile },
-  ] = await Promise.all([
-    supabase.from('conquistas').select('id, nome, xp_recompensa'),
-    supabase.from('usuario_conquistas').select('conquista_id').eq('user_id', userId),
-    supabase.from('sessoes_estudo').select('criado_em, tipo, acertou, duracao_minutos').eq('user_id', userId),
-    supabase.from('simulado_respostas').select('nota').eq('user_id', userId),
-    supabase.from('profiles').select('meta_diaria_minutos').eq('id', userId).single(),
-  ]);
+  try {
+    // 1. Catálogo estático de conquistas (com cache em memória)
+    let conquistas = getCache('conquistas-catalogo');
+    let promessaConquistas = Promise.resolve({ data: conquistas });
+    if (!conquistas) {
+      promessaConquistas = supabase.from('conquistas').select('id, nome, xp_recompensa');
+    }
 
-  if (!conquistas || !conquistas.length) return [];
+    // 2. Conquistas já obtidas
+    const promessaJaConquistadas = supabase.from('usuario_conquistas').select('conquista_id').eq('user_id', userId);
 
-  const idsConquistados = new Set((jaConquistadas || []).map(c => c.conquista_id));
-  const listaSessoes = sessoes || [];
-  const listaSimulados = simulados || [];
-  const metaDiaria = profile?.meta_diaria_minutos || 60;
+    // 3. Sessões de estudo (reutiliza se fornecidas pelo Dashboard)
+    let promessaSessoes = Promise.resolve({ data: dadosPrecarregados.sessoes });
+    if (!dadosPrecarregados.sessoes) {
+      promessaSessoes = supabase.from('sessoes_estudo').select('criado_em, tipo, acertou, duracao_minutos').eq('user_id', userId);
+    }
+
+    // 4. Simulados
+    const promessaSimulados = supabase.from('simulado_respostas').select('nota').eq('user_id', userId);
+
+    // 5. Meta diária (reutiliza se fornecida)
+    let promessaProfile = Promise.resolve({ data: { meta_diaria_minutos: dadosPrecarregados.metaDiaria } });
+    if (dadosPrecarregados.metaDiaria === undefined || dadosPrecarregados.metaDiaria === null) {
+      promessaProfile = supabase.from('profiles').select('meta_diaria_minutos').eq('id', userId).single();
+    }
+
+    const [
+      resConquistas,
+      { data: jaConquistadas },
+      { data: sessoes },
+      { data: simulados },
+      { data: profile },
+    ] = await Promise.all([
+      promessaConquistas,
+      promessaJaConquistadas,
+      promessaSessoes,
+      promessaSimulados,
+      promessaProfile,
+    ]);
+
+    if (!conquistas && resConquistas?.data) {
+      conquistas = resConquistas.data;
+      setCache('conquistas-catalogo', conquistas, 600); // 10 minutos
+    }
+
+    if (!conquistas || !conquistas.length) return [];
+
+    const idsConquistados = new Set((jaConquistadas || []).map(c => c.conquista_id));
+    const listaSessoes = sessoes || [];
+    const listaSimulados = simulados || [];
+    const metaDiaria = profile?.meta_diaria_minutos || 60;
 
   const criterios = {
     'Primeiro Passo': () => listaSessoes.length >= 1,
@@ -123,5 +157,9 @@ export async function verificarConquistas(userId) {
     await concederXpConquista(userId, c.xp_recompensa);
   }
 
-  return desbloqueadasAgora;
+    return desbloqueadasAgora;
+  } catch (err) {
+    console.warn('Erro ao verificar conquistas:', err);
+    return [];
+  }
 }

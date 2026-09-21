@@ -26,17 +26,25 @@ async function iniciar() {
   if (!session) return;
   userId = session.user.id;
 
-  const { data: materias } = await supabase
-    .from('materias')
-    .select('id, nome, cor')
-    .order('ordem');
+  const [resMaterias, resCronograma] = await Promise.all([
+    supabase.from('materias').select('id, nome, cor').order('ordem'),
+    supabase
+      .from('cronograma')
+      .select('id, titulo, data, hora_inicio, hora_fim, concluido, materia_id, materias(nome, cor)')
+      .eq('user_id', userId)
+      .order('data')
+      .order('hora_inicio'),
+  ]);
 
-  selectMateria.innerHTML = (materias || [])
+  const materias = resMaterias.data || [];
+  selectMateria.innerHTML = materias
     .map(m => `<option value="${m.id}">${m.nome}</option>`)
     .join('');
 
-  renderFiltros(materias || []);
-  await carregarCronograma();
+  renderFiltros(materias);
+
+  cronogramaCache = resCronograma.data || [];
+  renderLista();
 }
 
 async function carregarCronograma() {

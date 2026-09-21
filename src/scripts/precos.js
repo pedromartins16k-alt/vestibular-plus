@@ -76,7 +76,6 @@ function montarRecursos(plano) {
 
   recursos.push({ ok: plano.acesso_favoritos, texto: 'Favoritar resumos e questões' });
   recursos.push({ ok: plano.acesso_dificuldade_genio, texto: 'Nível de dificuldade Gênio' });
-  recursos.push({ ok: plano.acesso_google_calendar, texto: 'Sincronização com Google Calendar' });
   recursos.push({ ok: plano.acesso_estatisticas_avancadas, texto: 'Estatísticas avançadas' });
 
   return recursos;
@@ -183,24 +182,28 @@ async function iniciar() {
   const { data: { session } } = await supabase.auth.getSession();
   let planoAtualNome = null;
 
+  let promessaPerfil = Promise.resolve(null);
   if (session) {
     backLink.href = './dashboard.html';
     backLink.textContent = '← Voltar ao dashboard';
-
-    const { data: perfil } = await supabase
+    promessaPerfil = supabase
       .from('profiles')
       .select('planos(nome)')
       .eq('id', session.user.id)
       .single();
-    planoAtualNome = perfil?.planos?.nome ?? 'free';
   }
 
-  const { data: planos, error } = await supabase
-    .from('planos')
-    .select('*')
-    .order('ordem', { ascending: true });
+  const [resPerfil, resPlanos] = await Promise.all([
+    promessaPerfil,
+    supabase.from('planos').select('id, nome, preco_mensal, ordem, limite_questoes_dia, limite_resumos_dia, limite_simulados_semana, limite_chat_dia, acesso_favoritos, acesso_dificuldade_genio, acesso_estatisticas_avancadas').order('ordem', { ascending: true })
+  ]);
 
-  if (error || !planos) {
+  if (resPerfil?.data?.planos?.nome) {
+    planoAtualNome = resPerfil.data.planos.nome;
+  }
+
+  const planos = resPlanos.data;
+  if (resPlanos.error || !planos) {
     grid.innerHTML = '<p class="empty-state">Não foi possível carregar os planos agora. Tente recarregar a página.</p>';
     return;
   }

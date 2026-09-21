@@ -33,25 +33,31 @@ async function iniciar() {
 }
 
 async function carregarMetas() {
-  const { data: metas } = await supabase
-    .from('metas')
-    .select('id, descricao, tipo, valor_alvo, valor_atual, prazo')
-    .eq('user_id', userId);
+  const [resMetas, resSessoes] = await Promise.all([
+    supabase
+      .from('metas')
+      .select('id, descricao, tipo, valor_alvo, valor_atual, prazo')
+      .eq('user_id', userId),
+    supabase
+      .from('sessoes_estudo')
+      .select('tipo, duracao_minutos')
+      .eq('user_id', userId),
+  ]);
 
-  const { data: sessoes } = await supabase
-    .from('sessoes_estudo')
-    .select('tipo, duracao_minutos')
-    .eq('user_id', userId);
+  const metas = resMetas.data || [];
+  const sessoes = resSessoes.data || [];
+  const progresso = calcularProgresso(sessoes);
 
-  const progresso = calcularProgresso(sessoes || []);
-
-  metasCache = (metas || []).map(m => ({
-    ...m,
-    valor_atual: progresso[m.tipo] ?? 0,
-  }));
-
-  metasCache.forEach(m => {
-    supabase.from('metas').update({ valor_atual: m.valor_atual }).eq('id', m.id);
+  metasCache = metas.map(m => {
+    const novoValor = progresso[m.tipo] ?? 0;
+    // Atualiza no banco somente se o valor realmente mudou
+    if (m.valor_atual !== novoValor) {
+      supabase.from('metas').update({ valor_atual: novoValor }).eq('id', m.id).then();
+    }
+    return {
+      ...m,
+      valor_atual: novoValor,
+    };
   });
 
   renderMetas();
