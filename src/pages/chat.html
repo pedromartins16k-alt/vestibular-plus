@@ -31,7 +31,6 @@
     background: var(--bg-base);
   }
 
-  /* Canvas de fundo sutil */
   #fundo-ondas {
     position: fixed;
     top: 0;
@@ -195,15 +194,37 @@
   .header-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex-shrink: 0;
+  }
+
+  .plano-badge-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(59,130,246,0.2));
+    border: 1px solid rgba(168,85,247,0.4);
+    color: var(--color-neon);
+    white-space: nowrap;
+  }
+
+  .plano-badge-tag.ultimate {
+    background: linear-gradient(135deg, rgba(244,114,182,0.2), rgba(96,165,250,0.2));
+    border-color: rgba(244,114,182,0.5);
+    color: #f472b6;
+    box-shadow: 0 0 14px rgba(244,114,182,0.3);
   }
 
   .uso-badge {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 14px;
+    padding: 6px 12px;
     border-radius: var(--radius-full);
     background: rgba(124, 58, 237, 0.12);
     border: 1px solid rgba(124, 58, 237, 0.25);
@@ -294,7 +315,7 @@
   }
 
   /* =========================================================
-     ÁREA PRINCIPAL DA CONVERSA (OCUPA TODA A TELA)
+     ÁREA PRINCIPAL DA CONVERSA
      ========================================================= */
   .chat-conversa {
     position: relative;
@@ -320,7 +341,7 @@
   }
 
   /* =========================================================
-     ESTADO INICIAL ELEGANTE (EMPTY STATE)
+     ESTADO INICIAL COM ATALHOS INTELIGENTES
      ========================================================= */
   .empty-state-card {
     margin: 0 auto;
@@ -331,7 +352,7 @@
     flex-direction: column;
     align-items: center;
     width: 100%;
-    max-width: 720px;
+    max-width: 760px;
   }
 
   .empty-icon-glow {
@@ -365,7 +386,7 @@
   .empty-desc {
     font-size: 0.92rem;
     color: var(--text-secondary);
-    max-width: 540px;
+    max-width: 580px;
     line-height: 1.55;
     margin-bottom: 24px;
   }
@@ -420,7 +441,7 @@
   }
 
   /* =========================================================
-     BALÕES DE MENSAGENS MODERNOS
+     MENSAGENS & FORMATAÇÃO RICA
      ========================================================= */
   .msg-row {
     display: flex;
@@ -429,23 +450,12 @@
   }
 
   @keyframes slideUpMsg {
-    from {
-      opacity: 0;
-      transform: translateY(14px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
-  .msg-row-user {
-    justify-content: flex-end;
-  }
-
-  .msg-row-tutor {
-    justify-content: flex-start;
-  }
+  .msg-row-user { justify-content: flex-end; }
+  .msg-row-tutor { justify-content: flex-start; }
 
   .msg-bubble {
     max-width: 82%;
@@ -457,7 +467,6 @@
     box-shadow: var(--shadow-soft);
   }
 
-  /* Mensagem do Usuário */
   .msg-user {
     background: var(--gradient-primary);
     color: #ffffff;
@@ -466,7 +475,6 @@
     white-space: pre-wrap;
   }
 
-  /* Mensagem do Tutor */
   .msg-tutor {
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
@@ -496,23 +504,34 @@
     color: var(--color-neon);
   }
 
-  .btn-copiar {
+  .msg-acoes-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-acao-msg {
     background: transparent;
     border: none;
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: 0.76rem;
+    font-size: 0.78rem;
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 6px;
+    padding: 3px 6px;
     border-radius: var(--radius-sm);
     transition: all var(--transition-fast);
   }
 
-  .btn-copiar:hover {
+  .btn-acao-msg:hover {
     color: var(--text-primary);
     background: rgba(255, 255, 255, 0.08);
+  }
+
+  .btn-acao-msg.active {
+    color: var(--color-neon);
+    background: rgba(124, 58, 237, 0.15);
   }
 
   .msg-conteudo {
@@ -520,13 +539,8 @@
     line-height: 1.65;
   }
 
-  .msg-conteudo p {
-    margin: 0 0 10px;
-  }
-
-  .msg-conteudo p:last-child {
-    margin-bottom: 0;
-  }
+  .msg-conteudo p { margin: 0 0 10px; }
+  .msg-conteudo p:last-child { margin-bottom: 0; }
 
   .msg-conteudo code {
     background: rgba(124, 58, 237, 0.14);
@@ -545,28 +559,47 @@
     border: 1px solid var(--border-color);
   }
 
-  .msg-conteudo pre code {
-    background: transparent;
-    padding: 0;
-  }
+  .msg-conteudo pre code { background: transparent; padding: 0; }
 
-  /* Mensagem de Erro */
-  .msg-row-erro {
-    justify-content: center;
-  }
-
-  .msg-erro {
-    background: rgba(239, 68, 68, 0.12);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #fca5a5;
-    border-radius: var(--radius-md);
-    padding: 12px 18px;
-    text-align: center;
-    max-width: 90%;
-    font-size: 0.9rem;
+  /* Sugestões de Próximos Passos (Ações Contextuais) */
+  .proximos-passos-wrap {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border-color);
     display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .btn-passo-sugestao {
+    background: var(--glass-bg);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
+    transition: all var(--transition-fast);
+  }
+
+  .btn-passo-sugestao:hover {
+    background: var(--gradient-primary);
+    color: #fff;
+    border-color: transparent;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
+  }
+
+  .btn-passo-sugestao.destaque {
+    border-color: var(--color-neon);
+    color: var(--color-neon);
+  }
+  .btn-passo-sugestao.destaque:hover {
+    color: #fff;
   }
 
   /* Indicador de Digitando */
@@ -606,7 +639,7 @@
   }
 
   /* =========================================================
-     CAMPO DE MENSAGEM INFERIOR MODERNO (STICKY/FIXED FULL WIDTH)
+     COMPOSITOR INFERIOR MODERNO (COM ANEXO)
      ========================================================= */
   .chat-bottom-bar {
     position: relative;
@@ -629,12 +662,12 @@
 
   .input-card {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     gap: 10px;
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
-    border-radius: 24px;
-    padding: 8px 12px 8px 18px;
+    border-radius: 28px;
+    padding: 6px 10px 6px 14px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
   }
@@ -642,6 +675,27 @@
   .input-card:focus-within {
     border-color: var(--color-primary-500);
     box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), 0 8px 28px rgba(124, 58, 237, 0.12);
+  }
+
+  .btn-anexo {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+  }
+
+  .btn-anexo:hover {
+    color: var(--text-primary);
+    background: rgba(124, 58, 237, 0.12);
   }
 
   .input-mensagem,
@@ -695,10 +749,6 @@
     box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5);
   }
 
-  .btn-enviar:active:not(:disabled) {
-    transform: scale(0.95);
-  }
-
   .btn-enviar:disabled {
     opacity: 0.45;
     cursor: not-allowed;
@@ -723,6 +773,179 @@
   }
 
   /* =========================================================
+     DRAWER DE HISTÓRICO DE CONVERSAS
+     ========================================================= */
+  .drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    z-index: 50;
+    display: none;
+    opacity: 0;
+    transition: opacity var(--transition-base);
+  }
+
+  .drawer-overlay.active {
+    display: block;
+    opacity: 1;
+  }
+
+  .historico-drawer {
+    position: fixed;
+    top: 0;
+    right: -340px;
+    width: 320px;
+    height: 100vh;
+    height: 100dvh;
+    background: var(--bg-elevated);
+    border-left: 1px solid var(--border-color);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.35);
+    z-index: 51;
+    display: flex;
+    flex-direction: column;
+    transition: right var(--transition-base);
+    backdrop-filter: blur(20px);
+  }
+
+  .historico-drawer.active {
+    right: 0;
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .drawer-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .drawer-conteudo {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .historico-grupo-titulo {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+
+  .historico-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    background: var(--glass-bg);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    gap: 8px;
+  }
+
+  .historico-item:hover {
+    border-color: var(--color-primary-500);
+    background: rgba(124, 58, 237, 0.1);
+  }
+
+  .historico-item-texto {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+
+  .btn-del-conversa {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .btn-del-conversa:hover {
+    color: #ef4444;
+  }
+
+  /* =========================================================
+     MODAL DE CONFIRMAÇÃO (LIMPAR CONVERSA)
+     ========================================================= */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    z-index: 60;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-overlay.active {
+    display: flex;
+  }
+
+  .modal-confirm-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 28px 24px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    text-align: center;
+    animation: scaleUpModal 0.2s ease;
+  }
+
+  @keyframes scaleUpModal {
+    from { transform: scale(0.92); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .modal-confirm-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 10px;
+  }
+
+  .modal-confirm-card p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    margin-bottom: 24px;
+  }
+
+  .modal-botoes-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  /* =========================================================
      RESPONSIVIDADE (MOBILE & TABLET)
      ========================================================= */
   @media (max-width: 720px) {
@@ -731,18 +954,9 @@
       gap: 8px;
     }
 
-    .btn-voltar-text {
-      display: none;
-    }
-
-    .btn-voltar {
-      padding: 7px 10px;
-      font-size: 0.95rem;
-    }
-
-    .header-divider {
-      display: none;
-    }
+    .btn-voltar-text { display: none; }
+    .btn-voltar { padding: 7px 10px; font-size: 0.95rem; }
+    .header-divider { display: none; }
 
     .tutor-avatar-wrap {
       width: 36px;
@@ -751,21 +965,10 @@
       border-radius: 10px;
     }
 
-    .tutor-title {
-      font-size: 0.9rem;
-    }
-
-    .tutor-sub {
-      font-size: 0.72rem;
-    }
-
-    .tutor-status-badge {
-      display: none;
-    }
-
-    .uso-badge {
-      display: none !important;
-    }
+    .tutor-title { font-size: 0.9rem; }
+    .tutor-sub { font-size: 0.72rem; }
+    .tutor-status-badge { display: none; }
+    .uso-badge { display: none !important; }
 
     .btn-icon {
       width: 32px;
@@ -773,22 +976,10 @@
       font-size: 0.9rem;
     }
 
-    .materias-strip {
-      padding: 8px 14px;
-    }
-
-    .mensagens-wrap {
-      padding: 16px 14px;
-      gap: 14px;
-    }
-
-    .sugestoes-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .empty-title {
-      font-size: 1.35rem;
-    }
+    .materias-strip { padding: 8px 14px; }
+    .mensagens-wrap { padding: 16px 14px; gap: 14px; }
+    .sugestoes-grid { grid-template-columns: 1fr; }
+    .empty-title { font-size: 1.35rem; }
 
     .msg-bubble {
       max-width: 90%;
@@ -796,23 +987,10 @@
       font-size: 0.9rem;
     }
 
-    .chat-bottom-bar {
-      padding: 8px 12px 12px;
-    }
-
-    .input-card {
-      padding: 6px 8px 6px 14px;
-      border-radius: 20px;
-    }
-
-    .btn-enviar {
-      width: 38px;
-      height: 38px;
-    }
-
-    .chat-disclaimer {
-      font-size: 0.68rem;
-    }
+    .chat-bottom-bar { padding: 8px 12px 12px; }
+    .input-card { padding: 6px 8px 6px 10px; border-radius: 20px; }
+    .btn-enviar { width: 38px; height: 38px; }
+    .chat-disclaimer { font-size: 0.68rem; }
   }
 </style>
 </head>
@@ -847,7 +1025,11 @@
       </div>
 
       <div class="header-right">
+        <span class="plano-badge-tag" id="header-plano-badge" style="display:none;"></span>
         <span class="uso-badge" id="uso-badge">💬 Carregando...</span>
+        <button class="btn-icon" id="btn-historico" title="Histórico de conversas">
+          📜
+        </button>
         <button class="btn-icon" id="btn-novo-chat" title="Limpar e iniciar nova conversa">
           ↺
         </button>
@@ -869,48 +1051,52 @@
     <!-- ÁREA DA CONVERSA EM TELA CHEIA -->
     <main class="chat-conversa" id="chat-conversa">
       <div class="mensagens-wrap" id="mensagens">
-        <!-- ESTADO INICIAL (EMPTY STATE) -->
+        <!-- ESTADO INICIAL (EMPTY STATE) COM ATALHOS -->
         <div class="empty-state-card" id="empty-state">
           <div class="empty-icon-glow">💬</div>
           <h2 class="empty-title">Chat com IA · Tutor Inteligente</h2>
           <p class="empty-desc">
-            Tire suas dúvidas sobre matérias do vestibular, fórmulas, resolução passo a passo, conceitos difíceis e estratégias de estudo. Como posso te ajudar hoje?
+            Seu tutor pessoal para os estudos. Tire dúvidas, peça resoluções passo a passo, resumos de matérias e gere exercícios. Como posso ajudar você hoje?
           </p>
 
           <div class="sugestoes-grid" id="sugestoes-grid">
-            <button type="button" class="sugestao-btn" data-pergunta="O que é função afim e como ela é mais cobrada nos vestibulares?" data-materia-nome="Matemática">
-              <span class="sugestao-tag">📐 Matemática</span>
-              <span class="sugestao-texto">O que é função afim e como cai no vestibular?</span>
+            <button type="button" class="sugestao-btn" data-pergunta="Pode me ajudar a resolver uma questão passo a passo?">
+              <span class="sugestao-tag">📐 Questão</span>
+              <span class="sugestao-texto">Resolver questão de vestibular passo a passo</span>
             </button>
-            <button type="button" class="sugestao-btn" data-pergunta="Como fazer o balanceamento de equações químicas passo a passo?" data-materia-nome="Química">
-              <span class="sugestao-tag">🧪 Química</span>
-              <span class="sugestao-texto">Como balancear equações químicas por tentativas?</span>
+            <button type="button" class="sugestao-btn" data-pergunta="Explique os pontos mais cobrados dessa matéria de forma clara e objetiva.">
+              <span class="sugestao-tag">📚 Matéria</span>
+              <span class="sugestao-texto">Explicar conceitos e teorias da disciplina</span>
             </button>
-            <button type="button" class="sugestao-btn" data-pergunta="Quais são as principais figuras de linguagem que mais caem nas provas?" data-materia-nome="Português">
-              <span class="sugestao-tag">📚 Português</span>
-              <span class="sugestao-texto">Quais são as figuras de linguagem mais cobradas?</span>
+            <button type="button" class="sugestao-btn" data-pergunta="Crie um resumo esquemático completo sobre esse tema com fórmulas e tópicos.">
+              <span class="sugestao-tag">🧠 Resumo</span>
+              <span class="sugestao-texto">Criar resumo de estudo rápido</span>
             </button>
-            <button type="button" class="sugestao-btn" data-pergunta="Quais foram os principais fatores que desencadearam a Era Vargas no Brasil?" data-materia-nome="História">
-              <span class="sugestao-tag">🌎 História</span>
-              <span class="sugestao-texto">Resumo dos principais pontos da Era Vargas</span>
+            <button type="button" class="sugestao-btn" data-pergunta="Crie uma lista de flashcards com pergunta na frente e resposta no verso sobre esse assunto.">
+              <span class="sugestao-tag">✨ Flashcards</span>
+              <span class="sugestao-texto">Gerar flashcards para repetição espaçada</span>
             </button>
-            <button type="button" class="sugestao-btn" data-pergunta="Como aplicar as 3 Leis de Newton na prática para resolver problemas?" data-materia-nome="Física">
-              <span class="sugestao-tag">⚡ Física</span>
-              <span class="sugestao-texto">Como aplicar as 3 Leis de Newton?</span>
+            <button type="button" class="sugestao-btn" data-pergunta="Quero organizar um plano de estudos eficiente para o ENEM e vestibulares. Como montar?">
+              <span class="sugestao-tag">🎯 Plano de Estudos</span>
+              <span class="sugestao-texto">Montar plano de estudos e cronograma semanal</span>
             </button>
-            <button type="button" class="sugestao-btn" data-pergunta="Qual é a diferença fundamental entre os processos de mitose e meiose?" data-materia-nome="Biologia">
-              <span class="sugestao-tag">🧬 Biologia</span>
-              <span class="sugestao-texto">Qual a diferença entre mitose e meiose?</span>
+            <button type="button" class="sugestao-btn" data-pergunta="Quais são os critérios da banca do ENEM para tirar nota 1000 na redação? Analise uma proposta para mim.">
+              <span class="sugestao-tag">📝 Redação</span>
+              <span class="sugestao-texto">Dicas e critérios para Redação Nota 1000</span>
             </button>
           </div>
         </div>
       </div>
     </main>
 
-    <!-- CAMPO DE MENSAGEM FIXO INFERIOR -->
+    <!-- CAMPO DE MENSAGEM FIXO INFERIOR (COMPOSITOR) -->
     <footer class="chat-bottom-bar">
       <div class="bottom-bar-inner">
         <form class="input-card" id="form-mensagem">
+          <input type="file" id="input-anexo-file" style="display:none;" accept="image/*,.pdf,.txt" />
+          <button type="button" class="btn-anexo" id="btn-anexo" title="Anexar imagem ou arquivo de exercício (preparado)">
+            📎
+          </button>
           <textarea
             id="input-mensagem"
             class="input-mensagem"
@@ -931,6 +1117,30 @@
         </div>
       </div>
     </footer>
+  </div>
+
+  <!-- DRAWER DE HISTÓRICO DE CONVERSAS -->
+  <div class="drawer-overlay" id="drawer-overlay"></div>
+  <aside class="historico-drawer" id="historico-drawer">
+    <div class="drawer-header">
+      <h3>📜 Histórico de Conversas</h3>
+      <button class="btn-icon" id="btn-fechar-drawer" title="Fechar histórico">✕</button>
+    </div>
+    <div class="drawer-conteudo" id="drawer-lista-historico">
+      <p class="empty-state" style="font-size:0.85rem;">Nenhuma conversa anterior salva.</p>
+    </div>
+  </aside>
+
+  <!-- MODAL DE CONFIRMAÇÃO PARA LIMPAR CONVERSA -->
+  <div class="modal-overlay" id="modal-confirm-overlay">
+    <div class="modal-confirm-card">
+      <h3>Limpar conversa atual?</h3>
+      <p>Tem certeza que deseja limpar esta conversa? As mensagens atuais serão arquivadas no seu histórico.</p>
+      <div class="modal-botoes-row">
+        <button type="button" class="btn btn-ghost" id="btn-cancelar-limpar">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="btn-confirmar-limpar" style="background:#ef4444; border-color:#ef4444;">Limpar</button>
+      </div>
+    </div>
   </div>
 
   <script type="module" src="../scripts/theme.js"></script>

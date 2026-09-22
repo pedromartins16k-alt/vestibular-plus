@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient.js';
+import { isUltimate, hasFeature } from '../lib/permissions.js';
 
 // Ordem mínima do plano (planos.ordem) necessária pra cada recurso da sidebar.
 // 0 = free, 1 = basic, 2 = pro, 3 = premium/ultimate.
@@ -94,13 +95,17 @@ export async function aplicarCadeadosSidebar(userId, ordemPredefinida = null) {
     ordemUsuario = perfil?.planos?.ordem ?? 0;
   }
 
+  // Se for Ultimate, nenhum cadeado deve existir
+  if (isUltimate(ordemUsuario)) return;
+
   document.querySelectorAll('.nav-item[data-recurso]').forEach(item => {
     const recurso = item.dataset.recurso;
-    const ordemNecessaria = REQUISITOS_PLANO[recurso];
-    if (!ordemNecessaria || ordemUsuario >= ordemNecessaria) return;
+    if (hasFeature(recurso, ordemUsuario)) return;
+
+    const ordemNecessaria = REQUISITOS_PLANO[recurso] ?? 1;
 
     item.classList.add('nav-item-bloqueado');
-    item.classList.add(PLANO_CLASSES[ordemNecessaria]);
+    item.classList.add(PLANO_CLASSES[ordemNecessaria] || 'nav-bloqueado-basic');
 
     const span = document.createElement('span');
     span.className = 'cadeado-mini';

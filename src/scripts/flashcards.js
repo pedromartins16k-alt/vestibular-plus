@@ -136,10 +136,71 @@ async function iniciar() {
     progresso: progressoPorCard[c.id] || null,
   }));
 
+  // Ingestão de flashcards pendentes gerados pelo Chat com IA
+  await processarFlashcardsPendentes();
+
   renderFiltros(materias || []);
   renderModos();
   montarFila();
   mostrarProximoCard();
+}
+
+async function processarFlashcardsPendentes() {
+  try {
+    const pendentesRaw = localStorage.getItem('novos_flashcards_pendentes');
+    if (!pendentesRaw) return;
+    const novosCards = JSON.parse(pendentesRaw);
+    if (!Array.isArray(novosCards) || !novosCards.length) return;
+
+    // Converte os novos cards para o formato local
+    const cardsParaAdicionar = novosCards.map((c, idx) => ({
+      id: `local_${Date.now()}_${idx}`,
+      frente: c.frente || 'Pergunta',
+      verso: c.verso || 'Resposta',
+      materia_id: c.materia_id || 'geral',
+      assunto: c.assunto || 'Revisão IA',
+      materias: {
+        nome: c.materia_nome || 'Geral',
+        cor: c.materia_cor || '#7c3aed'
+      },
+      progresso: null
+    }));
+
+    // Injeta na lista de flashcards
+    todosFlashcards.unshift(...cardsParaAdicionar);
+
+    // Limpa a fila pendente
+    localStorage.removeItem('novos_flashcards_pendentes');
+
+    // Exibe notificação visual
+    const aviso = document.createElement('div');
+    aviso.style.cssText = `
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: linear-gradient(135deg, #7c3aed, #3b82f6);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-weight: 600;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      z-index: 10000;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      animation: fadeIn 0.3s ease;
+    `;
+    aviso.innerHTML = `✨ ${cardsParaAdicionar.length} novos flashcards importados do Chat IA!`;
+    document.body.appendChild(aviso);
+    setTimeout(() => {
+      aviso.style.opacity = '0';
+      aviso.style.transition = 'opacity 0.4s ease';
+      setTimeout(() => aviso.remove(), 400);
+    }, 4000);
+  } catch (err) {
+    console.warn('Erro ao processar flashcards pendentes do chat:', err);
+  }
 }
 
 function renderModos() {

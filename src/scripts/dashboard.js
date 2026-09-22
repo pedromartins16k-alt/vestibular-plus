@@ -5,6 +5,7 @@ import { calcularProgressoNivel } from '../utils/xp.js';
 import { iniciarBusca } from './busca-global.js';
 import { verificarConquistas } from './conquistas.js';
 import { aplicarCadeadosSidebar } from './plano-sidebar.js';
+import { isUltimate } from '../lib/permissions.js';
 import { getCache, setCache } from '../lib/cache.js';
 
 let currentUserId = null;
@@ -22,11 +23,6 @@ async function iniciarDashboard() {
 
   // Inicia Notificações (passando userId para evitar nova chamada a getSession)
   iniciarNotificacoes(userId);
-
-  // =========================================================================
-  // CARREGAMENTO PRIORITÁRIO EM PARALELO
-  // As requisições não se bloqueiam: cada elemento renderiza assim que responder.
-  // =========================================================================
 
   // 1. PRIORIDADE ALTA: Perfil do usuário (saudação, avatar, XP, cadeados)
   const promessaPerfil = carregarPerfil(userId);
@@ -48,6 +44,9 @@ async function iniciarDashboard() {
 
   // 6. PRIORIDADE BAIXA: Ranking (top 5) e Conquistas em segundo plano
   const promessaRanking = carregarRanking(userId);
+
+  // 7. PRIORIDADE MÉDIA: Carregar Projetos de Estudo do usuário
+  carregarProjetosEstudo(userId);
 
   // Executa verificação de conquistas em background aproveitando dados já carregados
   Promise.allSettled([promessaPerfil, promessaSessoes]).then(([resPerfil, resSessoes]) => {
@@ -76,13 +75,22 @@ async function carregarPerfil(userId) {
 
     if (error || !profile) return null;
 
+    const planoNome = profile.planos?.nome || 'free';
+    const ehUltimate = isUltimate(planoNome);
+
     const nomeExibicao = profile.nome_usuario || profile.nome?.split(' ')[0] || 'Aluno(a)';
     const elSaudacao = document.getElementById('saudacao');
     const elAvatar = document.getElementById('avatar-inicial');
     const elNivelInfo = document.getElementById('nivel-info');
     const elXpBar = document.getElementById('xp-bar');
 
-    if (elSaudacao) elSaudacao.textContent = `Olá, ${nomeExibicao}! 👋`;
+    if (elSaudacao) {
+      elSaudacao.innerHTML = `Olá, ${nomeExibicao}! 👋 ${
+        ehUltimate
+          ? `<span style="display:inline-block; font-size:.75rem; background:linear-gradient(135deg, #f59e0b, #ec4899); color:#fff; font-weight:800; padding:2px 8px; border-radius:999px; vertical-align:middle; margin-left:6px; letter-spacing:0.04em;">✦ ULTIMATE</span>`
+          : ''
+      }`;
+    }
     if (elAvatar) elAvatar.textContent = nomeExibicao[0]?.toUpperCase() || 'A';
 
     const { necessario, percentual } = calcularProgressoNivel(profile.xp, profile.nivel);
@@ -98,6 +106,44 @@ async function carregarPerfil(userId) {
   } catch (err) {
     console.error('Erro ao carregar perfil:', err);
     return null;
+  }
+}
+
+/**
+ * Renderiza os projetos e cronogramas de estudo criados via Chat IA ou salvos localmente
+ */
+function carregarProjetosEstudo(userId) {
+  const container = document.getElementById('projetos-estudo-list');
+  if (!container) return;
+
+  try {
+    const rawProjetos = localStorage.getItem(`vestibular_projetos_${userId}`);
+    if (!rawProjetos) return;
+
+    const projetos = JSON.parse(rawProjetos);
+    if (!Array.isArray(projetos) || !projetos.length) return;
+
+    container.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        ${projetos.slice(0, 3).map((p, idx) => `
+          <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <span style="font-weight:700; font-size:.92rem; color:var(--text-primary);">${p.titulo || 'Plano de Estudos'}</span>
+              <span style="font-size:.75rem; color:var(--text-secondary); background:rgba(124,58,237,0.1); padding:2px 8px; border-radius:999px; font-weight:600;">${p.materia || 'Geral'}</span>
+            </div>
+            <p style="font-size:.82rem; color:var(--text-secondary); margin:0 0 8px 0; line-height:1.4;">
+              Meta: ${p.meta || 'Concluir revisões e exercícios'}
+            </p>
+            <div style="display:flex; align-items:center; justify-content:space-between; font-size:.78rem; color:var(--text-secondary);">
+              <span>📅 Prazo: ${p.prazo || '30 dias'}</span>
+              <span>Tarefas: ${(p.etapas || []).length} etapas</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch (e) {
+    console.warn('Erro ao carregar projetos de estudo:', e);
   }
 }
 
