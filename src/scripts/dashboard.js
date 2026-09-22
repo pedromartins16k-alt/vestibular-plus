@@ -64,16 +64,57 @@ async function iniciarDashboard() {
 
 /**
  * Carrega e renderiza os dados do perfil: nome, avatar, XP e aplica cadeados na barra lateral.
+ * Para usuários novos (ex: via Google OAuth), assegura a criação do perfil inicial no plano Grátis.
  */
 async function carregarPerfil(userId) {
   try {
-    const { data: profile, error } = await supabase
+    let { data: profile, error } = await supabase
       .from('profiles')
       .select('nome, nome_usuario, nivel, xp, meta_diaria_minutos, planos(nome, ordem)')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
-    if (error || !profile) return null;
+    // Se o usuário ainda não possui perfil (usuário novo via OAuth)
+    if (!profile) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.id === userId) {
+          const meta = user.user_metadata || {};
+          const nomeInicial = meta.full_name || meta.name || meta.nome || user.email?.split('@')[0] || 'Aluno(a)';
+
+          // Busca id do plano free para vincular
+          const { data: planoFree } = await supabase
+            .from('planos')
+            .select('id')
+            .eq('nome', 'free')
+            .maybeSingle();
+
+          await supabase
+            .from('profiles')
+            .upsert({
+              id: userId,
+              nome: nomeInicial,
+              plano_id: planoFree?.id || null,
+              nivel: 1,
+              xp: 0,
+              meta_diaria_minutos: 60
+            }, { onConflict: 'id', ignoreDuplicates: true });
+
+          // Recarrega o perfil recém-criado
+          const { data: perfilNovo } = await supabase
+            .from('profiles')
+            .select('nome, nome_usuario, nivel, xp, meta_diaria_minutos, planos(nome, ordem)')
+            .eq('id', userId)
+            .maybeSingle();
+
+          profile = perfilNovo;
+        }
+      } catch (errNovo) {
+        console.warn('Erro ao provisionar perfil para novo usuário:', errNovo);
+      }
+    }
+
+    if (!profile) return null;
 
     const planoNome = profile.planos?.nome || 'free';
     const ehUltimate = isUltimate(planoNome);
