@@ -2,6 +2,7 @@ import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
+import { obterPlanoUsuario, hasFeature, hasPlanAccess, isUltimate } from '../lib/permissions.js';
 
 const vestibularesListaEl = document.getElementById('vestibulares-lista');
 const filtroTreineiroEl = document.getElementById('filtro-materias-treineiro');
@@ -12,6 +13,7 @@ const modalAula = document.getElementById('modal-aula');
 let aulasCache = [];
 let vestibularesCache = [];
 let materiaAtivaTreineiro = 'todas';
+let planoUsuarioInfo = { nome: 'free', ordem: 0, isUltimate: false };
 
 // Curadoria manual dos assuntos que mais caem em cada vestibular, com base no
 // perfil conhecido de cada prova (não é estatística oficial — pra ajustar,
@@ -155,23 +157,21 @@ async function iniciar() {
   if (!session) return;
   const userId = session.user.id;
 
-  // Carrega nível treineiro, matérias, vestibulares e aulas em paralelo.
-  // A query de nível usa join direto em vez de duas queries sequenciais.
-  const [nivelResult, materiasResult] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('planos(treineiro_nivel)')
-      .eq('id', userId)
-      .single(),
+  // 1. O plano do usuário DEVE ser obtido primeiro para que nenhum bloqueio incorreto
+  // seja renderizado durante a carga de aulas e vestibulares.
+  planoUsuarioInfo = await obterPlanoUsuario(userId);
+
+  // 2. Aplica travas nas abas conforme o plano
+  aplicarTravaAbas();
+  configurarTabs();
+  configurarModal();
+
+  // 3. Carrega dados já com o planoUsuarioInfo estabelecido
+  const [materiasResult] = await Promise.all([
     supabase.from('materias').select('id, nome, cor').order('ordem'),
     carregarVestibulares(),
     carregarAulas(),
   ]);
-
-  treineiroNivelUsuario = nivelResult.data?.planos?.treineiro_nivel || 'sp';
-  aplicarTravaAbas();
-  configurarTabs();
-  configurarModal();
 
   renderFiltroTreineiro(materiasResult.data || []);
   renderPesquisaVestibulares();
@@ -180,34 +180,22 @@ async function iniciar() {
 
 /* ===== Plano do usuário / trava de acesso ===== */
 
-// Nível de acesso do plano do usuário na área de vestibulares.
-// 'sp' = só aba SP | 'sp_treineiro' = SP + Sou treineiro | 'completo' = tudo, incluindo Por assunto
-let treineiroNivelUsuario = 'sp';
-
-const ORDEM_NIVEIS = { sp: 0, sp_treineiro: 1, completo: 2 };
 const NOME_PLANO_PARA_TREINEIRO = 'Pro';
 const NOME_PLANO_PARA_ASSUNTO = 'Ultimate';
 
-async function carregarNivelTreineiroUsuario(userId) {
-  const { data: perfil } = await supabase
-    .from('profiles')
-    .select('plano_id')
-    .eq('id', userId)
-    .single();
-
-  if (!perfil?.plano_id) return 'sp';
-
-  const { data: plano } = await supabase
-    .from('planos')
-    .select('treineiro_nivel')
-    .eq('id', perfil.plano_id)
-    .single();
-
-  return plano?.treineiro_nivel || 'sp';
-}
-
 function nivelLibera(nivelMinimoNecessario) {
-  return ORDEM_NIVEIS[treineiroNivelUsuario] >= ORDEM_NIVEIS[nivelMinimoNecessario];
+  // Ultimate sempre tem acesso total a todos os recursos
+  if (isUltimate(planoUsuarioInfo.ordem) || planoUsuarioInfo.isUltimate) return true;
+
+  if (nivelMinimoNecessario === 'sp_treineiro') {
+    // Exige no mínimo PRO (ordem 2) — Pro e Ultimate liberados!
+    return hasPlanAccess(planoUsuarioInfo.ordem, 2);
+  }
+  if (nivelMinimoNecessario === 'completo') {
+    // Exige no mínimo ULTIMATE (ordem 3)
+    return hasPlanAccess(planoUsuarioInfo.ordem, 3);
+  }
+  return true;
 }
 
 // Adiciona o cadeado visual nas abas "Sou treineiro" e "Por assunto"

@@ -1,18 +1,14 @@
 import { supabase } from '../lib/supabaseClient.js';
+import {
+  PLANOS_CONFIG,
+  obterOrdemPlano,
+  getPlanDisplayName
+} from '../lib/permissions.js';
 
 const grid = document.getElementById('planos-grid');
 const banner = document.getElementById('upgrade-banner');
 const backLink = document.getElementById('back-link');
 const faqLista = document.getElementById('faq-lista');
-
-const DESCRICOES = {
-  free: 'Pra começar a estudar sem gastar nada.',
-  basic: 'Todo o banco de questões liberado, sem limites diários.',
-  pro: 'Pra quem quer estudar todo dia com IA no nível genial.',
-  premium: 'A experiência completa, com o chat de IA sem limites.',
-};
-
-const DESTAQUE = 'pro'; // "Mais popular"
 
 const FAQ = [
   {
@@ -20,7 +16,7 @@ const FAQ = [
     r: 'Sim. Não tem fidelidade — você pode cancelar a qualquer momento e continua com acesso até o fim do período já pago.',
   },
   {
-    p: 'O que acontece se eu ficar sem crédito no plano Free?',
+    p: 'O que acontece se eu ficar sem crédito no plano Grátis?',
     r: 'Você continua com acesso ao que já usou, mas os limites diários (questões, resumos, chat) resetam automaticamente todo dia. Pra estudar sem limite, é só fazer upgrade.',
   },
   {
@@ -38,53 +34,14 @@ function formatarPreco(valor) {
   return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function montarRecursos(plano) {
-  const recursos = [];
-
-  recursos.push({
-    ok: true,
-    texto: plano.percentual_banco_liberado >= 100
-      ? 'Banco de questões 100% liberado'
-      : `${plano.percentual_banco_liberado}% do banco de questões liberado`,
-  });
-
-  recursos.push({
-    ok: true,
-    texto: plano.limite_questoes_dia
-      ? `${plano.limite_questoes_dia} questões por dia`
-      : 'Questões ilimitadas por dia',
-  });
-
-  recursos.push({
-    ok: true,
-    texto: plano.limite_resumos_dia
-      ? `${plano.limite_resumos_dia} resumos por dia`
-      : 'Resumos ilimitados por dia',
-  });
-
-  recursos.push({
-    ok: true,
-    texto: plano.limite_simulados_semana
-      ? `${plano.limite_simulados_semana} simulados por semana`
-      : 'Simulados ilimitados por semana',
-  });
-
-  recursos.push({
-    ok: true,
-    texto: `Chat com IA · ${plano.limite_chat_dia} perguntas/dia`,
-  });
-
-  recursos.push({ ok: plano.acesso_favoritos, texto: 'Favoritar resumos e questões' });
-  recursos.push({ ok: plano.acesso_dificuldade_genio, texto: 'Nível de dificuldade Gênio' });
-  recursos.push({ ok: plano.acesso_estatisticas_avancadas, texto: 'Estatísticas avançadas' });
-
-  return recursos;
-}
-
-function criarCard(plano, planoAtualNome) {
-  const isDestaque = plano.nome === DESTAQUE;
-  const isAtual = plano.nome === planoAtualNome;
+function criarCard(plano, planoAtualOrdem, usuarioAutenticado) {
+  const isDestaque = Boolean(plano.destaque);
+  const isAtual = usuarioAutenticado && planoAtualOrdem !== null && plano.ordem === planoAtualOrdem;
   const gratis = Number(plano.preco_mensal) === 0;
+
+  // Lógica dos botões
+  const isUpgrade = usuarioAutenticado && planoAtualOrdem !== null && plano.ordem > planoAtualOrdem;
+  const isDowngrade = usuarioAutenticado && planoAtualOrdem !== null && plano.ordem < planoAtualOrdem;
 
   const card = document.createElement('div');
   card.className = `card plano-card${isDestaque && !isAtual ? ' destaque' : ''}${isAtual ? ' atual' : ''}`;
@@ -97,23 +54,41 @@ function criarCard(plano, planoAtualNome) {
     ? `<div class="plano-preco"><span class="valor">Grátis</span></div>`
     : `<div class="plano-preco"><span class="moeda">R$</span><span class="valor">${formatarPreco(plano.preco_mensal)}</span><span class="periodo">/mês</span></div>`;
 
-  const recursos = montarRecursos(plano)
+  // Recursos canônicos com garantia de nunca ter undefined
+  const recursosHtml = (plano.recursos || [])
     .map(r => `
       <div class="plano-recurso${r.ok ? '' : ' indisponivel'}">
         <span class="check">${r.ok ? '✓' : '✕'}</span><span>${r.texto}</span>
       </div>
     `).join('');
 
+  // Nome do plano oficial (garantido nunca undefined)
+  const nomeExibicao = plano.nome || getPlanDisplayName(plano.id);
+
+  // Texto do botão de ação
+  let btnTexto;
+  if (isAtual) {
+    btnTexto = 'Plano atual';
+  } else if (isUpgrade) {
+    btnTexto = 'Fazer upgrade';
+  } else if (isDowngrade) {
+    btnTexto = 'Fazer downgrade';
+  } else if (gratis) {
+    btnTexto = 'Começar grátis';
+  } else {
+    btnTexto = 'Assinar';
+  }
+
   card.innerHTML = `
     ${selo}
-    <div class="plano-nome">${plano.nome_exibicao}</div>
-    <div class="plano-desc">${DESCRICOES[plano.nome] || ''}</div>
+    <div class="plano-nome">${nomeExibicao}</div>
+    <div class="plano-desc">${plano.descricao || ''}</div>
     ${precoHtml}
     <div class="plano-preco-anual-obs">&nbsp;</div>
-    <button class="btn ${isDestaque && !isAtual ? 'btn-primary' : 'btn-ghost'} plano-btn" data-plano="${plano.nome}">
-      ${isAtual ? 'Plano atual' : (gratis ? 'Começar grátis' : 'Assinar')}
+    <button class="btn ${isDestaque && !isAtual ? 'btn-primary' : 'btn-ghost'} plano-btn" data-plano="${plano.id}">
+      ${btnTexto}
     </button>
-    <div class="plano-recursos">${recursos}</div>
+    <div class="plano-recursos">${recursosHtml}</div>
   `;
 
   const btn = card.querySelector('.plano-btn');
@@ -130,7 +105,7 @@ async function tratarClique(plano) {
   const { data: { session } } = await supabase.auth.getSession();
 
   if (!session) {
-    window.location.href = `./cadastro.html?plano=${plano.nome}`;
+    window.location.href = `./cadastro.html?plano=${plano.id}`;
     return;
   }
 
@@ -139,7 +114,6 @@ async function tratarClique(plano) {
     return;
   }
 
-  // Checkout via Mercado Pago ainda não integrado — aviso temporário.
   alert('O pagamento por Mercado Pago está sendo finalizado. Em breve você vai poder assinar direto por aqui!');
 }
 
@@ -168,7 +142,11 @@ function mostrarBannerUpgrade() {
     cronograma: 'o Cronograma',
     favoritos: 'os Favoritos',
     metas: 'as Metas',
+    flashcards: 'os Flashcards',
     estatisticas: 'as Estatísticas avançadas',
+    dificuldade_genio: 'o Nível Gênio',
+    chat: 'mais perguntas no Chat com IA',
+    treineiro: 'o módulo Sou Treineiro',
   };
   const nomeRecurso = nomes[recurso] || 'esse recurso';
   banner.textContent = `🔒 Pra desbloquear ${nomeRecurso}, escolha um plano abaixo.`;
@@ -180,36 +158,43 @@ async function iniciar() {
   montarFaq();
 
   const { data: { session } } = await supabase.auth.getSession();
-  let planoAtualNome = null;
+  let planoAtualOrdem = null;
+  const usuarioAutenticado = Boolean(session);
 
-  let promessaPerfil = Promise.resolve(null);
   if (session) {
     backLink.href = './dashboard.html';
     backLink.textContent = '← Voltar ao dashboard';
-    promessaPerfil = supabase
-      .from('profiles')
-      .select('planos(nome)')
-      .eq('id', session.user.id)
-      .single();
+
+    try {
+      const { data: perfil } = await supabase
+        .from('profiles')
+        .select('planos(nome, ordem)')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (perfil?.planos) {
+        planoAtualOrdem = perfil.planos.ordem ?? obterOrdemPlano(perfil.planos.nome);
+      } else {
+        planoAtualOrdem = 0; // Default Free
+      }
+    } catch (err) {
+      console.warn('Erro ao consultar plano atual:', err);
+      planoAtualOrdem = 0;
+    }
   }
 
-  const [resPerfil, resPlanos] = await Promise.all([
-    promessaPerfil,
-    supabase.from('planos').select('id, nome, preco_mensal, ordem, limite_questoes_dia, limite_resumos_dia, limite_simulados_semana, limite_chat_dia, acesso_favoritos, acesso_dificuldade_genio, acesso_estatisticas_avancadas').order('ordem', { ascending: true })
-  ]);
-
-  if (resPerfil?.data?.planos?.nome) {
-    planoAtualNome = resPerfil.data.planos.nome;
-  }
-
-  const planos = resPlanos.data;
-  if (resPlanos.error || !planos) {
-    grid.innerHTML = '<p class="empty-state">Não foi possível carregar os planos agora. Tente recarregar a página.</p>';
-    return;
-  }
+  // A lista canônica dos 4 planos oficiais sempre ordenada de 0 a 3
+  const planosOrdenados = [
+    PLANOS_CONFIG.free,
+    PLANOS_CONFIG.basic,
+    PLANOS_CONFIG.pro,
+    PLANOS_CONFIG.ultimate
+  ];
 
   grid.innerHTML = '';
-  planos.forEach(plano => grid.appendChild(criarCard(plano, planoAtualNome)));
+  planosOrdenados.forEach(plano => {
+    grid.appendChild(criarCard(plano, planoAtualOrdem, usuarioAutenticado));
+  });
 }
 
 iniciar();

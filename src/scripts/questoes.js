@@ -4,6 +4,11 @@ import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { verificarConquistas } from './conquistas.js';
 import { buscarFavoritos, alternarFavorito } from './favoritos-global.js';
+import {
+  obterOrdemPlano,
+  canAccessDifficulty,
+  getPlanoMinimoParaDificuldade
+} from '../lib/permissions.js';
 
 const container = document.getElementById('questao-container');
 const filtroContainer = document.getElementById('filtro-materias');
@@ -25,28 +30,7 @@ let favoritosSet = new Set();
 let nomePlanoUsuario = 'free';
 
 function getPlanoExclusivo(dificuldade) {
-  if (dificuldade === 'genio') {
-    return {
-      nome: 'Ultimate',
-      classe: 'ultimate',
-      gradiente: 'linear-gradient(135deg, #f472b6, #c084fc, #60a5fa)',
-      desc: 'no nível Gênio'
-    };
-  }
-  if (dificuldade === 'dificil') {
-    return {
-      nome: 'PRO',
-      classe: 'pro',
-      gradiente: 'linear-gradient(135deg, #7c3aed, #a855f7)',
-      desc: 'no nível Difícil'
-    };
-  }
-  return {
-    nome: 'Basic',
-    classe: 'basic',
-    gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)',
-    desc: 'no nível Médio'
-  };
+  return getPlanoMinimoParaDificuldade(dificuldade);
 }
 
 function renderIconeCadeado(tipo) {
@@ -127,48 +111,19 @@ async function buscarTodasQuestoes() {
 }
 
 function marcarQuestoesLiberadasEBloqueadas(lista, nomePlano) {
-  const plano = (nomePlano || 'free').toLowerCase();
-
-  const mediosPorMateria = new Map();
-  lista.forEach(q => {
-    if ((q.dificuldade || 'facil') === 'medio') {
-      if (!mediosPorMateria.has(q.materia_id)) mediosPorMateria.set(q.materia_id, []);
-      mediosPorMateria.get(q.materia_id).push(q.id);
-    }
-  });
-
-  const idsMediosLiberadosFree = new Set();
-  mediosPorMateria.forEach(ids => {
-    const qtdLiberada = Math.max(1, Math.ceil(ids.length * 0.5));
-    ids.slice(0, qtdLiberada).forEach(id => idsMediosLiberadosFree.add(id));
-  });
+  const ordemPlano = obterOrdemPlano(nomePlano || 'free');
 
   return lista.map(q => {
     const nivel = q.dificuldade || 'facil';
-    let bloqueada = false;
-
-    if (plano === 'premium' || plano === 'ultimate') {
-      bloqueada = false;
-    } else if (plano === 'pro') {
-      bloqueada = (nivel === 'genio');
-    } else if (plano === 'basic') {
-      bloqueada = (nivel === 'dificil' || nivel === 'genio');
-    } else {
-      if (nivel === 'facil') {
-        bloqueada = false;
-      } else if (nivel === 'medio') {
-        bloqueada = !idsMediosLiberadosFree.has(q.id);
-      } else {
-        bloqueada = true;
-      }
-    }
+    const liberada = canAccessDifficulty(ordemPlano, nivel);
 
     return {
       ...q,
-      bloqueada
+      bloqueada: !liberada
     };
   });
 }
+
 
 async function buscarNomePlanoUsuario() {
   const { data: perfil, error } = await supabase

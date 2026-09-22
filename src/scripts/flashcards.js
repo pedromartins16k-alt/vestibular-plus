@@ -3,6 +3,7 @@ import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { verificarConquistas } from './conquistas.js';
+import { hasFeature } from '../lib/permissions.js';
 
 const studyArea = document.getElementById('study-area');
 const filtroContainer = document.getElementById('filtro-materias');
@@ -92,7 +93,7 @@ async function checarELimitarFlashcard() {
 async function buscarAcessoFlashcards() {
   const { data: perfil, error } = await supabase
     .from('profiles')
-    .select('planos(acesso_flashcards, nome)')
+    .select('planos(acesso_flashcards, nome, ordem)')
     .eq('id', userId)
     .single();
 
@@ -100,11 +101,10 @@ async function buscarAcessoFlashcards() {
     console.error('Erro ao buscar plano do usuário:', error);
     return false;
   }
-  // Se for plano free, flashcards são bloqueados
-  if ((perfil.planos.nome || 'free').toLowerCase() === 'free') {
-    return false;
-  }
-  return perfil.planos.acesso_flashcards ?? true;
+
+  // Basic (1), Pro (2) e Ultimate (3) liberados
+  const ordem = perfil.planos.ordem ?? perfil.planos.nome;
+  return hasFeature('flashcards', ordem);
 }
 
 async function iniciar() {
@@ -135,6 +135,16 @@ async function iniciar() {
     ...c,
     progresso: progressoPorCard[c.id] || null,
   }));
+
+  // Restaura contador de revisados hoje do cache/sessão persistida
+  try {
+    const hojeKey = new Date().toISOString().slice(0, 10);
+    const revStorageKey = `vestibular_fc_rev_${userId}_${hojeKey}`;
+    const salvoHoje = parseInt(localStorage.getItem(revStorageKey) || '0', 10);
+    revisadosHoje = Math.max(revisadosHoje, salvoHoje);
+  } catch (e) {
+    console.warn(e);
+  }
 
   // Ingestão de flashcards pendentes gerados pelo Chat com IA
   await processarFlashcardsPendentes();
@@ -360,36 +370,53 @@ async function mostrarProximoCard() {
 
   const cor = cardAtual.materias?.cor || '#7c3aed';
   const nomeMateria = cardAtual.materias?.nome || 'Geral';
+  const cardIndice = totalSessao > 0 ? (totalSessao - fila.length + 1) : 1;
 
   studyArea.innerHTML = `
     <div class="fc-container" id="flashcard-container">
       <div class="fc-card" id="flashcard">
         <div class="fc-face fc-frente">
           <span class="fc-tag" style="background:${cor}22; color:${cor};">${nomeMateria}</span>
-          ${cardAtual.frente}
-          <span class="fc-hint">👆 toque para virar</span>
+          <div style="margin:auto 0;">${cardAtual.frente}</div>
+          <button type="button" class="btn" id="btn-revelar-card" style="position:absolute; bottom:12px; font-size:.8rem; padding:6px 14px; background:rgba(124,58,237,0.15); border:1px solid rgba(124,58,237,0.3); color:var(--text-primary);">
+            👁️ Revelar Resposta
+          </button>
         </div>
         <div class="fc-face fc-verso">
-          ${cardAtual.verso}
+          <span class="fc-tag" style="background:${cor}22; color:${cor};">${nomeMateria} · Resposta</span>
+          <div style="margin:auto 0; max-height:85%; overflow-y:auto;">${cardAtual.verso}</div>
+          <span class="fc-hint">Como foi sua lembrança deste conceito?</span>
         </div>
       </div>
     </div>
     <div class="fc-avaliar-botoes" id="avaliar-botoes" style="display:none;">
-      <button class="fc-btn-avaliar fc-errei" id="btn-errei">😵 Não lembrei</button>
-      <button class="fc-btn-avaliar fc-acertei" id="btn-acertei">🙂 Lembrei</button>
+      <button class="fc-btn-avaliar fc-errei" id="btn-errei">😵 Errei / Não lembrei</button>
+      <button class="fc-btn-avaliar fc-acertei" id="btn-acertei">🙂 Acertei / Já sei</button>
     </div>
   `;
 
-  document.getElementById('flashcard-container').addEventListener('click', virarCard);
+  document.getElementById('flashcard-container').addEventListener('click', (e) => {
+    if (e.target.closest('#btn-revelar-card')) {
+      virarCard();
+    } else {
+      virarCard();
+    }
+  });
   document.getElementById('btn-errei').addEventListener('click', () => avaliar(false));
   document.getElementById('btn-acertei').addEventListener('click', () => avaliar(true));
 }
 
 function virarCard() {
-  if (virado) return;
+  if (virado) {
+    // Permite desvirar se o usuário quiser reler
+    virado = false;
+    document.getElementById('flashcard')?.classList.remove('flipped');
+    return;
+  }
   virado = true;
-  document.getElementById('flashcard').classList.add('flipped');
-  document.getElementById('avaliar-botoes').style.display = 'flex';
+  document.getElementById('flashcard')?.classList.add('flipped');
+  const avaliarBotoes = document.getElementById('avaliar-botoes');
+  if (avaliarBotoes) avaliarBotoes.style.display = 'flex';
 }
 
 async function avaliar(acertou) {
@@ -400,23 +427,39 @@ async function avaliar(acertou) {
   const proximaRevisao = new Date();
   proximaRevisao.setDate(proximaRevisao.getDate() + dias);
 
-  await supabase.from('flashcards_progresso').upsert({
-    user_id: userId,
-    flashcard_id: cardAtual.id,
-    nivel_memorizacao: novoNivel,
-    proxima_revisao: proximaRevisao.toISOString(),
-  });
+  // Se não for um ID puramente local (ex: local_...), salva no Supabase
+  if (!String(cardAtual.id).startsWith('local_')) {
+    try {
+      await supabase.from('flashcards_progresso').upsert({
+        user_id: userId,
+        flashcard_id: cardAtual.id,
+        nivel_memorizacao: novoNivel,
+        proxima_revisao: proximaRevisao.toISOString(),
+      });
 
-  await supabase.from('sessoes_estudo').insert({
-    user_id: userId,
-    materia_id: cardAtual.materia_id,
-    duracao_minutos: 1,
-    tipo: 'flashcards',
-  });
+      await supabase.from('sessoes_estudo').insert({
+        user_id: userId,
+        materia_id: cardAtual.materia_id,
+        duracao_minutos: 1,
+        tipo: 'flashcards',
+      });
 
-  await supabase.rpc('conceder_xp', { p_tipo: 'flashcard_revisado' });
+      await supabase.rpc('conceder_xp', { p_tipo: 'flashcard_revisado' });
+      verificarConquistas(userId);
+    } catch (err) {
+      console.warn('Erro ao sincronizar progresso no servidor:', err);
+    }
+  }
 
-  verificarConquistas(userId);
+  // Persiste progresso no localStorage para manter integridade no reload
+  try {
+    const hojeKey = new Date().toISOString().slice(0, 10);
+    const revStorageKey = `vestibular_fc_rev_${userId}_${hojeKey}`;
+    const contadorHoje = parseInt(localStorage.getItem(revStorageKey) || '0', 10) + 1;
+    localStorage.setItem(revStorageKey, contadorHoje.toString());
+  } catch (e) {
+    console.warn(e);
+  }
 
   cardAtual.progresso = {
     flashcard_id: cardAtual.id,
@@ -424,13 +467,8 @@ async function avaliar(acertou) {
     proxima_revisao: proximaRevisao.toISOString(),
   };
 
-  const cardResolvido = fila.shift();
-
-  if (acertou) {
-    revisadosHoje++;
-  } else {
-    fila.push(cardResolvido);
-  }
+  fila.shift();
+  revisadosHoje++;
 
   atualizarStats();
   mostrarProximoCard();

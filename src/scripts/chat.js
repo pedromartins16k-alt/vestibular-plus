@@ -2,7 +2,7 @@ import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
-import { obterPlanoUsuario, isUltimate } from '../lib/permissions.js';
+import { obterPlanoUsuario, isUltimate, getPlanLimit } from '../lib/permissions.js';
 
 // Elementos do DOM
 const mensagensEl = document.getElementById('mensagens');
@@ -209,43 +209,28 @@ function atualizarIdentificacaoTutor() {
   }
 }
 
-// Consulta do limite diário do usuário
+// Consulta do limite diário do usuário via RPC centralizada
 async function atualizarBadgeInicial(userId) {
   try {
-    if (planoInfo.isUltimate || planoInfo.ordem >= 2) {
-      definirBadge(0, null);
+    const { data: uso, error } = await supabase.rpc('consultar_uso_diario', { p_tipo: 'chat' });
+    const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
+
+    if (error || !uso) {
+      definirBadge(0, limiteOficial);
       return;
     }
 
-    const { data: perfil } = await supabase
-      .from('profiles')
-      .select('planos(limite_chat_dia)')
-      .eq('id', userId)
-      .single();
-
-    const limite = perfil?.planos?.limite_chat_dia;
-    const hoje = new Date().toISOString().slice(0, 10);
-    const { data: uso } = await supabase
-      .from('uso_diario')
-      .select('chat_perguntas')
-      .eq('user_id', userId)
-      .eq('data', hoje)
-      .maybeSingle();
-
-    const usado = uso?.chat_perguntas || 0;
-    definirBadge(usado, limite);
+    definirBadge(uso.usado ?? 0, uso.limite ?? limiteOficial);
   } catch (e) {
-    usoBadge.style.display = 'none';
+    const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
+    definirBadge(0, limiteOficial);
   }
 }
 
 function definirBadge(usado, limite) {
   usoBadge.style.display = 'inline-flex';
-  if (planoInfo.isUltimate || limite === null || limite === undefined) {
-    usoBadge.innerHTML = '<span class="uso-icon">💬</span> Perguntas ilimitadas hoje';
-  } else {
-    usoBadge.innerHTML = `<span class="uso-icon">💬</span> ${usado}/${limite} perguntas hoje`;
-  }
+  const limiteEfetivo = limite ?? getPlanLimit('chat_dia', planoInfo.nome) ?? 5;
+  usoBadge.innerHTML = `<span class="uso-icon">💬</span> ${usado}/${limiteEfetivo} perguntas hoje`;
 }
 
 function rolarParaFinal() {
@@ -442,53 +427,197 @@ function executarAcaoContextual(acao, textoOrigem) {
   }
 }
 
-// INTEGRAÇÃO CHAT -> FLASHCARDS
+// INTEGRAÇÃO CHAT -> FLASHCARDS (Widget Interativo Inline)
 function integrarChatParaFlashcards(conteudoTutor) {
   const materiaNome = materiaAtiva.nome || 'Geral';
-  const materiaId = materiaAtiva.id || '';
+  const materiaId   = materiaAtiva.id   || '';
+  const icone       = materiaAtiva.icone || '✨';
 
-  // Extrai conceitos ou gera pares de flashcards estruturados
-  const flashcardsGerados = [
-    {
-      frente: `Defina o conceito principal de ${materiaNome} abordado na conversa`,
-      verso: conteudoTutor.slice(0, 180).replace(/[#*`]/g, '') + '...',
-      materia_nome: materiaNome,
-      materia_id: materiaId,
-      assunto: materiaNome
-    },
-    {
-      frente: `Qual a aplicação prática no vestibular desse tópico de ${materiaNome}?`,
-      verso: 'Costuma ser cobrado em questões contextualizadas e interdisciplinares.',
-      materia_nome: materiaNome,
-      materia_id: materiaId,
-      assunto: materiaNome
+  /* ── 1. EXTRAÇÃO DE PARES PERGUNTA/RESPOSTA ── */
+  const pares = [];
+
+  // Tenta tabela Markdown: |Frente|Verso| ou |Pergunta|Resposta|
+  const linhasTabela = conteudoTutor.split('\n').filter(l => l.trim().startsWith('|'));
+  if (linhasTabela.length >= 3) {
+    for (let i = 0; i < linhasTabela.length; i++) {
+      const cols = linhasTabela[i].split('|').map(c => c.trim()).filter(Boolean);
+      // Pula linhas de separador (---|---) e cabeçalho
+      if (cols.length < 2) continue;
+      if (cols.some(c => /^[-:]+$/.test(c))) continue;
+      if (/^(frente|pergunta|front|question|#)/i.test(cols[0])) continue;
+      pares.push({ frente: cols[0], verso: cols[1] });
     }
-  ];
-
-  // Salva no localStorage para a página de Flashcards importar
-  try {
-    const pendentes = JSON.parse(localStorage.getItem('novos_flashcards_pendentes') || '[]');
-    pendentes.push(...flashcardsGerados);
-    localStorage.setItem('novos_flashcards_pendentes', JSON.stringify(pendentes));
-
-    // Exibe notificação de confirmação e link direto
-    const row = document.createElement('div');
-    row.className = 'msg-row msg-row-tutor';
-    row.innerHTML = `
-      <div class="msg-bubble msg-tutor" style="border: 1px solid var(--color-neon); box-shadow: 0 4px 20px rgba(168,85,247,0.25);">
-        <div style="font-weight:700; color:var(--color-neon); margin-bottom:6px;">✨ Flashcards preparados com sucesso!</div>
-        <p style="margin-bottom:12px; font-size:0.9rem;">Foram gerados <strong>${flashcardsGerados.length} flashcards inteligentes</strong> sobre ${materiaNome} baseados nesta conversa.</p>
-        <a class="btn btn-primary" href="./flashcards.html?importar=true" style="text-decoration:none; font-size:0.85rem; padding:8px 16px; border-radius:var(--radius-full);">
-          🧠 Estudar Flashcards Agora
-        </a>
-      </div>
-    `;
-    mensagensEl.appendChild(row);
-    rolarParaFinal();
-  } catch (err) {
-    console.error('Erro ao preparar flashcards:', err);
   }
+
+  // Tenta padrão "**Pergunta:** … **Resposta:** …" ou "Frente: … / Verso: …"
+  if (pares.length === 0) {
+    const blocos = conteudoTutor.split(/\n(?=\d+[\.\)]|\*\*\d+)/);
+    blocos.forEach(bloco => {
+      const frenteMatch = bloco.match(/(?:\*\*)?(?:Frente|Pergunta|Front|P)(?:\*\*)?[:\-]\s*(.+?)(?:\n|$)/i);
+      const versoMatch  = bloco.match(/(?:\*\*)?(?:Verso|Resposta|Back|R)(?:\*\*)?[:\-]\s*(.+?)(?:\n|$)/i);
+      if (frenteMatch && versoMatch) {
+        pares.push({
+          frente: frenteMatch[1].replace(/\*\*/g, '').trim(),
+          verso:  versoMatch[1].replace(/\*\*/g, '').trim()
+        });
+      }
+    });
+  }
+
+  // Tenta linhas numeradas: "1. Conceito — Definição" ou "1. **Conceito**: Definição"
+  if (pares.length === 0) {
+    const linhasNum = conteudoTutor.split('\n').filter(l => /^\d+[\.\)]/.test(l.trim()));
+    linhasNum.forEach(linha => {
+      const semNum = linha.replace(/^\d+[\.\)]\s*/, '').replace(/\*\*/g, '').trim();
+      const sep = semNum.match(/[—–:]/);
+      if (sep) {
+        const idx = semNum.indexOf(sep[0]);
+        const frente = semNum.slice(0, idx).trim();
+        const verso  = semNum.slice(idx + 1).trim();
+        if (frente && verso) pares.push({ frente, verso });
+      }
+    });
+  }
+
+  // Fallback: usa títulos/negrito como perguntas e o parágrafo seguinte como resposta
+  if (pares.length === 0) {
+    const linhas = conteudoTutor.split('\n');
+    for (let i = 0; i < linhas.length - 1; i++) {
+      const l = linhas[i].trim();
+      const titulo = l.match(/^#{1,3}\s+(.+)/) || l.match(/^\*\*(.+)\*\*$/);
+      if (titulo) {
+        const resposta = linhas.slice(i + 1).find(r => r.trim().length > 20);
+        if (resposta) {
+          pares.push({
+            frente: titulo[1].replace(/\*\*/g, '').trim() + '?',
+            verso:  resposta.replace(/[*#`]/g, '').trim().slice(0, 220)
+          });
+        }
+      }
+    }
+  }
+
+  // Último fallback: gera pares contextuais genéricos
+  if (pares.length === 0) {
+    const trecho = conteudoTutor.replace(/[#*`]/g, '').trim().slice(0, 300);
+    pares.push(
+      { frente: `O que define o conceito principal de ${materiaNome} abordado nessa resposta?`, verso: trecho + (trecho.length === 300 ? '…' : '') },
+      { frente: `Como esse tópico de ${materiaNome} costuma ser cobrado no vestibular?`, verso: 'Em questões contextualizadas, interdisciplinares, geralmente com interpretação de dados ou situações-problema.' },
+      { frente: `Cite um exemplo prático relacionado ao tema de ${materiaNome} apresentado.`, verso: 'Busque exemplos do cotidiano ou de provas anteriores do ENEM para fixar o conceito.' }
+    );
+  }
+
+  // Garante máx 20 cards e formato completo
+  const cards = pares.slice(0, 20).map(p => ({
+    frente: p.frente,
+    verso:  p.verso,
+    materia_nome: materiaNome,
+    materia_id:   materiaId,
+    assunto:      materiaNome
+  }));
+
+  /* ── 2. RENDERIZA O WIDGET ── */
+  let indiceAtual = 0;
+
+  function atualizar(box) {
+    const card = cards[indiceAtual];
+    box.querySelector('.cfc-pergunta-texto').textContent  = card.frente;
+    box.querySelector('.cfc-resposta-texto').textContent  = card.verso;
+    box.querySelector('.cfc-contador').textContent        = `${indiceAtual + 1} / ${cards.length}`;
+    box.querySelector('.cfc-progress-fill').style.width   = `${((indiceAtual + 1) / cards.length) * 100}%`;
+
+    const respostaWrap = box.querySelector('.cfc-resposta-wrap');
+    respostaWrap.classList.remove('revelada');
+
+    const btnRevelar = box.querySelector('.cfc-btn-revelar');
+    btnRevelar.textContent = '👁 Revelar resposta';
+    btnRevelar.classList.remove('revelado');
+
+    box.querySelector('.cfc-btn-nav.anterior').disabled = indiceAtual === 0;
+    box.querySelector('.cfc-btn-nav.proximo').disabled  = indiceAtual === cards.length - 1;
+  }
+
+  const box = document.createElement('div');
+  box.className = 'chat-flashcards-box';
+  box.innerHTML = `
+    <div class="cfc-header">
+      <div class="cfc-badge-tema">
+        <span class="icone">${icone}</span>
+        Flashcards · ${materiaNome}
+      </div>
+      <span class="cfc-contador">1 / ${cards.length}</span>
+    </div>
+    <div class="cfc-progress-track">
+      <div class="cfc-progress-fill" style="width:${(1/cards.length*100).toFixed(1)}%"></div>
+    </div>
+    <div class="cfc-card-stage">
+      <div class="cfc-pergunta-label">PERGUNTA</div>
+      <div class="cfc-pergunta-texto">${cards[0].frente}</div>
+      <button type="button" class="cfc-btn-revelar">👁 Revelar resposta</button>
+      <div class="cfc-resposta-wrap">
+        <div class="cfc-resposta-inner">
+          <div class="cfc-resposta-label">RESPOSTA</div>
+          <div class="cfc-resposta-texto">${cards[0].verso}</div>
+        </div>
+      </div>
+    </div>
+    <div class="cfc-nav-bar">
+      <button type="button" class="cfc-btn-nav anterior" disabled>← Anterior</button>
+      <button type="button" class="cfc-btn-nav proximo" ${cards.length === 1 ? 'disabled' : ''}>Próximo →</button>
+    </div>
+    <div class="cfc-acoes-bar">
+      <button type="button" class="cfc-btn-acao embaralhar">🔀 Embaralhar</button>
+      <button type="button" class="cfc-btn-acao salvar-deck">💾 Salvar deck</button>
+      <a class="cfc-btn-acao destaque-abrir" href="./flashcards.html?importar=true">📖 Abrir página de Flashcards</a>
+    </div>
+  `;
+
+  // Revelar resposta
+  box.querySelector('.cfc-btn-revelar').addEventListener('click', function () {
+    box.querySelector('.cfc-resposta-wrap').classList.add('revelada');
+    this.textContent = '✓ Resposta revelada';
+    this.classList.add('revelado');
+  });
+
+  // Navegação
+  box.querySelector('.cfc-btn-nav.anterior').addEventListener('click', () => {
+    if (indiceAtual > 0) { indiceAtual--; atualizar(box); }
+  });
+  box.querySelector('.cfc-btn-nav.proximo').addEventListener('click', () => {
+    if (indiceAtual < cards.length - 1) { indiceAtual++; atualizar(box); }
+  });
+
+  // Embaralhar
+  box.querySelector('.cfc-btn-acao.embaralhar').addEventListener('click', () => {
+    for (let i = cards.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [cards[i], cards[j]] = [cards[j], cards[i]];
+    }
+    indiceAtual = 0;
+    atualizar(box);
+  });
+
+  // Salvar deck
+  box.querySelector('.cfc-btn-acao.salvar-deck').addEventListener('click', function () {
+    try {
+      const pendentes = JSON.parse(localStorage.getItem('novos_flashcards_pendentes') || '[]');
+      pendentes.push(...cards);
+      localStorage.setItem('novos_flashcards_pendentes', JSON.stringify(pendentes));
+      this.textContent = '✓ Deck salvo!';
+      this.classList.add('salvo');
+      setTimeout(() => {
+        this.textContent = '💾 Salvar deck';
+        this.classList.remove('salvo');
+      }, 3000);
+    } catch (err) {
+      console.error('Erro ao salvar deck:', err);
+    }
+  });
+
+  mensagensEl.appendChild(box);
+  rolarParaFinal();
 }
+
 
 // INTEGRAÇÃO CHAT -> PROJETOS DE ESTUDO (Reflete no Dashboard)
 function integrarChatParaProjeto(conteudoTutor) {
@@ -496,28 +625,39 @@ function integrarChatParaProjeto(conteudoTutor) {
   const hoje = new Date();
   const prazoData = new Date(hoje.setDate(hoje.getDate() + 14)).toISOString().slice(0, 10);
 
+  const idProjeto = 'proj_' + Date.now();
+  const tituloProjeto = `Dominar ${materiaNome} para Vestibulares`;
+  const metaDesc = `Plano intensivo focado em tópicos fundamentais sugeridos pelo Tutor de IA.`;
+  const tarefas = [
+    { titulo: 'Revisar conceitos teóricos e fórmulas', concluida: true },
+    { titulo: 'Praticar 15 questões de provas anteriores', concluida: false },
+    { titulo: 'Revisar flashcards com repetição espaçada', concluida: false },
+    { titulo: 'Fazer 1 simulado cronometrado de diagnóstico', concluida: false }
+  ];
+
   const novoProjeto = {
-    id: 'proj_' + Date.now(),
-    objetivo: `Dominar ${materiaNome} para Vestibulares`,
+    id: idProjeto,
+    titulo: tituloProjeto,
+    objetivo: tituloProjeto,
     materia: materiaNome,
-    descricao: `Plano intensivo de estudos focado em tópicos fundamentais sugeridos pelo Tutor de IA.`,
-    prazo: prazoData,
+    descricao: metaDesc,
+    meta: metaDesc,
+    prazo: `${prazoData} (14 dias)`,
     status: 'em_andamento',
     progresso: 25,
-    tarefas: [
-      { titulo: 'Revisar conceitos teóricos e fórmulas', concluida: true },
-      { titulo: 'Praticar 15 questões de provas anteriores', concluida: false },
-      { titulo: 'Revisar flashcards com repetição espaçada', concluida: false },
-      { titulo: 'Fazer 1 simulado cronometrado de diagnóstico', concluida: false }
-    ],
+    tarefas: tarefas,
+    etapas: tarefas,
     criado_em: new Date().toISOString()
   };
 
   try {
-    const storageKey = `vestibular_projetos_${userId}`;
+    const storageKey = userId ? `vestibular_projetos_${userId}` : 'vestibular_projetos_guest';
     const projetosAtuais = JSON.parse(localStorage.getItem(storageKey) || '[]');
     projetosAtuais.unshift(novoProjeto);
     localStorage.setItem(storageKey, JSON.stringify(projetosAtuais));
+    if (userId) {
+      localStorage.setItem('vestibular_projetos_guest', JSON.stringify(projetosAtuais));
+    }
 
     // Feedback visual direto no chat
     const row = document.createElement('div');
@@ -581,9 +721,44 @@ function renderErro(texto) {
 
 // Envio para a Edge Function do Supabase
 async function enviarMensagem(mensagem) {
+  // 1. Verifica cota antes de processar
+  try {
+    const { data: checagem } = await supabase.rpc('consultar_uso_diario', { p_tipo: 'chat' });
+    const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
+
+    if (checagem && checagem.permitido === false) {
+      const limiteExibido = checagem.limite || limiteOficial;
+      if (planoInfo.isUltimate || planoInfo.ordem >= 3) {
+        renderErro(`Você atingiu o limite diário de ${limiteExibido} perguntas do Chat IA no plano Ultimate. O contador reseta à meia-noite.`);
+      } else {
+        renderErro(`Você atingiu o limite diário de perguntas do Chat IA (${limiteExibido} perguntas/dia) para o seu plano. Faça upgrade para continuar!`);
+        const linkUpgrade = document.createElement('div');
+        linkUpgrade.style.margin = '10px 0 0 28px';
+        linkUpgrade.innerHTML = `<a href="./precos.html?upgrade=chat" class="btn btn-primary" style="display:inline-flex; padding:8px 16px; font-size:0.9rem;">Fazer upgrade do plano</a>`;
+        mensagensEl.appendChild(linkUpgrade);
+      }
+      rolarParaFinal();
+      return;
+    }
+  } catch (errCheck) {
+    console.warn('[Chat IA] Erro ao consultar cota prévia:', errCheck);
+  }
+
   renderMensagem('user', mensagem);
   historico.push({ role: 'usuario', texto: mensagem });
   renderCarregando();
+
+  // Registra uso no banco
+  supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'chat' }).then(({ data: usoRes }) => {
+    if (usoRes) {
+      const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
+      definirBadge(usoRes.usado ?? 0, usoRes.limite ?? limiteOficial);
+    }
+  }).catch(() => {});
+
+  const msgLower = (mensagem || '').toLowerCase();
+  const solicitouFlashcards = /\b(flashcards?|cards?)\b/i.test(msgLower) && /\b(cri[ae]|ger[ae]|fa[çz]|mont[ae]|elabor[ae]|10|5|quantos)\b/i.test(msgLower);
+  const solicitouProjeto = /\b(projeto|plano|cronograma)\b/i.test(msgLower) && /\b(cri[ae]|ger[ae]|fa[çz]|mont[ae]|elabor[ae]|organiz[ae])\b/i.test(msgLower);
 
   try {
     const { data, error } = await supabase.functions.invoke('chat-ia', {
@@ -599,11 +774,23 @@ async function enviarMensagem(mensagem) {
     if (data?.resposta) {
       renderMensagem('tutor', data.resposta);
       historico.push({ role: 'assistente', texto: data.resposta });
+      if (solicitouFlashcards) {
+        integrarChatParaFlashcards(data.resposta);
+      }
+      if (solicitouProjeto) {
+        integrarChatParaProjeto(data.resposta);
+      }
     } else if (error) {
       console.warn('[Chat IA] Edge Function retornou erro, usando tutor educacional:', error);
       const respostaFallback = gerarRespostaTutorFallback(mensagem, materiaAtiva.nome);
       renderMensagem('tutor', respostaFallback);
       historico.push({ role: 'assistente', texto: respostaFallback });
+      if (solicitouFlashcards) {
+        integrarChatParaFlashcards(respostaFallback);
+      }
+      if (solicitouProjeto) {
+        integrarChatParaProjeto(respostaFallback);
+      }
     } else {
       renderErro('Não recebi uma resposta válida do tutor. Tente novamente.');
     }
@@ -617,6 +804,12 @@ async function enviarMensagem(mensagem) {
     const respostaFallback = gerarRespostaTutorFallback(mensagem, materiaAtiva.nome);
     renderMensagem('tutor', respostaFallback);
     historico.push({ role: 'assistente', texto: respostaFallback });
+    if (solicitouFlashcards) {
+      integrarChatParaFlashcards(respostaFallback);
+    }
+    if (solicitouProjeto) {
+      integrarChatParaProjeto(respostaFallback);
+    }
   }
 }
 
@@ -625,6 +818,23 @@ function gerarRespostaTutorFallback(mensagem, materia) {
   const m = (mensagem || '').toLowerCase();
 
   if (m.includes('função afim') || m.includes('funcao afim')) {
+    if (m.includes('flashcard') || m.includes('card')) {
+      return `Aqui estão **10 Flashcards Essenciais sobre Função Afim** para sua revisão do ENEM e vestibulares:
+
+| Frente (Pergunta) | Verso (Resposta) |
+| --- | --- |
+| Qual é a lei geral de formação de uma função afim? | f(x) = ax + b, com a e b pertencentes aos reais e a ≠ 0. |
+| O que representa o coeficiente angular 'a'? | Representa a taxa de variação e a inclinação da reta no gráfico. |
+| O que ocorre se o coeficiente angular 'a' for positivo (a > 0)? | A função é estritamente crescente; conforme x aumenta, f(x) também aumenta. |
+| O que ocorre se o coeficiente angular 'a' for negativo (a < 0)? | A função é estritamente decrescente; conforme x aumenta, f(x) diminui. |
+| Qual o significado geométrico do coeficiente linear 'b'? | É o ponto exato onde a reta intercepta o eixo das ordenadas (y), no ponto (0, b). |
+| O que caracteriza uma Função Linear? | É uma função afim em que b = 0, ou seja, f(x) = ax, passando obrigatoriamente pela origem (0, 0). |
+| O que caracteriza uma Função Constante? | É quando a = 0 (f(x) = b), formando uma reta paralela ao eixo x (não é classificada como função de 1º grau). |
+| Como se calcula a raiz ou zero da função afim? | Igualando f(x) a 0: ax + b = 0 → x = -b / a. Geometricamente, intercepta o eixo x em (-b/a, 0). |
+| Qual a taxa de variação média em uma função afim? | A taxa de variação é constante e igual a Δy / Δx = (y2 - y1) / (x2 - x1) = a. |
+| Como a função afim é cobrada no ENEM? | Em situações cotidianas com uma parte fixa mais uma variável (ex: corridas de app: tarifa base + preço/km). |`;
+    }
+
     return `Uma **função afim** (ou função polinomial do 1º grau) é qualquer função com a lei de formação:
 
 \`f(x) = ax + b\` (com a ≠ 0)

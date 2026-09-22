@@ -117,7 +117,7 @@ function carregarProjetosEstudo(userId) {
   if (!container) return;
 
   try {
-    const rawProjetos = localStorage.getItem(`vestibular_projetos_${userId}`);
+    const rawProjetos = localStorage.getItem(`vestibular_projetos_${userId}`) || localStorage.getItem('vestibular_projetos_guest');
     if (!rawProjetos) return;
 
     const projetos = JSON.parse(rawProjetos);
@@ -125,21 +125,23 @@ function carregarProjetosEstudo(userId) {
 
     container.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:12px;">
-        ${projetos.slice(0, 3).map((p, idx) => `
+        ${projetos.slice(0, 3).map((p) => {
+          const listaTarefas = p.tarefas || p.etapas || [];
+          return `
           <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 14px;">
             <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-              <span style="font-weight:700; font-size:.92rem; color:var(--text-primary);">${p.titulo || 'Plano de Estudos'}</span>
+              <span style="font-weight:700; font-size:.92rem; color:var(--text-primary);">${p.titulo || p.objetivo || 'Plano de Estudos'}</span>
               <span style="font-size:.75rem; color:var(--text-secondary); background:rgba(124,58,237,0.1); padding:2px 8px; border-radius:999px; font-weight:600;">${p.materia || 'Geral'}</span>
             </div>
             <p style="font-size:.82rem; color:var(--text-secondary); margin:0 0 8px 0; line-height:1.4;">
-              Meta: ${p.meta || 'Concluir revisões e exercícios'}
+              Meta: ${p.meta || p.descricao || 'Concluir revisões e exercícios'}
             </p>
             <div style="display:flex; align-items:center; justify-content:space-between; font-size:.78rem; color:var(--text-secondary);">
               <span>📅 Prazo: ${p.prazo || '30 dias'}</span>
-              <span>Tarefas: ${(p.etapas || []).length} etapas</span>
+              <span>Tarefas: ${listaTarefas.length} etapas</span>
             </div>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
     `;
   } catch (e) {
@@ -218,19 +220,20 @@ async function carregarCotasDisponiveis(userId, planoNome = null) {
       supabase.rpc('consultar_uso_diario', { p_tipo: 'simulado' })
     ]);
 
-    const formatarCota = (res, fallbackLimite) => {
+    const formatarCota = (res, fallbackLimite, tipo) => {
       if (res?.error || !res?.data) return fallbackLimite;
       const d = res.data;
-      if (d.plano && ['pro', 'premium', 'ultimate'].includes(d.plano.toLowerCase())) return '∞';
+      // Chat nunca é ilimitado (Ultimate tem exatamente 100/dia)
+      if (tipo !== 'chat' && d.ilimitado === true) return '∞';
       const lim = d.limite ?? fallbackLimite;
       const usado = d.usado ?? 0;
       return Math.max(0, lim - usado);
     };
 
-    if (elQ) elQ.textContent = formatarCota(usoQ, 15);
-    if (elR) elR.textContent = formatarCota(usoR, 10);
-    if (elC) elC.textContent = formatarCota(usoC, 10);
-    if (elS) elS.textContent = formatarCota(usoS, 5);
+    if (elQ) elQ.textContent = formatarCota(usoQ, 15, 'questao');
+    if (elR) elR.textContent = formatarCota(usoR, 10, 'resumo');
+    if (elC) elC.textContent = formatarCota(usoC, 5, 'chat');
+    if (elS) elS.textContent = formatarCota(usoS, 5, 'simulado');
   } catch (err) {
     console.error('Erro ao carregar cotas:', err);
   } finally {

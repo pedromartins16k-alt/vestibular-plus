@@ -2,6 +2,11 @@ import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
+import {
+  obterOrdemPlano,
+  canAccessDifficulty,
+  getPlanoMinimoParaDificuldade
+} from '../lib/permissions.js';
 
 const conteudo = document.getElementById('conteudo');
 const filtrosTabs = document.getElementById('filtros-tabs');
@@ -29,28 +34,7 @@ const FILTROS = [
 ];
 
 function getPlanoExclusivo(dificuldade) {
-  if (dificuldade === 'genio') {
-    return {
-      nome: 'Ultimate',
-      classe: 'ultimate',
-      gradiente: 'linear-gradient(135deg, #f472b6, #c084fc, #60a5fa)',
-      desc: 'no nível Gênio'
-    };
-  }
-  if (dificuldade === 'dificil') {
-    return {
-      nome: 'PRO',
-      classe: 'pro',
-      gradiente: 'linear-gradient(135deg, #7c3aed, #a855f7)',
-      desc: 'no nível Difícil'
-    };
-  }
-  return {
-    nome: 'Basic',
-    classe: 'basic',
-    gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)',
-    desc: 'no nível Médio'
-  };
+  return getPlanoMinimoParaDificuldade(dificuldade);
 }
 
 function renderIconeCadeado(tipo) {
@@ -103,36 +87,18 @@ function renderIconeCadeado(tipo) {
   `;
 }
 
+// Aplica regras de liberação centralizadas: ordemDificuldade <= ordemPlano
 function marcarSimuladosLiberadosEBloqueados(lista, nomePlano) {
-  const plano = (nomePlano || 'free').toLowerCase();
-
-  const medios = lista.filter(s => (s.dificuldade || 'facil') === 'medio');
-  const qtdMediosLiberadosFree = Math.max(1, Math.ceil(medios.length * 0.5));
-  const idsMediosLiberados = new Set(medios.slice(0, qtdMediosLiberadosFree).map(s => s.id));
+  const ordemPlano = obterOrdemPlano(nomePlano || 'free');
 
   return lista.map(s => {
     const nivel = s.dificuldade || 'facil';
-    let bloqueado = false;
+    const liberado = canAccessDifficulty(ordemPlano, nivel);
 
-    if (plano === 'premium' || plano === 'ultimate') {
-      bloqueado = false;
-    } else if (plano === 'pro') {
-      bloqueado = (nivel === 'genio');
-    } else if (plano === 'basic') {
-      bloqueado = (nivel === 'dificil' || nivel === 'genio');
-    } else {
-      if (nivel === 'facil') {
-        bloqueado = false;
-      } else if (nivel === 'medio') {
-        bloqueado = !idsMediosLiberados.has(s.id);
-      } else {
-        bloqueado = true;
-      }
-    }
-
-    return { ...s, bloqueado };
+    return { ...s, bloqueado: !liberado };
   });
 }
+
 
 async function buscarNomePlanoUsuario() {
   const { data: perfil, error } = await supabase

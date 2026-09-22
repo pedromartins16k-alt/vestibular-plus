@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
+import { obterPlanoUsuario, hasFeature } from '../lib/permissions.js';
 
 const resumoEl = document.getElementById('resumo-geral');
 const tipoListaEl = document.getElementById('tipo-lista');
@@ -23,10 +24,41 @@ const TIPO_INFO = {
   simulados_feitos: { label: 'Simulados feitos', icone: '⏱️', unidade: 'simulados' },
 };
 
+/**
+ * Exibe tela de upgrade quando o usuário não tem plano Ultimate.
+ */
+function mostrarTelaUpgrade() {
+  const main = document.querySelector('main') || document.body;
+  main.querySelectorAll('section, .section-title, .resumo-section').forEach(el => {
+    el.style.display = 'none';
+  });
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:20px;text-align:center;padding:40px 20px;';
+  div.innerHTML = `
+    <div style="font-size:3rem;">📊</div>
+    <h2 style="font-size:1.5rem;font-weight:700;color:var(--text-primary,#fff);">Estatísticas Avançadas</h2>
+    <p style="color:var(--text-secondary,#94a3b8);max-width:380px;line-height:1.6;">
+      Acompanhe seu desempenho detalhado, histórico de simulados, conquistas e metas com o plano <strong>Ultimate</strong>.
+    </p>
+    <a href="./precos.html?upgrade=estatisticas" class="btn btn-primary" style="padding:12px 28px;border-radius:8px;font-weight:600;font-size:1rem;">
+      ✦ Fazer upgrade para Ultimate
+    </a>
+    <a href="./dashboard.html" style="color:var(--text-secondary,#94a3b8);font-size:0.9rem;">← Voltar ao dashboard</a>
+  `;
+  main.appendChild(div);
+}
+
 async function iniciar() {
   const session = await exigirAutenticacao();
   if (!session) return;
   const userId = session.user.id;
+
+  // Estatísticas avançadas são exclusivas do plano Ultimate
+  const planoInfo = await obterPlanoUsuario(userId);
+  if (!hasFeature('estatisticas_avancadas', planoInfo.ordem)) {
+    mostrarTelaUpgrade();
+    return;
+  }
 
   const [
     { data: sessoes },
@@ -48,6 +80,7 @@ async function iniciar() {
   renderizarConquistas(conquistas || [], conquistasUsuario || []);
   renderizarMetas(metas || [], sessoes || []);
 }
+
 
 function renderizarResumo(sessoes, respostas, conquistasUsuario) {
   const totalMinutos = sessoes.reduce((soma, s) => soma + (s.duracao_minutos || 0), 0);

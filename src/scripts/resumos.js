@@ -4,6 +4,11 @@ import { exigirAutenticacao } from '../lib/authGuard.js';
 import { iniciarBusca } from './busca-global.js';
 import { verificarConquistas } from './conquistas.js';
 import { buscarFavoritos, alternarFavorito } from './favoritos-global.js';
+import {
+  obterOrdemPlano,
+  canAccessDifficulty,
+  getPlanoMinimoParaDificuldade
+} from '../lib/permissions.js';
 
 const grid = document.getElementById('resumo-grid');
 const filtroContainer = document.getElementById('filtro-materias');
@@ -15,40 +20,8 @@ let favoritosSet = new Set();
 let resumoModalAtual = null;
 
 function getPlanoExclusivo(resumo) {
-  if (resumo.nivel_dificuldade === 'genio') {
-    return {
-      nome: 'Ultimate',
-      classe: 'ultimate',
-      gradiente: 'linear-gradient(135deg, #f472b6, #c084fc, #60a5fa)',
-      corTexto: '#ffffff',
-      desc: 'no nível Gênio'
-    };
-  }
-  if (resumo.nivel_dificuldade === 'dificil') {
-    return {
-      nome: 'PRO',
-      classe: 'pro',
-      gradiente: 'linear-gradient(135deg, #7c3aed, #a855f7)',
-      corTexto: '#e9d5ff',
-      desc: 'no nível Difícil'
-    };
-  }
-  if (resumo.nivel_dificuldade === 'medio') {
-    return {
-      nome: 'Basic',
-      classe: 'basic',
-      gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)',
-      corTexto: '#bae6fd',
-      desc: 'no nível Médio'
-    };
-  }
-  return {
-    nome: 'Basic',
-    classe: 'basic',
-    gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)',
-    corTexto: '#bae6fd',
-    desc: 'do catálogo completo'
-  };
+  const dif = resumo?.nivel_dificuldade || 'facil';
+  return getPlanoMinimoParaDificuldade(dif);
 }
 
 function renderIconeCadeado(tipo) {
@@ -101,56 +74,21 @@ function renderIconeCadeado(tipo) {
   `;
 }
 
-// Aplica regras de liberação:
-// - Fácil: 100% liberado para todos
-// - Médio: 50% liberado no Free, 100% liberado no Basic, Pro e Ultimate
-// - Difícil: 100% liberado no Pro e Ultimate (bloqueado no Free/Basic com "Exclusivo PRO")
-// - Gênio: 100% liberado no Ultimate (bloqueado no Free/Basic/Pro com "Exclusivo Ultimate")
+// Aplica regras de liberação centralizadas: ordemDificuldade <= ordemPlano
 function marcarResumosLiberadosEBloqueados(lista, nomePlano) {
-  const plano = (nomePlano || 'free').toLowerCase();
-
-  // Mapeia médios por matéria para liberar exatamente 50% no plano Free
-  const mediosPorMateria = new Map();
-  lista.forEach(r => {
-    if ((r.nivel_dificuldade || 'facil') === 'medio') {
-      if (!mediosPorMateria.has(r.materia_id)) mediosPorMateria.set(r.materia_id, []);
-      mediosPorMateria.get(r.materia_id).push(r.id);
-    }
-  });
-
-  const idsMediosLiberadosFree = new Set();
-  mediosPorMateria.forEach(ids => {
-    const qtdLiberada = Math.max(1, Math.ceil(ids.length * 0.5)); // Metade liberada
-    ids.slice(0, qtdLiberada).forEach(id => idsMediosLiberadosFree.add(id));
-  });
+  const ordemPlano = obterOrdemPlano(nomePlano || 'free');
 
   return lista.map(r => {
     const nivel = r.nivel_dificuldade || 'facil';
-    let bloqueado = false;
-
-    if (plano === 'premium' || plano === 'ultimate') {
-      bloqueado = false;
-    } else if (plano === 'pro') {
-      bloqueado = (nivel === 'genio');
-    } else if (plano === 'basic') {
-      bloqueado = (nivel === 'dificil' || nivel === 'genio');
-    } else {
-      // Plano Free:
-      if (nivel === 'facil') {
-        bloqueado = false; // Todos os fáceis desbloqueados!
-      } else if (nivel === 'medio') {
-        bloqueado = !idsMediosLiberadosFree.has(r.id); // Metade liberada, metade bloqueada para Basic
-      } else {
-        bloqueado = true; // Difícil e Gênio bloqueados
-      }
-    }
+    const liberado = canAccessDifficulty(ordemPlano, nivel);
 
     return {
       ...r,
-      bloqueado
+      bloqueado: !liberado
     };
   });
 }
+
 
 async function buscarNomePlanoUsuario(userId) {
   const { data: perfil, error } = await supabase
