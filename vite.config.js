@@ -3,6 +3,7 @@ import { resolve } from 'path';
 // Configuração multi-página: cada HTML em src/pages vira uma rota estática.
 export default defineConfig({
   root: 'src',
+  envDir: resolve(__dirname),
   publicDir: '../public',
   build: {
     outDir: '../dist',

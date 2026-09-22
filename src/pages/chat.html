@@ -2,67 +2,937 @@
 <html lang="pt-BR" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Chat com IA · Vestibular+</title>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles/base.css" />
 <style>
-  .page-wrap { padding: 32px 5%; max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; height: calc(100vh - 64px); }
-  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
-  .back-link { color: var(--text-secondary); font-size: .9rem; }
-  .back-link:hover { color: var(--text-primary); }
-  .page-title { font-size: 1.8rem; margin-top: 6px; }
-  .uso-badge {
-    display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: var(--radius-full);
-    background: rgba(124,58,237,.12); color: var(--text-secondary); font-size: .8rem; font-weight: 600;
+  /* =========================================================
+     ESTRUTURA EM TELA CHEIA (100dvh / 100vh)
+     ========================================================= */
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: var(--bg-base);
   }
-  .filtro-materias { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
-  .chip {
-    padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
-    background: var(--bg-elevated); font-size: .85rem; font-weight: 600; cursor: pointer;
+
+  .chat-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-base);
+  }
+
+  /* Canvas de fundo sutil */
+  #fundo-ondas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  /* =========================================================
+     HEADER SUPERIOR MODERNO
+     ========================================================= */
+  .chat-header {
+    position: relative;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .btn-voltar {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .btn-voltar:hover {
+    color: var(--text-primary);
+    border-color: var(--color-primary-500);
+    transform: translateX(-2px);
+  }
+
+  .header-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .tutor-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .tutor-avatar-wrap {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.25rem;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+    flex-shrink: 0;
+  }
+
+  .tutor-avatar-status {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #22c55e;
+    border: 2px solid var(--bg-base);
+    box-shadow: 0 0 8px #22c55e;
+  }
+
+  .tutor-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .tutor-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .tutor-title {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tutor-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.12);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+  }
+
+  .tutor-status-badge .pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    animation: pulseGlow 1.8s infinite ease-in-out;
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.85); }
+  }
+
+  .tutor-sub {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .uso-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    background: rgba(124, 58, 237, 0.12);
+    border: 1px solid rgba(124, 58, 237, 0.25);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
     transition: all var(--transition-fast);
   }
-  .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
-  .chat-card { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 0; }
-  .mensagens { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
-  .msg { max-width: 80%; padding: 12px 16px; border-radius: var(--radius-md); font-size: .92rem; line-height: 1.55; white-space: pre-wrap; }
-  .msg-usuario { align-self: flex-end; background: var(--gradient-primary); color: #fff; border-bottom-right-radius: 4px; }
-  .msg-assistente { align-self: flex-start; background: var(--bg-elevated); border: 1px solid var(--border-color); border-bottom-left-radius: 4px; }
-  .msg-erro { align-self: center; background: rgba(239,68,68,.15); border: 1px solid #ef4444; color: #fff; text-align: center; max-width: 90%; }
-  .msg-carregando { align-self: flex-start; color: var(--text-secondary); font-size: .85rem; padding: 4px 16px; }
-  .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
-  .input-row { display: flex; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--border-color); }
-  .input-row textarea {
-    flex: 1; resize: none; border-radius: var(--radius-md); border: 1px solid var(--border-color);
-    background: var(--bg-elevated); color: var(--text-primary); padding: 12px 14px; font-family: inherit;
-    font-size: .92rem; line-height: 1.4; max-height: 120px;
+
+  .btn-icon:hover {
+    background: rgba(124, 58, 237, 0.15);
+    border-color: var(--color-primary-500);
+    transform: translateY(-1px);
   }
-  .input-row textarea:focus { outline: none; border-color: var(--color-primary-500); }
-  .input-row button { align-self: flex-end; }
+
+  /* =========================================================
+     BARRA DE MATÉRIAS (SUB-HEADER)
+     ========================================================= */
+  .materias-strip {
+    position: relative;
+    z-index: 15;
+    padding: 10px 24px;
+    background: var(--glass-bg);
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    flex-shrink: 0;
+  }
+
+  .materias-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filtro-materias {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-color);
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  .chip:hover {
+    color: var(--text-primary);
+    border-color: rgba(124, 58, 237, 0.4);
+    background: rgba(124, 58, 237, 0.08);
+  }
+
+  .chip.active {
+    background: var(--gradient-primary);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+  }
+
+  /* =========================================================
+     ÁREA PRINCIPAL DA CONVERSA (OCUPA TODA A TELA)
+     ========================================================= */
+  .chat-conversa {
+    position: relative;
+    z-index: 10;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mensagens-wrap {
+    flex: 1;
+    max-width: 880px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 24px 20px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-sizing: border-box;
+  }
+
+  /* =========================================================
+     ESTADO INICIAL ELEGANTE (EMPTY STATE)
+     ========================================================= */
+  .empty-state-card {
+    margin: 0 auto;
+    padding: 16px 12px 28px;
+    text-align: center;
+    animation: fadeIn 0.5s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 720px;
+  }
+
+  .empty-icon-glow {
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #fff;
+    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.4);
+    margin-bottom: 16px;
+    animation: floatIcon 3s ease-in-out infinite alternate;
+  }
+
+  @keyframes floatIcon {
+    from { transform: translateY(0); }
+    to { transform: translateY(-8px); }
+  }
+
+  .empty-title {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .empty-desc {
+    font-size: 0.92rem;
+    color: var(--text-secondary);
+    max-width: 540px;
+    line-height: 1.55;
+    margin-bottom: 24px;
+  }
+
+  .sugestoes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    width: 100%;
+  }
+
+  .sugestao-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    padding: 14px 18px;
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    box-shadow: var(--shadow-soft);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sugestao-btn:hover {
+    border-color: var(--color-primary-500);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.18);
+    background: rgba(124, 58, 237, 0.05);
+  }
+
+  .sugestao-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-neon);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .sugestao-texto {
+    font-size: 0.88rem;
+    color: var(--text-primary);
+    line-height: 1.4;
+    font-weight: 500;
+  }
+
+  /* =========================================================
+     BALÕES DE MENSAGENS MODERNOS
+     ========================================================= */
+  .msg-row {
+    display: flex;
+    width: 100%;
+    animation: slideUpMsg 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes slideUpMsg {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .msg-row-user {
+    justify-content: flex-end;
+  }
+
+  .msg-row-tutor {
+    justify-content: flex-start;
+  }
+
+  .msg-bubble {
+    max-width: 82%;
+    padding: 14px 18px;
+    font-size: 0.94rem;
+    line-height: 1.6;
+    word-break: break-word;
+    position: relative;
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* Mensagem do Usuário */
+  .msg-user {
+    background: var(--gradient-primary);
+    color: #ffffff;
+    border-radius: 20px 20px 4px 20px;
+    box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3);
+    white-space: pre-wrap;
+  }
+
+  /* Mensagem do Tutor */
+  .msg-tutor {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 20px 20px 20px 4px;
+    color: var(--text-primary);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .msg-tutor-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+  }
+
+  .tutor-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: var(--color-neon);
+  }
+
+  .btn-copiar {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.76rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+  }
+
+  .btn-copiar:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .msg-conteudo {
+    white-space: pre-wrap;
+    line-height: 1.65;
+  }
+
+  .msg-conteudo p {
+    margin: 0 0 10px;
+  }
+
+  .msg-conteudo p:last-child {
+    margin-bottom: 0;
+  }
+
+  .msg-conteudo code {
+    background: rgba(124, 58, 237, 0.14);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 0.88em;
+  }
+
+  .msg-conteudo pre {
+    background: rgba(0, 0, 0, 0.35);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+    margin: 10px 0;
+    border: 1px solid var(--border-color);
+  }
+
+  .msg-conteudo pre code {
+    background: transparent;
+    padding: 0;
+  }
+
+  /* Mensagem de Erro */
+  .msg-row-erro {
+    justify-content: center;
+  }
+
+  .msg-erro {
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+    border-radius: var(--radius-md);
+    padding: 12px 18px;
+    text-align: center;
+    max-width: 90%;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* Indicador de Digitando */
+  .msg-typing-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 18px;
+    border-radius: 20px 20px 20px 4px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    box-shadow: var(--shadow-soft);
+  }
+
+  .typing-dots {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .typing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-primary-500);
+    animation: typingBounce 1.4s infinite ease-in-out;
+  }
+
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes typingBounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-5px); opacity: 1; }
+  }
+
+  /* =========================================================
+     CAMPO DE MENSAGEM INFERIOR MODERNO (STICKY/FIXED FULL WIDTH)
+     ========================================================= */
+  .chat-bottom-bar {
+    position: relative;
+    z-index: 20;
+    padding: 12px 20px 18px;
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+  }
+
+  .bottom-bar-inner {
+    max-width: 880px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .input-card {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 8px 12px 8px 18px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .input-card:focus-within {
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), 0 8px 28px rgba(124, 58, 237, 0.12);
+  }
+
+  .input-mensagem,
+  #input-mensagem {
+    flex: 1;
+    resize: none;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    padding: 8px 0;
+    max-height: 140px;
+    min-height: 24px;
+  }
+
+  .input-mensagem:focus,
+  #input-mensagem:focus {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .input-mensagem::placeholder,
+  #input-mensagem::placeholder {
+    color: var(--text-secondary);
+    opacity: 0.8;
+  }
+
+  .btn-enviar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
+  }
+
+  .btn-enviar:hover:not(:disabled) {
+    transform: scale(1.06);
+    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5);
+  }
+
+  .btn-enviar:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  .btn-enviar:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-enviar svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transform: translateX(1px);
+  }
+
+  .chat-disclaimer {
+    text-align: center;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    opacity: 0.75;
+  }
+
+  /* =========================================================
+     RESPONSIVIDADE (MOBILE & TABLET)
+     ========================================================= */
+  @media (max-width: 720px) {
+    .chat-header {
+      padding: 8px 12px;
+      gap: 8px;
+    }
+
+    .btn-voltar-text {
+      display: none;
+    }
+
+    .btn-voltar {
+      padding: 7px 10px;
+      font-size: 0.95rem;
+    }
+
+    .header-divider {
+      display: none;
+    }
+
+    .tutor-avatar-wrap {
+      width: 36px;
+      height: 36px;
+      font-size: 1.1rem;
+      border-radius: 10px;
+    }
+
+    .tutor-title {
+      font-size: 0.9rem;
+    }
+
+    .tutor-sub {
+      font-size: 0.72rem;
+    }
+
+    .tutor-status-badge {
+      display: none;
+    }
+
+    .uso-badge {
+      display: none !important;
+    }
+
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      font-size: 0.9rem;
+    }
+
+    .materias-strip {
+      padding: 8px 14px;
+    }
+
+    .mensagens-wrap {
+      padding: 16px 14px;
+      gap: 14px;
+    }
+
+    .sugestoes-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .empty-title {
+      font-size: 1.35rem;
+    }
+
+    .msg-bubble {
+      max-width: 90%;
+      padding: 12px 14px;
+      font-size: 0.9rem;
+    }
+
+    .chat-bottom-bar {
+      padding: 8px 12px 12px;
+    }
+
+    .input-card {
+      padding: 6px 8px 6px 14px;
+      border-radius: 20px;
+    }
+
+    .btn-enviar {
+      width: 38px;
+      height: 38px;
+    }
+
+    .chat-disclaimer {
+      font-size: 0.68rem;
+    }
+  }
 </style>
 </head>
 <body>
-  <div class="page-wrap">
-    <div class="page-header">
-      <div>
-        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
-        <h1 class="page-title">💬 Chat com IA</h1>
+  <canvas id="fundo-ondas"></canvas>
+
+  <div class="chat-app">
+    <!-- HEADER SUPERIOR -->
+    <header class="chat-header">
+      <div class="header-left">
+        <a class="btn-voltar" href="./dashboard.html" title="Voltar ao Dashboard">
+          <span class="btn-voltar-icon">←</span> <span class="btn-voltar-text">Dashboard</span>
+        </a>
+        <div class="header-divider"></div>
+        <div class="tutor-info">
+          <div class="tutor-avatar-wrap" id="tutor-avatar">
+            🤖
+            <div class="tutor-avatar-status" title="Tutor disponível online"></div>
+          </div>
+          <div class="tutor-text">
+            <div class="tutor-title-row">
+              <h1 class="tutor-title" id="tutor-header-title">Chat com IA</h1>
+              <span class="tutor-status-badge">
+                <span class="pulse-dot"></span> Online
+              </span>
+            </div>
+            <div class="tutor-sub">
+              <span id="tutor-sub-cargo">Tutor Geral</span> · Vestibular+
+            </div>
+          </div>
+        </div>
       </div>
-      <span class="uso-badge" id="uso-badge">Carregando...</span>
-    </div>
-    <div class="filtro-materias" id="filtro-materias">
-      <div class="chip active" data-materia="">Sem matéria específica</div>
-    </div>
-    <div class="card chat-card">
-      <div class="mensagens" id="mensagens">
-        <p class="empty-state">Manda sua dúvida sobre qualquer matéria e o tutor te ajuda a entender o conceito 🎓</p>
+
+      <div class="header-right">
+        <span class="uso-badge" id="uso-badge">💬 Carregando...</span>
+        <button class="btn-icon" id="btn-novo-chat" title="Limpar e iniciar nova conversa">
+          ↺
+        </button>
+        <button class="btn-icon" id="theme-toggle" title="Alternar tema">
+          🌙
+        </button>
       </div>
-      <form class="input-row" id="form-mensagem">
-        <textarea id="input-mensagem" rows="1" placeholder="Digite sua pergunta..." required></textarea>
-        <button type="submit" class="btn btn-primary" id="btn-enviar">Enviar</button>
-      </form>
-    </div>
+    </header>
+
+    <!-- BARRA DE SELEÇÃO DE MATÉRIAS (CHIPS) -->
+    <nav class="materias-strip" aria-label="Filtrar por matéria">
+      <div class="filtro-materias" id="filtro-materias">
+        <button type="button" class="chip active" data-materia="" data-nome="">
+          📚 Todas as matérias
+        </button>
+      </div>
+    </nav>
+
+    <!-- ÁREA DA CONVERSA EM TELA CHEIA -->
+    <main class="chat-conversa" id="chat-conversa">
+      <div class="mensagens-wrap" id="mensagens">
+        <!-- ESTADO INICIAL (EMPTY STATE) -->
+        <div class="empty-state-card" id="empty-state">
+          <div class="empty-icon-glow">💬</div>
+          <h2 class="empty-title">Chat com IA · Tutor Inteligente</h2>
+          <p class="empty-desc">
+            Tire suas dúvidas sobre matérias do vestibular, fórmulas, resolução passo a passo, conceitos difíceis e estratégias de estudo. Como posso te ajudar hoje?
+          </p>
+
+          <div class="sugestoes-grid" id="sugestoes-grid">
+            <button type="button" class="sugestao-btn" data-pergunta="O que é função afim e como ela é mais cobrada nos vestibulares?" data-materia-nome="Matemática">
+              <span class="sugestao-tag">📐 Matemática</span>
+              <span class="sugestao-texto">O que é função afim e como cai no vestibular?</span>
+            </button>
+            <button type="button" class="sugestao-btn" data-pergunta="Como fazer o balanceamento de equações químicas passo a passo?" data-materia-nome="Química">
+              <span class="sugestao-tag">🧪 Química</span>
+              <span class="sugestao-texto">Como balancear equações químicas por tentativas?</span>
+            </button>
+            <button type="button" class="sugestao-btn" data-pergunta="Quais são as principais figuras de linguagem que mais caem nas provas?" data-materia-nome="Português">
+              <span class="sugestao-tag">📚 Português</span>
+              <span class="sugestao-texto">Quais são as figuras de linguagem mais cobradas?</span>
+            </button>
+            <button type="button" class="sugestao-btn" data-pergunta="Quais foram os principais fatores que desencadearam a Era Vargas no Brasil?" data-materia-nome="História">
+              <span class="sugestao-tag">🌎 História</span>
+              <span class="sugestao-texto">Resumo dos principais pontos da Era Vargas</span>
+            </button>
+            <button type="button" class="sugestao-btn" data-pergunta="Como aplicar as 3 Leis de Newton na prática para resolver problemas?" data-materia-nome="Física">
+              <span class="sugestao-tag">⚡ Física</span>
+              <span class="sugestao-texto">Como aplicar as 3 Leis de Newton?</span>
+            </button>
+            <button type="button" class="sugestao-btn" data-pergunta="Qual é a diferença fundamental entre os processos de mitose e meiose?" data-materia-nome="Biologia">
+              <span class="sugestao-tag">🧬 Biologia</span>
+              <span class="sugestao-texto">Qual a diferença entre mitose e meiose?</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- CAMPO DE MENSAGEM FIXO INFERIOR -->
+    <footer class="chat-bottom-bar">
+      <div class="bottom-bar-inner">
+        <form class="input-card" id="form-mensagem">
+          <textarea
+            id="input-mensagem"
+            class="input-mensagem"
+            rows="1"
+            placeholder="Digite sua dúvida..."
+            required
+            autocomplete="off"
+          ></textarea>
+          <button type="submit" class="btn-enviar" id="btn-enviar" title="Enviar mensagem (Enter)">
+            <svg viewBox="0 0 24 24">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
+        <div class="chat-disclaimer">
+          O Tutor com IA do Vestibular+ pode cometer erros. Verifique fórmulas e fatos acadêmicos essenciais.
+        </div>
+      </div>
+    </footer>
   </div>
+
   <script type="module" src="../scripts/theme.js"></script>
   <script type="module" src="../scripts/chat.js"></script>
 </body>
