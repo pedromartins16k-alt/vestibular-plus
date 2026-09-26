@@ -395,7 +395,7 @@ function renderMensagem(role, texto, mensagemOriginal = null) {
     bubble.querySelectorAll('.btn-passo-sugestao').forEach(btn => {
       btn.addEventListener('click', () => {
         const acao = btn.dataset.acao;
-        executarAcaoContextual(acao, texto);
+        executarAcaoContextual(acao, texto, btn);
       });
     });
 
@@ -413,7 +413,7 @@ function renderMensagem(role, texto, mensagemOriginal = null) {
 }
 
 // Ações do Ecossistema (Chat -> Flashcards, Chat -> Projetos, Exemplo, Exercício)
-function executarAcaoContextual(acao, textoOrigem) {
+function executarAcaoContextual(acao, textoOrigem, btn = null) {
   if (acao === 'exemplo') {
     inputEl.value = 'Dê um exemplo prático resolvido passo a passo sobre essa explicação.';
     formEl.requestSubmit();
@@ -423,7 +423,8 @@ function executarAcaoContextual(acao, textoOrigem) {
   } else if (acao === 'flashcards') {
     integrarChatParaFlashcards(textoOrigem);
   } else if (acao === 'projeto') {
-    integrarChatParaProjeto(textoOrigem);
+    const ultimaPergunta = [...historico].reverse().find(h => h.role === 'usuario')?.texto || '';
+    integrarChatParaProjeto(textoOrigem, ultimaPergunta, btn);
   }
 }
 
@@ -619,44 +620,294 @@ function integrarChatParaFlashcards(conteudoTutor) {
 }
 
 
-// INTEGRAÇÃO CHAT -> PROJETOS DE ESTUDO (Reflete no Dashboard)
-function integrarChatParaProjeto(conteudoTutor) {
-  const materiaNome = materiaAtiva.nome || 'ENEM 2026';
-  const hoje = new Date();
-  const prazoData = new Date(hoje.setDate(hoje.getDate() + 14)).toISOString().slice(0, 10);
+// =========================================================
+// EXTRAÇÃO INTELIGENTE DE TEMA, MATÉRIA, PRAZO E TAREFAS
+// =========================================================
+function extrairInformacoesProjeto(conteudoTutor, mensagemUsuario) {
+  const msgUser = (mensagemUsuario || '').trim();
+  const msgTutor = (conteudoTutor || '').trim();
 
-  const idProjeto = 'proj_' + Date.now();
-  const tituloProjeto = `Dominar ${materiaNome} para Vestibulares`;
-  const metaDesc = `Plano intensivo focado em tópicos fundamentais sugeridos pelo Tutor de IA.`;
-  const tarefas = [
-    { titulo: 'Revisar conceitos teóricos e fórmulas', concluida: true },
-    { titulo: 'Praticar 15 questões de provas anteriores', concluida: false },
-    { titulo: 'Revisar flashcards com repetição espaçada', concluida: false },
-    { titulo: 'Fazer 1 simulado cronometrado de diagnóstico', concluida: false }
+  // 1. Extração de Prazo / Duração
+  let prazoDias = 30; // Padrão inteligente de 30 dias para planos de estudo
+  const matchDias = msgUser.match(/\b(\d+)\s*(?:dias?)\b/i) || msgTutor.match(/\b(\d+)\s*(?:dias?)\b/i);
+  const matchSemanas = msgUser.match(/\b(\d+)\s*(?:semanas?)\b/i) || msgTutor.match(/\b(\d+)\s*(?:semanas?)\b/i);
+  const matchMeses = msgUser.match(/\b(\d+)\s*(?:m[eê]s(?:es)?)\b/i) || msgTutor.match(/\b(\d+)\s*(?:m[eê]s(?:es)?)\b/i);
+
+  if (matchDias) {
+    prazoDias = parseInt(matchDias[1], 10);
+  } else if (matchSemanas) {
+    prazoDias = parseInt(matchSemanas[1], 10) * 7;
+  } else if (matchMeses) {
+    prazoDias = parseInt(matchMeses[1], 10) * 30;
+  } else if (/duas semanas/i.test(msgUser)) {
+    prazoDias = 14;
+  } else if (/um m[eê]s/i.test(msgUser)) {
+    prazoDias = 30;
+  }
+
+  if (isNaN(prazoDias) || prazoDias < 3) prazoDias = 14;
+  if (prazoDias > 180) prazoDias = 180;
+
+  const dataAlvo = new Date();
+  dataAlvo.setDate(dataAlvo.getDate() + prazoDias);
+  const prazoFormatado = dataAlvo.toISOString().slice(0, 10);
+  const prazoTexto = `${prazoFormatado} (${prazoDias} dias)`;
+
+  // 2. Extração de Matéria e Tópico
+  const materiasPadrao = [
+    {
+      nome: 'História',
+      regex: /\b(hist[oó]ria|brasil col[oô]nia|era vargas|ditadura|revolu[cç][aã]o|guerra fria|idade m[eé]dia|feudalismo|iluminismo|gr[eé]cia|roma antiga|rep[uú]blica|independ[eê]ncia|antiguidade)\b/i
+    },
+    {
+      nome: 'Geografia',
+      regex: /\b(geografia|geopol[ií]tica|relevo|clima|urbaniza[cç][aã]o|vegeta[cç][aã]o|cartografia|demografia|migra[cç][aã]o|globaliza[cç][aã]o|biomas?)\b/i
+    },
+    {
+      nome: 'Biologia',
+      regex: /\b(biologia|ecologia|citologia|gen[eé]tica|dna|c[eé]lula|fotoss[ií]ntese|evolu[cç][aã]o|fisiologia|bot[aâ]nica|zoologia|v[ií]rus|bact[eé]ria|bioqu[ií]mica)\b/i
+    },
+    {
+      nome: 'Física',
+      regex: /\b(f[ií]sica|mec[aâ]nica|cinem[aá]tica|termodin[aâ]mica|[oó]ptica|eletricidade|eletromagnetismo|ondulat[oó]ria|newton|din[aâ]mica|energia|gravita[cç][aã]o)\b/i
+    },
+    {
+      nome: 'Química',
+      regex: /\b(qu[ií]mica|estequiometria|termoqu[ií]mica|solu[cç][oõ]es|org[aâ]nica|inorg[aâ]nica|eletroqu[ií]mica|tabela peri[oó]dica|rea[cç][oõ]es|[aá]tomo|liga[cç][oõ]es)\b/i
+    },
+    {
+      nome: 'Matemática',
+      regex: /\b(matem[aá]tica|fun[cç][aã]o|fun[cç][oõ]es|geometria|trigonometria|probabilidade|estat[ií]stica|logaritmo|[aá]lgebra|porcentagem|progress[aã]o|matriz|equa[cç][aã]o)\b/i
+    },
+    {
+      nome: 'Português',
+      regex: /\b(portugu[eê]s|gram[aá]tica|sintaxe|literatura|modernismo|romantismo|realismo|figuras de linguagem|concord[aâ]ncia|pontua[cç][aã]o|morfologia)\b/i
+    },
+    {
+      nome: 'Redação',
+      regex: /\b(reda[cç][aã]o|disserta[cç][aã]o|proposta de interven[cç][aã]o|nota 1000|conectivos|argumenta[cç][aã]o|repert[oó]rio)\b/i
+    },
+    {
+      nome: 'Filosofia',
+      regex: /\b(filosofia|[eé]tica|moral|s[oó]crates|plat[aã]o|arist[oó]teles|kant|nietzsche|foucault|iluministas?)\b/i
+    },
+    {
+      nome: 'Sociologia',
+      regex: /\b(sociologia|cidadania|desigualdade|marx|durkheim|weber|movimentos sociais)\b/i
+    }
   ];
 
-  const novoProjeto = {
-    id: idProjeto,
+  let materiaDetectada = (materiaAtiva?.nome && materiaAtiva.nome !== 'Todas as matérias') ? materiaAtiva.nome : '';
+
+  if (!materiaDetectada) {
+    for (const m of materiasPadrao) {
+      if (m.regex.test(msgUser) || m.regex.test(msgTutor)) {
+        materiaDetectada = m.nome;
+        break;
+      }
+    }
+  }
+
+  // 3. Extração do TEMA específico (ex: "História do Brasil", "Função Afim", "Revolução Francesa")
+  let temaEspecifico = '';
+
+  const patterns = [
+    /(?:projeto|plano|cronograma|estudo[s]?)\s+(?:de\s+estudos?\s+)?(?:de|para|sobre)\s+([a-záàâãéèêíïóôõöúçñ0-9\s-]{3,45})/i,
+    /(?:aprender|estudar|dominar|revisar|focar em|compreender)\s+([a-záàâãéèêíïóôõöúçñ0-9\s-]{3,45})/i,
+    /(?:como passar em|como ir bem em|guia de)\s+([a-záàâãéèêíïóôõöúçñ0-9\s-]{3,45})/i
+  ];
+
+  for (const pat of patterns) {
+    const match = msgUser.match(pat);
+    if (match && match[1]) {
+      let cand = match[1].trim();
+      cand = cand.replace(/\b(em\s+\d+\s*(?:dias?|semanas?|m[eê]s(?:es)?)|para o enem|pro enem|para vestibulares?|r[aá]pido|do zero|passo a passo|por favor)\b/gi, '').trim();
+      cand = cand.replace(/[.,:;!?]+$/, '').trim();
+      if (cand.length >= 3 && !/^(o|a|os|as|um|uma|meu|minha|esse|esta|isso|tudo)$/i.test(cand)) {
+        temaEspecifico = cand;
+        break;
+      }
+    }
+  }
+
+  if (!temaEspecifico && msgTutor) {
+    const matchTitulo = msgTutor.match(/^(?:#+\s*|\*\*)([^\n*#]+)(?:\*\*|$)/m);
+    if (matchTitulo && matchTitulo[1] && matchTitulo[1].length < 50) {
+      temaEspecifico = matchTitulo[1].trim();
+    }
+  }
+
+  if (temaEspecifico) {
+    temaEspecifico = temaEspecifico.charAt(0).toUpperCase() + temaEspecifico.slice(1);
+  } else if (materiaDetectada) {
+    temaEspecifico = materiaDetectada;
+  } else {
+    temaEspecifico = 'Preparação Intensiva para o Vestibular';
+  }
+
+  if (!materiaDetectada) {
+    materiaDetectada = temaEspecifico.length <= 25 ? temaEspecifico : 'Geral';
+  }
+
+  const tituloProjeto = `Dominar ${temaEspecifico}`;
+  const objetivoProjeto = `Plano focado em ${temaEspecifico} para Vestibulares`;
+  const metaDesc = `Cronograma de ${prazoDias} dias para dominar os conteúdos essenciais de ${temaEspecifico}, com foco em teoria, fixação de exercícios e resolução de questões reais.`;
+
+  // 4. Extração ou Construção de Tarefas Dinâmicas
+  let tarefas = [];
+
+  const linhasLista = msgTutor.match(/(?:^|\n)\s*(?:\d+[\.\)]|[-*•])\s+([^\n]+)/g);
+  if (linhasLista && linhasLista.length >= 3) {
+    for (const linha of linhasLista) {
+      const itemLimpo = linha.replace(/^\s*(?:\d+[\.\)]|[-*•])\s+/, '').trim();
+      const textoItem = itemLimpo.replace(/\*\*/g, '').trim();
+      if (textoItem.length > 8 && textoItem.length < 120 && !/^(olá|espero|boa sorte|bons estudos|conclusão|introdução)/i.test(textoItem)) {
+        tarefas.push({
+          titulo: textoItem,
+          concluida: tarefas.length === 0
+        });
+      }
+      if (tarefas.length >= 5) break;
+    }
+  }
+
+  if (tarefas.length < 3) {
+    tarefas = [
+      { titulo: `Revisar os fundamentos teóricos e conceitos-chave de ${temaEspecifico}`, concluida: true },
+      { titulo: `Resolver 20 questões contextualizadas de ${temaEspecifico} do ENEM e vestibulares`, concluida: false },
+      { titulo: `Elaborar resumo esquemático ou mapa mental com as fórmulas e pontos críticos`, concluida: false },
+      { titulo: `Revisar flashcards de fixação ativa sobre ${temaEspecifico}`, concluida: false },
+      { titulo: `Fazer simulado temático e diagnosticar os pontos com maior taxa de erro`, concluida: false }
+    ];
+  }
+
+  return {
+    materia: materiaDetectada,
+    tema: temaEspecifico,
     titulo: tituloProjeto,
-    objetivo: tituloProjeto,
-    materia: materiaNome,
+    objetivo: objetivoProjeto,
     descricao: metaDesc,
     meta: metaDesc,
-    prazo: `${prazoData} (14 dias)`,
+    prazo: prazoTexto,
+    prazoDias,
+    prazoData: prazoFormatado,
+    tarefas
+  };
+}
+
+// Deduplicação inteligente de lista de projetos locais
+function deduplicarProjetosLocais(lista) {
+  if (!Array.isArray(lista)) return [];
+  const mapa = new Map();
+
+  for (const p of lista) {
+    if (!p) continue;
+    const tit = (p.titulo || p.objetivo || 'projeto').trim().toLowerCase();
+    const mat = (p.materia || 'geral').trim().toLowerCase();
+    const chave = `${tit}::${mat}`;
+
+    if (!mapa.has(chave)) {
+      mapa.set(chave, p);
+    } else {
+      const anterior = mapa.get(chave);
+      if ((p.progresso || 0) > (anterior.progresso || 0)) {
+        mapa.set(chave, p);
+      }
+    }
+  }
+
+  return Array.from(mapa.values());
+}
+
+// Cache em memória para evitar duplicações por cliques repetidos ou chamadas concorrentes
+let ultimoProjetoCriado = {
+  chave: '',
+  timestamp: 0,
+  id: null
+};
+
+// INTEGRAÇÃO CHAT -> PROJETOS DE ESTUDO (Reflete no Dashboard)
+function integrarChatParaProjeto(conteudoTutor, mensagemUsuario = '', botaoElemento = null) {
+  // Se o botão já foi acionado e processado nesta mensagem, ignora repetição
+  if (botaoElemento && botaoElemento.dataset.processado === 'true') {
+    return;
+  }
+
+  // Se mensagemUsuario não foi informada, tenta pegar a última do histórico
+  let msgUser = mensagemUsuario;
+  if (!msgUser && typeof historico !== 'undefined' && Array.isArray(historico)) {
+    msgUser = [...historico].reverse().find(h => h.role === 'usuario')?.texto || '';
+  }
+
+  const info = extrairInformacoesProjeto(conteudoTutor, msgUser);
+  const chaveProjeto = `${info.titulo}::${info.materia}`.toLowerCase().trim();
+  const agora = Date.now();
+
+  // Trava Anti-Duplicação 1: Mesmo projeto criado há menos de 15 segundos
+  if (ultimoProjetoCriado.chave === chaveProjeto && (agora - ultimoProjetoCriado.timestamp < 15000)) {
+    if (botaoElemento) {
+      botaoElemento.textContent = '✓ Projeto já adicionado ao Dashboard';
+      botaoElemento.disabled = true;
+      botaoElemento.dataset.processado = 'true';
+    }
+    return;
+  }
+
+  const idProjeto = 'proj_' + agora;
+  const novoProjeto = {
+    id: idProjeto,
+    titulo: info.titulo,
+    objetivo: info.objetivo,
+    materia: info.materia,
+    descricao: info.descricao,
+    meta: info.meta,
+    prazo: info.prazo,
     status: 'em_andamento',
-    progresso: 25,
-    tarefas: tarefas,
-    etapas: tarefas,
+    progresso: Math.round((info.tarefas.filter(t => t.concluida).length / info.tarefas.length) * 100) || 20,
+    tarefas: info.tarefas,
+    etapas: info.tarefas,
     criado_em: new Date().toISOString()
   };
 
   try {
     const storageKey = userId ? `vestibular_projetos_${userId}` : 'vestibular_projetos_guest';
-    const projetosAtuais = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    const projetosAtuais = JSON.parse(localStorage.getItem(storageKey) || localStorage.getItem('vestibular_projetos_guest') || '[]');
+
+    // Trava Anti-Duplicação 2: Verifica se já existe um projeto idêntico salvo recentemente
+    const indexExistente = projetosAtuais.findIndex(p => {
+      const pChave = `${p.titulo || p.objetivo || ''}::${p.materia || ''}`.toLowerCase().trim();
+      return pChave === chaveProjeto;
+    });
+
+    if (indexExistente !== -1) {
+      const existente = projetosAtuais[indexExistente];
+      const diffMs = agora - (new Date(existente.criado_em || 0).getTime() || 0);
+      if (diffMs < 300000) { // 5 minutos
+        ultimoProjetoCriado = { chave: chaveProjeto, timestamp: agora, id: existente.id };
+        if (botaoElemento) {
+          botaoElemento.textContent = '✓ Projeto já salvo no Dashboard';
+          botaoElemento.disabled = true;
+          botaoElemento.dataset.processado = 'true';
+        }
+        return;
+      }
+    }
+
+    // Salva com desduplicação
     projetosAtuais.unshift(novoProjeto);
-    localStorage.setItem(storageKey, JSON.stringify(projetosAtuais));
+    const projetosDeduplicados = deduplicarProjetosLocais(projetosAtuais);
+
+    localStorage.setItem(storageKey, JSON.stringify(projetosDeduplicados));
     if (userId) {
-      localStorage.setItem('vestibular_projetos_guest', JSON.stringify(projetosAtuais));
+      localStorage.setItem('vestibular_projetos_guest', JSON.stringify(projetosDeduplicados));
+    }
+
+    ultimoProjetoCriado = { chave: chaveProjeto, timestamp: agora, id: idProjeto };
+
+    if (botaoElemento) {
+      botaoElemento.textContent = '✓ Projeto no Dashboard!';
+      botaoElemento.disabled = true;
+      botaoElemento.dataset.processado = 'true';
     }
 
     // Feedback visual direto no chat
@@ -665,7 +916,7 @@ function integrarChatParaProjeto(conteudoTutor) {
     row.innerHTML = `
       <div class="msg-bubble msg-tutor" style="border: 1px solid #3b82f6; box-shadow: 0 4px 20px rgba(59,130,246,0.25);">
         <div style="font-weight:700; color:#38bdf8; margin-bottom:6px;">🎯 Projeto de Estudos Criado!</div>
-        <p style="margin-bottom:8px; font-size:0.9rem;"><strong>${novoProjeto.objetivo}</strong> foi adicionado ao seu painel com 4 tarefas e prazo para ${prazoData}.</p>
+        <p style="margin-bottom:8px; font-size:0.9rem;"><strong>${novoProjeto.titulo}</strong> (${novoProjeto.materia}) foi adicionado ao seu painel com ${novoProjeto.tarefas.length} tarefas e prazo para ${info.prazoData}.</p>
         <a class="btn" href="./dashboard.html?projeto=${novoProjeto.id}" style="background:var(--gradient-primary); color:#fff; text-decoration:none; font-size:0.85rem; padding:8px 16px; border-radius:var(--radius-full); display:inline-flex; align-items:center; gap:6px;">
           📊 Ver no Dashboard
         </a>
@@ -758,7 +1009,14 @@ async function enviarMensagem(mensagem) {
 
   const msgLower = (mensagem || '').toLowerCase();
   const solicitouFlashcards = /\b(flashcards?|cards?)\b/i.test(msgLower) && /\b(cri[ae]|ger[ae]|fa[çz]|mont[ae]|elabor[ae]|10|5|quantos)\b/i.test(msgLower);
-  const solicitouProjeto = /\b(projeto|plano|cronograma)\b/i.test(msgLower) && /\b(cri[ae]|ger[ae]|fa[çz]|mont[ae]|elabor[ae]|organiz[ae])\b/i.test(msgLower);
+  // Regex expandido: detecta "quero aprender X em Y dias", "crie um plano para Z", "me ajude a estudar W", etc.
+  const solicitouProjeto = (
+    /\b(projeto|plano|cronograma|roteiro|guia)\b/i.test(msgLower) &&
+    /\b(cri[ae]|ger[ae]|fa[çz]|mont[ae]|elabor[ae]|organiz[ae]|precis[ao])\b/i.test(msgLower)
+  ) || (
+    /\b(quero|preciso|me ajud[ae]|vou)\b/i.test(msgLower) &&
+    /\b(aprender|estudar|dominar|entender|focar)\b/i.test(msgLower)
+  );
 
   try {
     const { data, error } = await supabase.functions.invoke('chat-ia', {
@@ -778,7 +1036,7 @@ async function enviarMensagem(mensagem) {
         integrarChatParaFlashcards(data.resposta);
       }
       if (solicitouProjeto) {
-        integrarChatParaProjeto(data.resposta);
+        integrarChatParaProjeto(data.resposta, mensagem);
       }
     } else if (error) {
       console.warn('[Chat IA] Edge Function retornou erro, usando tutor educacional:', error);
@@ -789,7 +1047,7 @@ async function enviarMensagem(mensagem) {
         integrarChatParaFlashcards(respostaFallback);
       }
       if (solicitouProjeto) {
-        integrarChatParaProjeto(respostaFallback);
+        integrarChatParaProjeto(respostaFallback, mensagem);
       }
     } else {
       renderErro('Não recebi uma resposta válida do tutor. Tente novamente.');
@@ -808,7 +1066,7 @@ async function enviarMensagem(mensagem) {
       integrarChatParaFlashcards(respostaFallback);
     }
     if (solicitouProjeto) {
-      integrarChatParaProjeto(respostaFallback);
+      integrarChatParaProjeto(respostaFallback, mensagem);
     }
   }
 }
