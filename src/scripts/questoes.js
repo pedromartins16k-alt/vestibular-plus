@@ -275,14 +275,76 @@ async function iniciar() {
           let melhorAula = null;
           let melhorScore = 0;
 
-          // Dicionário temático histórico/educacional para associar eventos a aulas conhecidas
+          // Dicionário temático curricular completo com aliases específicos por matéria
           const sinonimosTematicos = [
+            // --- REDAÇÃO ---
             {
-              termos: ['1932', 'constitucionalista', 'revolucao de 32', 'vargas', 'getulio', 'provisorio', 'estado novo'],
+              termos: [
+                'desenvolvimento 2 a 3 paragrafos', 'desenvolvimento', 'paragrafo', 'paragrafos',
+                'tese', 'introducao', 'tese esta explicita na introducao', 'tese e introducao',
+                'conclusao', 'estrutura da redacao', 'competencias do enem', 'competencia 1',
+                'planejamento antes de escrever', 'introducao modelo', 'desenvolvimento 1',
+                'desenvolvimento 2', 'conclusao modelo', 'nota 900', 'nota 1000'
+              ],
+              aulaKeyword: 'estrutura'
+            },
+            {
+              termos: [
+                'contra-argumento + refutacao', 'contra argumento + refutacao', 'contra argumento',
+                'contra-argumento', 'refutacao', 'contraponto', 'argumento 1', 'argumento 2',
+                'construcao de argumentos', 'argumentacao', 'tipos de argumentacao',
+                'ponto de vista', 'defesa da tese'
+              ],
+              aulaKeyword: 'argumentacao'
+            },
+            {
+              termos: [
+                'repertorio (ex.: dado estatistico)', 'repertorio (ex.: citacao de autor)',
+                'dado estatistico', 'dados estatisticos', 'citacao de autor', 'citacao',
+                'repertorio produtivo', 'repertorio sociocultural', 'repertorio', 'referencias',
+                'exemplos e contextualizacao', 'relacao entre argumento e repertorio',
+                'conhecimento sociocultural', 'citações e referências'
+              ],
+              aulaKeyword: 'repertorio'
+            },
+            {
+              termos: [
+                'proposta de intervencao', 'crie uma proposta de intervencao', 'intervencao',
+                'agente da intervencao', 'agente', 'acao da intervencao', 'acao',
+                'meio modo', 'meio', 'finalidade', 'detalhamento da proposta', 'detalhamento',
+                'cinco elementos'
+              ],
+              aulaKeyword: 'intervencao'
+            },
+            {
+              termos: [
+                'coesao e coerencia', 'coesao', 'coerencia', 'conectivos', 'progressao textual',
+                'articuladores', 'operadores argumentativos'
+              ],
+              aulaKeyword: 'coesao'
+            },
+            {
+              termos: [
+                'erros mais comuns', 'erros que reduzem a nota', 'desvios gramaticais',
+                'fuga ao tema', 'tangenciamento', 'o que derruba sua nota'
+              ],
+              aulaKeyword: 'erros'
+            },
+            {
+              termos: [
+                'generos textuais na redacao', 'alem da dissertacao', 'dissertativo argumentativo',
+                'tipos textuais'
+              ],
+              aulaKeyword: 'generos textuais'
+            },
+
+            // --- HISTÓRIA ---
+            {
+              termos: ['1932', 'constitucionalista', 'revolucao de 32', 'revolucao de 1932', 'revolucao constitucionalista', 'vargas', 'getulio', 'provisorio', 'estado novo'],
               aulaKeyword: 'vargas'
             },
             {
-              termos: ['ditadura', 'ai 5', 'militares', '1964', 'redemocratizacao'],
+              termos: ['ditadura', 'ai 5', 'militares', '1964', 'redemocratizacao', 'golpe de 64'],
               aulaKeyword: 'ditadura'
             },
             {
@@ -290,16 +352,130 @@ async function iniciar() {
               aulaKeyword: 'guerra fria'
             },
             {
-              termos: ['newton', 'inercia', 'dinamica', 'leis de newton'],
+              termos: ['brasil colonia', 'capitanias', 'ciclo do acucar', 'ciclo do ouro', 'escravidao colonial'],
+              aulaKeyword: 'brasil colonia'
+            },
+            {
+              termos: ['revolucao industrial', 'maquina a vapor', 'proletariado', 'ludismo', 'cartismo'],
+              aulaKeyword: 'revolucao industrial'
+            },
+            {
+              termos: ['revolucao francesa', 'queda da bastilha', 'jacobinos', 'girondinos', 'antigo regime'],
+              aulaKeyword: 'revolucao francesa'
+            },
+
+            // --- MATEMÁTICA ---
+            {
+              termos: ['funcao', 'funcoes', 'funcao afim', 'funcao quadratica', 'grafico de funcao', 'dominio e imagem'],
+              aulaKeyword: 'funcoes'
+            },
+            {
+              termos: ['probabilidade', 'chance', 'espaco amostral', 'eventos independentes'],
+              aulaKeyword: 'probabilidade'
+            },
+            {
+              termos: ['geometria', 'geometria plana', 'area', 'perimetro', 'triangulo', 'circunferencia'],
+              aulaKeyword: 'geometria'
+            },
+            {
+              termos: ['estatistica', 'media', 'mediana', 'moda', 'desvio padrao', 'variancia'],
+              aulaKeyword: 'estatistica'
+            },
+            {
+              termos: ['logaritmo', 'logaritmos', 'log', 'propriedades dos logaritmos'],
+              aulaKeyword: 'logaritmo'
+            },
+
+            // --- BIOLOGIA ---
+            {
+              termos: ['genetica', 'mendel', 'leis de mendel', 'alelos', 'heranca', 'dna', 'rna'],
+              aulaKeyword: 'mendel'
+            },
+            {
+              termos: ['citologia', 'celula', 'mitocondria', 'membrana', 'ribossomos', 'organelas'],
+              aulaKeyword: 'citologia'
+            },
+            {
+              termos: ['ecologia', 'cadeia alimentar', 'teia alimentar', 'relacoes ecologicas', 'biomas', 'nicho'],
+              aulaKeyword: 'ecologia'
+            },
+            {
+              termos: ['evolucao', 'darwin', 'selecao natural', 'adaptacao', 'especiacao'],
+              aulaKeyword: 'evolucao'
+            },
+            {
+              termos: ['fisiologia', 'sistema circulatorio', 'sistema digestorio', 'sistema nervoso', 'hormonios'],
+              aulaKeyword: 'fisiologia'
+            },
+
+            // --- FÍSICA ---
+            {
+              termos: ['newton', 'inercia', 'dinamica', 'leis de newton', 'forca peso', 'atrito'],
               aulaKeyword: 'newton'
             },
             {
-              termos: ['estequiometria', 'mol', 'massa molar', 'reacao quimica'],
+              termos: ['cinematica', 'velocidade', 'aceleracao', 'mruv', 'mru', 'queda livre'],
+              aulaKeyword: 'cinematica'
+            },
+            {
+              termos: ['eletricidade', 'corrente eletrica', 'tensao', 'resistencia', 'ohms', 'circuito'],
+              aulaKeyword: 'eletricidade'
+            },
+            {
+              termos: ['optica', 'reflexao', 'refracao', 'espelhos', 'lentes'],
+              aulaKeyword: 'optica'
+            },
+            {
+              termos: ['ondulatoria', 'frequencia', 'comprimento de onda', 'som', 'difracao'],
+              aulaKeyword: 'ondulatoria'
+            },
+
+            // --- QUÍMICA ---
+            {
+              termos: ['estequiometria', 'mol', 'massa molar', 'reacao quimica', 'rendimento', 'pureza'],
               aulaKeyword: 'estequiometria'
             },
             {
-              termos: ['citologia', 'celula', 'mitocondria', 'membrana'],
-              aulaKeyword: 'citologia'
+              termos: ['ligacoes quimicas', 'ligacao ionica', 'ligacao covalente', 'eletronegatividade'],
+              aulaKeyword: 'ligacoes'
+            },
+            {
+              termos: ['funcoes organicas', 'hidrocarbonetos', 'alcool', 'acido carboxilico', 'cetona'],
+              aulaKeyword: 'organicas'
+            },
+            {
+              termos: ['acidos', 'bases', 'ph', 'poh', 'neutralizacao'],
+              aulaKeyword: 'acidos'
+            },
+
+            // --- PORTUGUÊS ---
+            {
+              termos: ['interpretacao de texto', 'compreensao', 'inferencia', 'sentido do texto', 'pegadinha'],
+              aulaKeyword: 'interpretacao'
+            },
+            {
+              termos: ['figuras de linguagem', 'metafora', 'metonimia', 'antitese', 'paradoxo', 'ironia', 'eufemismo'],
+              aulaKeyword: 'figuras'
+            },
+            {
+              termos: ['funcoes da linguagem', 'emotiva', 'conativa', 'metalinguistica', 'referencial', 'fatica', 'poetica'],
+              aulaKeyword: 'funcoes da linguagem'
+            },
+            {
+              termos: ['variacao linguistica', 'preconceito linguistico', 'dialeto', 'giria', 'regionalismo'],
+              aulaKeyword: 'variacao'
+            },
+            {
+              termos: ['crase', 'regencia', 'concordancia', 'concordancia verbal', 'concordancia nominal'],
+              aulaKeyword: 'crase'
+            },
+            {
+              termos: ['literatura', 'movimentos literarios', 'modernismo', 'romantismo', 'realismo', 'barroco'],
+              aulaKeyword: 'literatura'
+            },
+            {
+              termos: ['gramatica', 'sintaxe', 'morfologia', 'analise sintatica', 'classes de palavras'],
+              aulaKeyword: 'gramatica'
             }
           ];
 
@@ -319,12 +495,16 @@ async function iniciar() {
               score += 5;
             }
 
-            // 3. Correspondência contextual via sinônimos temáticos comprovados
+            // 3. Correspondência contextual via sinônimos temáticos e aliases granulares
             for (const sin of sinonimosTematicos) {
-              const temTermoAssunto = sin.termos.some(t => assuntoNorm.includes(t));
-              const aulaBate = tituloNorm.includes(sin.aulaKeyword);
-              if (temTermoAssunto && aulaBate) {
-                score += 4;
+              if (tituloNorm.includes(sin.aulaKeyword)) {
+                for (const termo of sin.termos) {
+                  const termoNorm = normalizar(termo);
+                  if (assuntoNorm.includes(termoNorm)) {
+                    const peso = termoNorm.length >= 8 ? 6 : (termoNorm.length >= 5 ? 4 : 2);
+                    score += peso;
+                  }
+                }
               }
             }
 

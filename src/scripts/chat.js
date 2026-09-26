@@ -621,8 +621,179 @@ function integrarChatParaFlashcards(conteudoTutor) {
 
 
 // =========================================================
-// EXTRAÇÃO INTELIGENTE DE TEMA, MATÉRIA, PRAZO E TAREFAS
+// CLASSIFICAÇÃO ROBUSTA DE MATÉRIAS E EXTRAÇÃO DE PROJETOS
 // =========================================================
+function normalizarTextoMateria(txt) {
+  return (txt || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+// Configuração curricular oficial com termos explícitos e temas/tópicos
+const MATERIAS_CONFIG = [
+  {
+    nome: 'Redação',
+    termosExatos: [
+      'redacao', 'dissertacao', 'dissertativo', 'dissertativa', 'texto dissertativo',
+      'dissertacao-argumentativa', 'proposta de intervencao', 'competencias do enem',
+      'nota 1000', 'repertorio para redacao', 'repertorio sociocultural', 'repertorio'
+    ],
+    temas: [
+      'redacao', 'dissertacao', 'dissertativa', 'argumentacao', 'conectivos',
+      'proposta de intervencao', 'repertorio sociocultural', 'competencias do enem',
+      'competencia 1', 'competencia 2', 'competencia 3', 'competencia 4', 'competencia 5',
+      'paragrafo dissertativo', 'introducao de redacao', 'conclusao de redacao'
+    ]
+  },
+  {
+    nome: 'Matemática',
+    termosExatos: [
+      'matematica', 'funcao', 'funcoes', 'algebra', 'geometria', 'trigonometria',
+      'probabilidade', 'estatistica', 'logaritmo', 'logaritmos', 'equacao', 'equacoes'
+    ],
+    temas: [
+      'matematica', 'funcao', 'funcoes', 'funcao afim', 'funcao quadratica',
+      'funcao exponencial', 'funcao logaritmica', 'algebra', 'geometria plana',
+      'geometria espacial', 'geometria analitica', 'geometria', 'trigonometria',
+      'probabilidade', 'estatistica', 'logaritmo', 'logaritmos', 'equacao', 'equacoes',
+      'analise combinatoria', 'matriz', 'matrizes', 'determinantes', 'sistemas lineares',
+      'progressao aritmetica', 'progressao geometrica', 'pa e pg', 'porcentagem', 'regra de tres'
+    ]
+  },
+  {
+    nome: 'Biologia',
+    termosExatos: [
+      'biologia', 'celula', 'celulas', 'genetica', 'ecologia', 'evolucao',
+      'mitose', 'meiose', 'fisiologia'
+    ],
+    temas: [
+      'biologia', 'celula', 'celulas', 'citologia', 'genetica', 'dna', 'rna',
+      'ecologia', 'biomas', 'cadeia alimentar', 'evolucao', 'darwinismo', 'lamarckismo',
+      'mitose', 'meiose', 'divisao celular', 'fisiologia', 'fisiologia humana',
+      'botanica', 'zoologia', 'reino vegetal', 'reino animal', 'virus', 'bacterias',
+      'bioquimica', 'fotossintese', 'respiracao celular', 'sistema imunologico', 'imunologia', 'embriologia'
+    ]
+  },
+  {
+    nome: 'História',
+    termosExatos: [
+      'historia', 'brasil colonia', 'era vargas', 'vargas', 'ditadura',
+      'revolucao', 'imperio', 'republica'
+    ],
+    temas: [
+      'historia', 'historia do brasil', 'historia geral', 'vargas', 'era vargas',
+      'ditadura', 'ditadura militar', 'revolucao', 'revolucao francesa', 'revolucao industrial',
+      'brasil colonia', 'brasil imperio', 'brasil republica', 'imperio', 'republica',
+      'guerra fria', 'primeira guerra', 'segunda guerra', 'feudalismo', 'idade media',
+      'idade moderna', 'idade contemporanea', 'antiguidade', 'grecia antiga', 'roma antiga',
+      'independencia do brasil', 'iluminismo', 'renascimento'
+    ]
+  },
+  {
+    nome: 'Geografia',
+    termosExatos: [
+      'geografia', 'geopolitica', 'relevo', 'clima', 'urbanizacao', 'cartografia'
+    ],
+    temas: [
+      'geografia', 'geografia fisica', 'geografia humana', 'geopolitica', 'relevo',
+      'clima', 'climatologia', 'urbanizacao', 'cartografia', 'demografia', 'populacao',
+      'migracao', 'migracoes', 'globalizacao', 'biomas brasileiros', 'agropecuaria',
+      'meio ambiente', 'hidrografia', 'fontes de energia', 'industrializacao'
+    ]
+  },
+  {
+    nome: 'Física',
+    termosExatos: [
+      'fisica', 'mecanica', 'cinematica', 'termodinamica', 'optica',
+      'eletricidade', 'eletromagnetismo', 'ondulatoria', 'newton'
+    ],
+    temas: [
+      'fisica', 'mecanica', 'cinematica', 'dinamica', 'leis de newton', 'newton',
+      'energia', 'trabalho e energia', 'termodinamica', 'calorimetria', 'optica',
+      'optica geometrica', 'eletricidade', 'eletrostatica', 'eletrodinamica',
+      'circuitos eletricos', 'eletromagnetismo', 'ondulatoria', 'ondas', 'hidrostatica',
+      'gravitacao universal', 'gravitacao'
+    ]
+  },
+  {
+    nome: 'Química',
+    termosExatos: [
+      'quimica', 'estequiometria', 'termoquimica', 'eletroquimica',
+      'tabela periodica', 'atomo', 'ligacoes quimicas'
+    ],
+    temas: [
+      'quimica', 'quimica organica', 'quimica inorganica', 'fisico-quimica',
+      'estequiometria', 'calculo estequiometrico', 'termoquimica', 'solucoes',
+      'concentracao de solucoes', 'eletroquimica', 'pilhas e baterias', 'tabela periodica',
+      'reacoes quimicas', 'atomo', 'estrutura atomica', 'modelos atomicos',
+      'ligacoes quimicas', 'ligacoes', 'equilibrio quimico', 'cinetica quimica',
+      'acidos e bases', 'funcoes organicas'
+    ]
+  },
+  {
+    nome: 'Português',
+    termosExatos: [
+      'portugues', 'gramatica', 'sintaxe', 'morfologia', 'literatura', 'figuras de linguagem'
+    ],
+    temas: [
+      'portugues', 'lingua portuguesa', 'gramatica', 'sintaxe', 'analise sintatica',
+      'morfologia', 'classes de palavras', 'concordancia', 'concordancia verbal',
+      'concordancia nominal', 'regencia', 'regencia verbal', 'crase', 'pontuacao',
+      'interpretacao de texto', 'compreensao de texto', 'generos textuais',
+      'figuras de linguagem', 'literatura', 'quinhentismo', 'barroco', 'arcadismo',
+      'romantismo', 'realismo', 'naturalismo', 'parnasianismo', 'simbolismo',
+      'modernismo', 'vanguardas europeias'
+    ]
+  }
+];
+
+function classificarMateriasTexto(texto) {
+  if (!texto) return [];
+  const norm = normalizarTextoMateria(texto);
+  const resultados = [];
+
+  for (const m of MATERIAS_CONFIG) {
+    let score = 0;
+    let matchTermo = '';
+    let isExato = false;
+
+    // 1. Termos exatos da matéria
+    for (const termo of m.termosExatos) {
+      const termoNorm = normalizarTextoMateria(termo);
+      const regex = new RegExp('(\\b|[^a-z0-9])' + termoNorm.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\b|[^a-z0-9]|$)', 'i');
+      if (regex.test(norm)) {
+        score += 10;
+        matchTermo = termo;
+        isExato = true;
+        break;
+      }
+    }
+
+    // 2. Tópicos / temas específicos
+    if (!isExato) {
+      for (const tema of m.temas) {
+        const temaNorm = normalizarTextoMateria(tema);
+        const regex = new RegExp('(\\b|[^a-z0-9])' + temaNorm.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '(\\b|[^a-z0-9]|$)', 'i');
+        if (regex.test(norm)) {
+          score += 4;
+          if (!matchTermo) matchTermo = tema;
+          break;
+        }
+      }
+    }
+
+    if (score > 0) {
+      resultados.push({ nome: m.nome, score, isExato, matchTermo });
+    }
+  }
+
+  // Ordena por score descendente (maior pontuação primeiro)
+  resultados.sort((a, b) => b.score - a.score);
+  return resultados;
+}
+
 function extrairInformacoesProjeto(conteudoTutor, mensagemUsuario) {
   const msgUser = (mensagemUsuario || '').trim();
   const msgTutor = (conteudoTutor || '').trim();
@@ -653,79 +824,65 @@ function extrairInformacoesProjeto(conteudoTutor, mensagemUsuario) {
   const prazoFormatado = dataAlvo.toISOString().slice(0, 10);
   const prazoTexto = `${prazoFormatado} (${prazoDias} dias)`;
 
-  // 2. Extração de Matéria e Tópico
-  const materiasPadrao = [
-    {
-      nome: 'História',
-      regex: /\b(hist[oó]ria|brasil col[oô]nia|era vargas|ditadura|revolu[cç][aã]o|guerra fria|idade m[eé]dia|feudalismo|iluminismo|gr[eé]cia|roma antiga|rep[uú]blica|independ[eê]ncia|antiguidade)\b/i
-    },
-    {
-      nome: 'Geografia',
-      regex: /\b(geografia|geopol[ií]tica|relevo|clima|urbaniza[cç][aã]o|vegeta[cç][aã]o|cartografia|demografia|migra[cç][aã]o|globaliza[cç][aã]o|biomas?)\b/i
-    },
-    {
-      nome: 'Biologia',
-      regex: /\b(biologia|ecologia|citologia|gen[eé]tica|dna|c[eé]lula|fotoss[ií]ntese|evolu[cç][aã]o|fisiologia|bot[aâ]nica|zoologia|v[ií]rus|bact[eé]ria|bioqu[ií]mica)\b/i
-    },
-    {
-      nome: 'Física',
-      regex: /\b(f[ií]sica|mec[aâ]nica|cinem[aá]tica|termodin[aâ]mica|[oó]ptica|eletricidade|eletromagnetismo|ondulat[oó]ria|newton|din[aâ]mica|energia|gravita[cç][aã]o)\b/i
-    },
-    {
-      nome: 'Química',
-      regex: /\b(qu[ií]mica|estequiometria|termoqu[ií]mica|solu[cç][oõ]es|org[aâ]nica|inorg[aâ]nica|eletroqu[ií]mica|tabela peri[oó]dica|rea[cç][oõ]es|[aá]tomo|liga[cç][oõ]es)\b/i
-    },
-    {
-      nome: 'Matemática',
-      regex: /\b(matem[aá]tica|fun[cç][aã]o|fun[cç][oõ]es|geometria|trigonometria|probabilidade|estat[ií]stica|logaritmo|[aá]lgebra|porcentagem|progress[aã]o|matriz|equa[cç][aã]o)\b/i
-    },
-    {
-      nome: 'Português',
-      regex: /\b(portugu[eê]s|gram[aá]tica|sintaxe|literatura|modernismo|romantismo|realismo|figuras de linguagem|concord[aâ]ncia|pontua[cç][aã]o|morfologia)\b/i
-    },
-    {
-      nome: 'Redação',
-      regex: /\b(reda[cç][aã]o|disserta[cç][aã]o|proposta de interven[cç][aã]o|nota 1000|conectivos|argumenta[cç][aã]o|repert[oó]rio)\b/i
-    },
-    {
-      nome: 'Filosofia',
-      regex: /\b(filosofia|[eé]tica|moral|s[oó]crates|plat[aã]o|arist[oó]teles|kant|nietzsche|foucault|iluministas?)\b/i
-    },
-    {
-      nome: 'Sociologia',
-      regex: /\b(sociologia|cidadania|desigualdade|marx|durkheim|weber|movimentos sociais)\b/i
+  // 2. Classificação Robusta de Matéria com Prioridade Absoluta para o Usuário
+  const matsUsuario = classificarMateriasTexto(msgUser);
+  let materiaDetectada = '';
+  let conflitoMaterias = false;
+
+  if (matsUsuario.length > 0) {
+    const exatosUsuario = matsUsuario.filter(m => m.isExato);
+    if (exatosUsuario.length > 1) {
+      // Conflito explícito: o usuário pediu múltiplas matérias (ex: "redação e biologia")
+      conflitoMaterias = true;
+      materiaDetectada = exatosUsuario.map(m => m.nome).join(' e ');
+    } else if (exatosUsuario.length === 1) {
+      materiaDetectada = exatosUsuario[0].nome;
+    } else {
+      materiaDetectada = matsUsuario[0].nome;
     }
-  ];
-
-  let materiaDetectada = (materiaAtiva?.nome && materiaAtiva.nome !== 'Todas as matérias') ? materiaAtiva.nome : '';
-
-  if (!materiaDetectada) {
-    for (const m of materiasPadrao) {
-      if (m.regex.test(msgUser) || m.regex.test(msgTutor)) {
-        materiaDetectada = m.nome;
-        break;
-      }
+  } else if (materiaAtiva?.nome && materiaAtiva.nome !== 'Todas as matérias') {
+    // Se o usuário não mencionou matéria explícita, mas estava com um chip de matéria ativo
+    materiaDetectada = materiaAtiva.nome;
+  } else {
+    // Apenas se o usuário não indicou matéria, inspeciona o conteúdo do tutor com validação
+    const matsTutor = classificarMateriasTexto(msgTutor);
+    if (matsTutor.length > 0) {
+      materiaDetectada = matsTutor[0].nome;
     }
   }
 
-  // 3. Extração do TEMA específico (ex: "História do Brasil", "Função Afim", "Revolução Francesa")
+  // 3. Extração do TEMA específico (ex: "Redação", "Função Afim", "Genética")
   let temaEspecifico = '';
 
   const patterns = [
-    /(?:projeto|plano|cronograma|estudo[s]?)\s+(?:de\s+estudos?\s+)?(?:de|para|sobre)\s+([a-záàâãéèêíïóôõöúçñ0-9\s-]{3,45})/i,
-    /(?:aprender|estudar|dominar|revisar|focar em|compreender)\s+([a-záàâãéèêíïóôõöúçñ0-9\s-]{3,45})/i,
-    /(?:como passar em|como ir bem em|guia de)\s+([a-záàâãéèêíïóôõöúçñ0-9\s-]{3,45})/i
+    /(?:projeto|plano|cronograma|estudo[s]?)\s+(?:de\s+estudos?\s+)?(?:de|para|sobre)\s+([a-z\u00C0-\u00FF0-9\s-]{3,45})/i,
+    /(?:aprender|estudar|dominar|revisar|focar em|compreender|melhorar)\s+(?:minha\s+|meu\s+)?([a-z\u00C0-\u00FF0-9\s-]{3,45})/i,
+    /(?:como passar em|como ir bem em|guia de)\s+([a-z\u00C0-\u00FF0-9\s-]{3,45})/i
   ];
 
   for (const pat of patterns) {
     const match = msgUser.match(pat);
     if (match && match[1]) {
       let cand = match[1].trim();
-      cand = cand.replace(/\b(em\s+\d+\s*(?:dias?|semanas?|m[eê]s(?:es)?)|para o enem|pro enem|para vestibulares?|r[aá]pido|do zero|passo a passo|por favor)\b/gi, '').trim();
+      cand = cand.replace(/\b(em\s+\d+\s*(?:dias?|semanas?|m[eê]s(?:es)?)|para o enem|pro enem|do enem|no enem|para vestibulares?|r[aá]pido|do zero|passo a passo|por favor)\b/gi, '').trim();
+      cand = cand.replace(/^(estudar|aprender|revisar|dominar|melhorar|focar em|compreender)\s+/i, '').trim();
       cand = cand.replace(/[.,:;!?]+$/, '').trim();
-      if (cand.length >= 3 && !/^(o|a|os|as|um|uma|meu|minha|esse|esta|isso|tudo)$/i.test(cand)) {
+      // Não considera palavras genéricas ou conectivos como tema
+      if (cand.length >= 3 && !/^(o|a|os|as|um|uma|meu|minha|esse|esta|isso|tudo|estudo|estudos)$/i.test(cand)) {
         temaEspecifico = cand;
         break;
+      }
+    }
+  }
+
+  // Se o tema extraído ficou vazio ou virou algo genérico, aproveita o termo identificado da matéria
+  if (!temaEspecifico && matsUsuario.length > 0) {
+    if (matsUsuario.length === 1 && matsUsuario[0].isExato) {
+      temaEspecifico = matsUsuario[0].nome;
+    } else {
+      const melhorMatch = matsUsuario[0].matchTermo;
+      if (melhorMatch && melhorMatch.length >= 3 && melhorMatch !== 'enem' && melhorMatch !== 'estudo') {
+        temaEspecifico = melhorMatch.charAt(0).toUpperCase() + melhorMatch.slice(1);
       }
     }
   }
@@ -733,8 +890,21 @@ function extrairInformacoesProjeto(conteudoTutor, mensagemUsuario) {
   if (!temaEspecifico && msgTutor) {
     const matchTitulo = msgTutor.match(/^(?:#+\s*|\*\*)([^\n*#]+)(?:\*\*|$)/m);
     if (matchTitulo && matchTitulo[1] && matchTitulo[1].length < 50) {
-      temaEspecifico = matchTitulo[1].trim();
+      const candTitulo = matchTitulo[1].trim();
+      if (!/^(ol[aá]|bom dia|boa tarde|boa noite|tutor)/i.test(candTitulo)) {
+        temaEspecifico = candTitulo;
+      }
     }
+  }
+
+  // 4. Validação Cruzada: A matéria corresponde à intenção explícita do usuário?
+  if (matsUsuario.length === 1) {
+    materiaDetectada = matsUsuario[0].nome;
+  }
+
+  // Se o tema coincidir com a matéria detectada (mesmo sem acento), utiliza o nome oficial
+  if (materiaDetectada && normalizarTextoMateria(temaEspecifico) === normalizarTextoMateria(materiaDetectada)) {
+    temaEspecifico = materiaDetectada;
   }
 
   if (temaEspecifico) {
@@ -753,7 +923,7 @@ function extrairInformacoesProjeto(conteudoTutor, mensagemUsuario) {
   const objetivoProjeto = `Plano focado em ${temaEspecifico} para Vestibulares`;
   const metaDesc = `Cronograma de ${prazoDias} dias para dominar os conteúdos essenciais de ${temaEspecifico}, com foco em teoria, fixação de exercícios e resolução de questões reais.`;
 
-  // 4. Extração ou Construção de Tarefas Dinâmicas
+  // 5. Extração ou Construção de Tarefas Dinâmicas
   let tarefas = [];
 
   const linhasLista = msgTutor.match(/(?:^|\n)\s*(?:\d+[\.\)]|[-*•])\s+([^\n]+)/g);
@@ -783,6 +953,7 @@ function extrairInformacoesProjeto(conteudoTutor, mensagemUsuario) {
 
   return {
     materia: materiaDetectada,
+    conflito: conflitoMaterias,
     tema: temaEspecifico,
     titulo: tituloProjeto,
     objetivo: objetivoProjeto,
@@ -1011,6 +1182,18 @@ async function enviarMensagem(mensagem) {
     /\b(aprender|estudar|dominar|entender|focar)\b/i.test(msgLower)
   );
 
+  // Detecta matéria da mensagem do usuário com alta prioridade
+  const matsDetectadas = classificarMateriasTexto(mensagem);
+  let materiaEnvio = (materiaAtiva.nome && materiaAtiva.nome !== 'Todas as matérias') ? materiaAtiva.nome : undefined;
+
+  if (matsDetectadas.length === 1 && matsDetectadas[0].isExato) {
+    materiaEnvio = matsDetectadas[0].nome;
+    // Se o filtro atual não estava na matéria específica, seleciona a matéria detectada
+    if (!materiaAtiva.nome || materiaAtiva.nome === 'Todas as matérias') {
+      selecionarMateriaPorNome(matsDetectadas[0].nome);
+    }
+  }
+
   try {
     let data = null;
     let error = null;
@@ -1024,7 +1207,7 @@ async function enviarMensagem(mensagem) {
         body: {
           mensagem,
           historico,
-          materia: materiaAtiva.nome || undefined,
+          materia: materiaEnvio || undefined,
         },
       });
 
