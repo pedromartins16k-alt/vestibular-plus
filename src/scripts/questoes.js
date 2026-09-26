@@ -193,6 +193,18 @@ async function iniciar() {
   favoritosSet = favoritos || new Set();
 
   renderFiltros(materiasCache);
+
+  // Lê o parâmetro ?materia= da URL para pré-selecionar a matéria quando
+  // o usuário navega a partir de "Progresso por matéria" no dashboard.
+  const paramMateria = new URLSearchParams(window.location.search).get('materia');
+  if (paramMateria && paramMateria !== 'todas') {
+    const chipAlvo = filtroContainer.querySelector(`.chip[data-materia="${paramMateria}"]`);
+    if (chipAlvo) {
+      chipAlvo.click();
+      return; // renderTemas() já cuida da renderização
+    }
+  }
+
   renderQuestaoAtual();
 }
 

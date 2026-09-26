@@ -486,6 +486,28 @@ function atualizarProximoPasso(projetos, sessoes) {
 }
 
 /**
+ * Remove projetos duplicados da lista, mantendo o de maior progresso.
+ * Critério de duplicidade: mesmo titulo + materia (case-insensitive).
+ */
+function deduplicarProjetos(lista) {
+  if (!Array.isArray(lista)) return [];
+  const mapa = new Map();
+  for (const p of lista) {
+    if (!p) continue;
+    const chave = `${(p.titulo || p.objetivo || '').trim().toLowerCase()}::${(p.materia || 'geral').trim().toLowerCase()}`;
+    if (!mapa.has(chave)) {
+      mapa.set(chave, p);
+    } else {
+      const anterior = mapa.get(chave);
+      if ((p.progresso || 0) > (anterior.progresso || 0)) {
+        mapa.set(chave, p);
+      }
+    }
+  }
+  return Array.from(mapa.values());
+}
+
+/**
  * Renderiza os projetos e cronogramas de estudo salvos localmente
  */
 function carregarProjetosEstudo(userId) {
@@ -493,11 +515,22 @@ function carregarProjetosEstudo(userId) {
   if (!container) return [];
 
   try {
-    const rawProjetos = localStorage.getItem(`vestibular_projetos_${userId}`) || localStorage.getItem('vestibular_projetos_guest');
+    const storageKey = userId ? `vestibular_projetos_${userId}` : 'vestibular_projetos_guest';
+    const rawProjetos = localStorage.getItem(storageKey) || localStorage.getItem('vestibular_projetos_guest');
     if (!rawProjetos) return [];
 
-    const projetos = JSON.parse(rawProjetos);
-    if (!Array.isArray(projetos) || !projetos.length) return [];
+    const projetosRaw = JSON.parse(rawProjetos);
+    if (!Array.isArray(projetosRaw) || !projetosRaw.length) return [];
+
+    // Deduplicação automática: limpa entradas repetidas já salvas no localStorage
+    const projetos = deduplicarProjetos(projetosRaw);
+    if (projetos.length < projetosRaw.length) {
+      // Persiste a lista limpa de volta
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(projetos));
+        localStorage.setItem('vestibular_projetos_guest', JSON.stringify(projetos));
+      } catch (_) {}
+    }
 
     container.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:12px;">
@@ -529,7 +562,7 @@ function carregarProjetosEstudo(userId) {
               <span class="see-all" style="font-size:0.82rem; font-weight:700;">Abrir Projeto →</span>
             </div>
           </div>
-        `}).join('')}
+        `;}).join('')}
       </div>
     `;
 
@@ -697,7 +730,7 @@ async function carregarMateriasEProgresso(promessaSessoes) {
                 </div>
                 <span class="materia-tempo">${tempoFormatado}</span>
               </div>
-              <a href="./questoes.html" class="see-all" style="font-size:0.75rem;" title="Praticar ${m.nome}">Praticar →</a>
+              <a href="./questoes.html?materia=${m.id}" class="see-all" style="font-size:0.75rem;" title="Praticar ${m.nome}">Praticar →</a>
             </div>
           `;
         }).join('');
