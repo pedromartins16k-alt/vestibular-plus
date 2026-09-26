@@ -149,7 +149,14 @@ function abrirModalProjeto(projetoId) {
   if (elMateria) elMateria.textContent = proj.materia || 'Geral';
   if (elPrazo) elPrazo.textContent = `📅 Prazo: ${proj.prazo || '30 dias'}`;
   if (elDesc) elDesc.textContent = proj.descricao || proj.meta || 'Plano de estudos intensivo para seu vestibular.';
-  if (elBtnPraticar) elBtnPraticar.href = './questoes.html';
+
+  // Botão global "Praticar Questões": leva a matéria do projeto como contexto
+  if (elBtnPraticar) {
+    const materiaParam = encodeURIComponent(proj.materia || '');
+    elBtnPraticar.href = materiaParam
+      ? `./questoes.html?materia=${materiaParam}`
+      : './questoes.html';
+  }
 
   const tarefasNorm = (proj.tarefas || proj.etapas || []).map(normalizarTarefa);
   const total = tarefasNorm.length;
@@ -173,12 +180,21 @@ function abrirModalProjeto(projetoId) {
     if (tarefasNorm.length === 0) {
       elTarefasLista.innerHTML = `<p style="font-size:0.86rem; color:var(--text-secondary);">Nenhuma atividade cadastrada para este projeto.</p>`;
     } else {
-      elTarefasLista.innerHTML = tarefasNorm.map((t, idx) => `
+      const materiaParam = encodeURIComponent(proj.materia || '');
+      elTarefasLista.innerHTML = tarefasNorm.map((t, idx) => {
+        const assuntoParam = encodeURIComponent(t.titulo || '');
+        const urlPraticar = materiaParam
+          ? `./questoes.html?materia=${materiaParam}&assunto=${assuntoParam}`
+          : `./questoes.html?assunto=${assuntoParam}`;
+        return `
         <div class="modal-tarefa-item ${t.concluida ? 'concluida' : ''}" data-task-idx="${idx}" title="Clique para alternar status">
           <span class="modal-tarefa-check">${t.concluida ? '✓' : ''}</span>
           <span class="modal-tarefa-texto">${t.titulo}</span>
+          <a class="modal-tarefa-praticar-btn" href="${urlPraticar}" title="Praticar questões desta atividade" onclick="event.stopPropagation()">
+            Praticar →
+          </a>
         </div>
-      `).join('');
+      `}).join('');
 
       // Adiciona interatividade para alternar o status das tarefas
       elTarefasLista.querySelectorAll('.modal-tarefa-item').forEach(item => {

@@ -194,14 +194,94 @@ async function iniciar() {
 
   renderFiltros(materiasCache);
 
-  // Lê o parâmetro ?materia= da URL para pré-selecionar a matéria quando
-  // o usuário navega a partir de "Progresso por matéria" no dashboard.
-  const paramMateria = new URLSearchParams(window.location.search).get('materia');
+  // ── Leitura de parâmetros de contexto de projeto ─────────────────────────
+  // Suportamos dois formatos:
+  //  • ?materia=<UUID>    — vindo de "Progresso por matéria" no dashboard (legado)
+  //  • ?materia=<nome>    — vindo do botão "Praticar" de projetos (ex: "História")
+  //  • ?assunto=<texto>   — título da tarefa do projeto (ex: "Governo Provisório")
+  // ─────────────────────────────────────────────────────────────────────────
+  const params = new URLSearchParams(window.location.search);
+  const paramMateria = params.get('materia');
+  const paramAssunto = params.get('assunto');
+
   if (paramMateria && paramMateria !== 'todas') {
-    const chipAlvo = filtroContainer.querySelector(`.chip[data-materia="${paramMateria}"]`);
+    // 1. Tenta match exato por UUID (comportamento legado — Progresso por matéria)
+    let chipAlvo = filtroContainer.querySelector(`.chip[data-materia="${paramMateria}"]`);
+
+    // 2. Se não achou por UUID, tenta match por nome (case-insensitive, sem acentos)
+    if (!chipAlvo) {
+      const normalizar = str => (str || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim();
+
+      const nomeAlvo = normalizar(paramMateria);
+      const materiaEncontrada = materiasCache.find(m => normalizar(m.nome) === nomeAlvo);
+      if (materiaEncontrada) {
+        chipAlvo = filtroContainer.querySelector(`.chip[data-materia="${materiaEncontrada.id}"]`);
+      }
+    }
+
     if (chipAlvo) {
+      // Ativa o filtro de matéria (seta materiaAtiva, mostra temas)
       chipAlvo.click();
-      return; // renderTemas() já cuida da renderização
+
+      // 3. Se veio ?assunto=, tenta selecionar a aula (tema) mais próxima
+      if (paramAssunto) {
+        // Pequeno delay para garantir que renderTemas() já terminou de inserir os .tema-card
+        setTimeout(() => {
+          const normalizar = str => (str || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim();
+
+          const assuntoNorm = normalizar(paramAssunto);
+          // Extrai palavras com 4+ caracteres como palavras-chave
+          const palavrasChave = assuntoNorm
+            .split(/\s+/)
+            .filter(p => p.length >= 4);
+
+          // Pontua cada aula pelo número de palavras-chave que seu título contém
+          let melhorAulaId = null;
+          let melhorPontuacao = 0;
+
+          const aulasDaMateria = aulasCache.filter(a => a.materia_id === materiaAtiva);
+
+          for (const aula of aulasDaMateria) {
+            const tituloNorm = normalizar(aula.titulo);
+            let pontos = 0;
+            for (const palavra of palavrasChave) {
+              if (tituloNorm.includes(palavra)) pontos++;
+            }
+            // Bonus se o assunto contém o título da aula (correspondência reversa)
+            if (assuntoNorm.includes(tituloNorm) && tituloNorm.length > 4) pontos += 2;
+            if (pontos > melhorPontuacao) {
+              melhorPontuacao = pontos;
+              melhorAulaId = aula.id;
+            }
+          }
+
+          if (melhorAulaId && melhorPontuacao > 0) {
+            // Clica no card do tema correspondente, se existir no DOM
+            const cardTema = container.querySelector(`.tema-card[data-tema="${melhorAulaId}"]`);
+            if (cardTema) {
+              cardTema.click();
+            } else {
+              // Seleciona diretamente via variável e renderiza
+              temaAtivo = melhorAulaId;
+              mostrandoTemas = false;
+              indiceAtual = 0;
+              renderQuestaoAtual();
+            }
+          }
+          // Se não encontrou aula específica: mantém a visão de temas da matéria
+          // → o estudante vê todas as questões da matéria (nunca mistura disciplinas)
+        }, 50);
+      }
+
+      return; // renderTemas() já cuida da renderização inicial
     }
   }
 

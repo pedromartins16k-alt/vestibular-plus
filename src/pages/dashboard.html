@@ -1441,6 +1441,32 @@
     border-top: 1px solid var(--border-color);
     margin-top: 6px;
   }
+
+  /* Botão contextual "Praticar →" de cada atividade */
+  .modal-tarefa-praticar-btn {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: 8px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-primary-400, #818cf8);
+    background: rgba(124, 58, 237, 0.08);
+    border: 1px solid rgba(124, 58, 237, 0.18);
+    text-decoration: none;
+    transition: background 0.18s, color 0.18s, border-color 0.18s;
+    white-space: nowrap;
+  }
+  .modal-tarefa-praticar-btn:hover {
+    background: var(--gradient-primary);
+    color: #fff;
+    border-color: transparent;
+  }
+  .modal-tarefa-item.concluida .modal-tarefa-praticar-btn {
+    opacity: 0.5;
+  }
 </style>
 </head>
 <body>
