@@ -666,7 +666,7 @@ function integrarChatParaProjeto(conteudoTutor) {
       <div class="msg-bubble msg-tutor" style="border: 1px solid #3b82f6; box-shadow: 0 4px 20px rgba(59,130,246,0.25);">
         <div style="font-weight:700; color:#38bdf8; margin-bottom:6px;">🎯 Projeto de Estudos Criado!</div>
         <p style="margin-bottom:8px; font-size:0.9rem;"><strong>${novoProjeto.objetivo}</strong> foi adicionado ao seu painel com 4 tarefas e prazo para ${prazoData}.</p>
-        <a class="btn" href="./dashboard.html" style="background:var(--gradient-primary); color:#fff; text-decoration:none; font-size:0.85rem; padding:8px 16px; border-radius:var(--radius-full); display:inline-flex; align-items:center; gap:6px;">
+        <a class="btn" href="./dashboard.html?projeto=${novoProjeto.id}" style="background:var(--gradient-primary); color:#fff; text-decoration:none; font-size:0.85rem; padding:8px 16px; border-radius:var(--radius-full); display:inline-flex; align-items:center; gap:6px;">
           📊 Ver no Dashboard
         </a>
       </div>

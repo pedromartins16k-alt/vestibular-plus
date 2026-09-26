@@ -28,6 +28,9 @@ async function iniciarDashboard() {
   // Inicializa data atual e mensagem motivacional contextual
   atualizarDataEMotivacao();
 
+  // Configura eventos de fechamento do modal de detalhes do projeto
+  configurarEventosModalProjeto();
+
   // Inicia Notificações (passando userId para evitar nova chamada a getSession)
   iniciarNotificacoes(userId);
 
@@ -46,6 +49,9 @@ async function iniciarDashboard() {
   // 4. PRIORIDADE MÉDIA: Carregar Projetos de Estudo do usuário e atualizar "Seu Próximo Passo"
   const projetosCarregados = carregarProjetosEstudo(userId);
   dadosProjetosCache = projetosCarregados || [];
+
+  // Se houver projeto na URL (ex: ao vir do Chat IA ou após F5), abre os detalhes
+  verificarProjetoNaUrl(dadosProjetosCache);
 
   // 5. PRIORIDADE MÉDIA: Progresso por matéria (usa dados de sessões quando prontos)
   const promessaMaterias = carregarMateriasEProgresso(promessaSessoes);
@@ -74,6 +80,189 @@ async function iniciarDashboard() {
 
   // Inicia sincronização Realtime e listener de visibilidade
   iniciarSincronizacaoRealtime(userId);
+}
+
+/**
+ * Normaliza qualquer tarefa (string ou objeto) para garantir estrutura previsível
+ */
+function normalizarTarefa(t) {
+  if (!t) return { titulo: 'Atividade de estudo', concluida: false };
+  if (typeof t === 'string') return { titulo: t, concluida: false };
+  if (typeof t === 'object') {
+    return {
+      titulo: t.titulo || t.nome || t.texto || t.descricao || 'Atividade de estudo',
+      concluida: Boolean(t.concluida)
+    };
+  }
+  return { titulo: String(t), concluida: false };
+}
+
+/**
+ * Salva a lista de projetos em ambas as chaves de localStorage
+ */
+function salvarProjetosLocalStorage(projetos) {
+  try {
+    const storageKey = currentUserId ? `vestibular_projetos_${currentUserId}` : 'vestibular_projetos_guest';
+    localStorage.setItem(storageKey, JSON.stringify(projetos));
+    localStorage.setItem('vestibular_projetos_guest', JSON.stringify(projetos));
+  } catch (err) {
+    console.warn('Erro ao salvar projetos no localStorage:', err);
+  }
+}
+
+/**
+ * Abre o modal de visualização e consulta das atividades de um projeto específico
+ */
+function abrirModalProjeto(projetoId) {
+  const modal = document.getElementById('modal-projeto-detalhes');
+  if (!modal) return;
+
+  const storageKey = currentUserId ? `vestibular_projetos_${currentUserId}` : 'vestibular_projetos_guest';
+  let projetos = [];
+  try {
+    projetos = JSON.parse(localStorage.getItem(storageKey) || localStorage.getItem('vestibular_projetos_guest') || '[]');
+  } catch (_) {
+    projetos = [];
+  }
+
+  const proj = projetos.find(p => p.id === projetoId) || projetos[0];
+  if (!proj) return;
+
+  // Atualiza a URL com o ID do projeto para permitir F5 sem perder o contexto
+  try {
+    const urlAtual = new URL(window.location.href);
+    urlAtual.searchParams.set('projeto', proj.id);
+    window.history.replaceState({}, '', urlAtual.toString());
+  } catch (_) {}
+
+  const elTitulo = document.getElementById('modal-proj-titulo');
+  const elMateria = document.getElementById('modal-proj-materia');
+  const elStatus = document.getElementById('modal-proj-status');
+  const elPrazo = document.getElementById('modal-proj-prazo');
+  const elDesc = document.getElementById('modal-proj-desc');
+  const elProgTexto = document.getElementById('modal-proj-prog-texto');
+  const elProgFill = document.getElementById('modal-proj-prog-fill');
+  const elTarefasLista = document.getElementById('modal-proj-tarefas-lista');
+  const elBtnPraticar = document.getElementById('modal-proj-btn-praticar');
+
+  if (elTitulo) elTitulo.textContent = proj.titulo || proj.objetivo || 'Plano de Estudos';
+  if (elMateria) elMateria.textContent = proj.materia || 'Geral';
+  if (elPrazo) elPrazo.textContent = `📅 Prazo: ${proj.prazo || '30 dias'}`;
+  if (elDesc) elDesc.textContent = proj.descricao || proj.meta || 'Plano de estudos intensivo para seu vestibular.';
+  if (elBtnPraticar) elBtnPraticar.href = './questoes.html';
+
+  const tarefasNorm = (proj.tarefas || proj.etapas || []).map(normalizarTarefa);
+  const total = tarefasNorm.length;
+  const concluidas = tarefasNorm.filter(t => t.concluida).length;
+  const percentual = total > 0 ? Math.round((concluidas / total) * 100) : (proj.progresso ?? 25);
+
+  if (elStatus) {
+    if (percentual === 100) {
+      elStatus.textContent = 'Concluído';
+      elStatus.className = 'modal-projeto-status concluido';
+    } else {
+      elStatus.textContent = 'Em andamento';
+      elStatus.className = 'modal-projeto-status';
+    }
+  }
+
+  if (elProgTexto) elProgTexto.textContent = `${percentual}% concluído (${concluidas}/${total} atividades)`;
+  if (elProgFill) elProgFill.style.width = `${percentual}%`;
+
+  if (elTarefasLista) {
+    if (tarefasNorm.length === 0) {
+      elTarefasLista.innerHTML = `<p style="font-size:0.86rem; color:var(--text-secondary);">Nenhuma atividade cadastrada para este projeto.</p>`;
+    } else {
+      elTarefasLista.innerHTML = tarefasNorm.map((t, idx) => `
+        <div class="modal-tarefa-item ${t.concluida ? 'concluida' : ''}" data-task-idx="${idx}" title="Clique para alternar status">
+          <span class="modal-tarefa-check">${t.concluida ? '✓' : ''}</span>
+          <span class="modal-tarefa-texto">${t.titulo}</span>
+        </div>
+      `).join('');
+
+      // Adiciona interatividade para alternar o status das tarefas
+      elTarefasLista.querySelectorAll('.modal-tarefa-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = parseInt(item.dataset.taskIdx, 10);
+          tarefasNorm[idx].concluida = !tarefasNorm[idx].concluida;
+
+          proj.tarefas = tarefasNorm;
+          proj.etapas = tarefasNorm;
+          const novasConcluidas = tarefasNorm.filter(t => t.concluida).length;
+          proj.progresso = Math.round((novasConcluidas / tarefasNorm.length) * 100);
+          proj.status = proj.progresso === 100 ? 'concluido' : 'em_andamento';
+
+          salvarProjetosLocalStorage(projetos);
+          dadosProjetosCache = projetos;
+
+          // Atualiza a visualização do modal
+          abrirModalProjeto(proj.id);
+
+          // Atualiza os cards da página sem recarregar
+          carregarProjetosEstudo(currentUserId);
+          atualizarProximoPasso(projetos, dadosSessoesCache);
+        });
+      });
+    }
+  }
+
+  modal.classList.add('open');
+}
+
+/**
+ * Fecha o modal de projeto e remove o parâmetro ?projeto da URL sem recarregar a página
+ */
+function fecharModalProjeto() {
+  const modal = document.getElementById('modal-projeto-detalhes');
+  if (modal) {
+    modal.classList.remove('open');
+  }
+  try {
+    const urlAtual = new URL(window.location.href);
+    urlAtual.searchParams.delete('projeto');
+    window.history.replaceState({}, '', urlAtual.pathname + (urlAtual.search ? urlAtual.search : ''));
+  } catch (_) {}
+}
+
+/**
+ * Configura os listeners dos botões de fechar, backdrop e tecla ESC
+ */
+function configurarEventosModalProjeto() {
+  const modal = document.getElementById('modal-projeto-detalhes');
+  const btnFechar = document.getElementById('modal-proj-fechar');
+  const btnVoltar = document.getElementById('modal-proj-btn-voltar');
+
+  btnFechar?.addEventListener('click', fecharModalProjeto);
+  btnVoltar?.addEventListener('click', fecharModalProjeto);
+
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) fecharModalProjeto();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.classList.contains('open')) {
+      fecharModalProjeto();
+    }
+  });
+}
+
+/**
+ * Abre o projeto automaticamente se houver parâmetro ?projeto na URL
+ */
+function verificarProjetoNaUrl(projetos) {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const projId = params.get('projeto');
+    if (projId && Array.isArray(projetos) && projetos.length > 0) {
+      const existe = projetos.find(p => p.id === projId);
+      if (existe) {
+        abrirModalProjeto(existe.id);
+      } else {
+        abrirModalProjeto(projetos[0].id);
+      }
+    }
+  } catch (_) {}
 }
 
 /**
@@ -203,11 +392,12 @@ function atualizarProximoPasso(projetos, sessoes) {
   const primeiroProjeto = Array.isArray(projetos) && projetos.length > 0 ? projetos[0] : null;
 
   if (primeiroProjeto) {
-    const tarefas = primeiroProjeto.tarefas || primeiroProjeto.etapas || [];
-    const proximaTarefa = tarefas.length > 0 ? tarefas[0] : (primeiroProjeto.meta || 'Revisar exercícios da matéria');
+    const tarefasNorm = (primeiroProjeto.tarefas || primeiroProjeto.etapas || []).map(normalizarTarefa);
+    const proximaPendente = tarefasNorm.find(t => !t.concluida) || tarefasNorm[0];
+    const proximaTarefaTexto = proximaPendente ? proximaPendente.titulo : (primeiroProjeto.meta || 'Revisar exercícios da matéria');
     const materia = primeiroProjeto.materia || 'Geral';
     const prazo = primeiroProjeto.prazo || 'Em andamento';
-    const progresso = primeiroProjeto.progresso || 25;
+    const progresso = primeiroProjeto.progresso ?? 25;
 
     container.innerHTML = `
       <div class="proximo-passo-card fade-up">
@@ -219,7 +409,7 @@ function atualizarProximoPasso(projetos, sessoes) {
               <span class="proximo-passo-materia-tag">${materia}</span>
             </div>
             <p class="proximo-passo-desc">
-              <strong>Próxima atividade:</strong> ${proximaTarefa}
+              <strong>Próxima atividade:</strong> ${proximaTarefaTexto}
             </p>
             <div class="proximo-passo-meta">
               <span>📅 Prazo: ${prazo}</span>
@@ -227,9 +417,9 @@ function atualizarProximoPasso(projetos, sessoes) {
             </div>
           </div>
           <div class="proximo-passo-actions">
-            <a href="./chat.html" class="btn btn-primary btn-proximo-passo">
-              Continuar com IA 🚀
-            </a>
+            <button type="button" class="btn btn-primary btn-proximo-passo btn-abrir-projeto-hero" data-projeto-id="${primeiroProjeto.id}">
+              Abrir Projeto 📋
+            </button>
             <a href="./questoes.html" class="btn btn-ghost btn-proximo-passo">
               Praticar Questões 📝
             </a>
@@ -237,6 +427,10 @@ function atualizarProximoPasso(projetos, sessoes) {
         </div>
       </div>
     `;
+
+    container.querySelector('.btn-abrir-projeto-hero')?.addEventListener('click', () => {
+      abrirModalProjeto(primeiroProjeto.id);
+    });
     return;
   }
 
@@ -307,18 +501,22 @@ function carregarProjetosEstudo(userId) {
 
     container.innerHTML = `
       <div style="display:flex; flex-direction:column; gap:12px;">
-        ${projetos.slice(0, 3).map((p) => {
-          const listaTarefas = p.tarefas || p.etapas || [];
-          const proximaTarefa = listaTarefas.length > 0 ? listaTarefas[0] : (p.meta || 'Revisar exercícios');
-          const progresso = p.progresso || 25;
+        ${projetos.slice(0, 3).map((p, idx) => {
+          if (!p.id) p.id = 'proj_' + Date.now() + '_' + idx;
+          const tarefasNorm = (p.tarefas || p.etapas || []).map(normalizarTarefa);
+          const proximaPendente = tarefasNorm.find(t => !t.concluida) || tarefasNorm[0];
+          const proximaTarefaTexto = proximaPendente ? proximaPendente.titulo : (p.meta || 'Revisar exercícios');
+          const progresso = p.progresso ?? 25;
+          const concluidasCount = tarefasNorm.filter(t => t.concluida).length;
+
           return `
-          <div class="projeto-item-card">
+          <div class="projeto-item-card" data-projeto-id="${p.id}" style="cursor:pointer;" title="Clique para abrir detalhes do projeto">
             <div class="projeto-top">
               <span class="projeto-titulo">${p.titulo || p.objetivo || 'Plano de Estudos'}</span>
               <span class="projeto-tag-materia">${p.materia || 'Geral'}</span>
             </div>
             <p class="projeto-meta-texto">
-              <strong>Próxima etapa:</strong> ${proximaTarefa}
+              <strong>Próxima etapa:</strong> ${proximaTarefaTexto}
             </p>
             <div style="margin: 4px 0 2px;">
               <div style="height:6px; border-radius:999px; background:var(--border-color); overflow:hidden;">
@@ -327,13 +525,21 @@ function carregarProjetosEstudo(userId) {
             </div>
             <div class="projeto-footer">
               <span>📅 Prazo: ${p.prazo || '30 dias'}</span>
-              <span>Tarefas: ${listaTarefas.length} etapas</span>
-              <a href="./chat.html" class="see-all" style="font-size:0.78rem;">Continuar →</a>
+              <span>Tarefas: ${concluidasCount}/${tarefasNorm.length} (${progresso}%)</span>
+              <span class="see-all" style="font-size:0.82rem; font-weight:700;">Abrir Projeto →</span>
             </div>
           </div>
         `}).join('')}
       </div>
     `;
+
+    // Ao clicar em qualquer ponto do card ou no botão "Abrir Projeto", abre o modal de detalhes
+    container.querySelectorAll('.projeto-item-card').forEach(card => {
+      const projId = card.dataset.projetoId;
+      card.addEventListener('click', () => {
+        abrirModalProjeto(projId);
+      });
+    });
 
     return projetos;
   } catch (e) {
