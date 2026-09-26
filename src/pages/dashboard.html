@@ -6,10 +6,18 @@
 <title>Dashboard · Vestibular+</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles/base.css" />
 <style>
-  .app-layout { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  /* ==========================================================================
+     LAYOUT PRINCIPAL & SIDEBAR
+     ========================================================================== */
+  .app-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+    position: relative;
+  }
 
   .sidebar {
     border-right: 1px solid var(--border-color);
@@ -24,25 +32,77 @@
     overflow-x: hidden;
     scrollbar-width: thin;
     scrollbar-color: var(--color-primary-500) transparent;
+    z-index: 50;
   }
   .sidebar::-webkit-scrollbar { width: 6px; }
   .sidebar::-webkit-scrollbar-thumb { background: var(--color-primary-500); border-radius: var(--radius-full); }
   .sidebar::-webkit-scrollbar-track { background: transparent; }
-  .sidebar .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; margin-bottom: 28px; padding: 0 8px; flex-shrink: 0; }
-  .sidebar .logo .dot { width: 32px; height: 32px; border-radius: 9px; background: var(--gradient-primary); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; }
+  .sidebar .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 800;
+    font-size: 1.15rem;
+    margin-bottom: 28px;
+    padding: 0 8px;
+    flex-shrink: 0;
+    letter-spacing: -0.01em;
+  }
+  .sidebar .logo .dot {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.4);
+  }
 
-  .main { padding: 24px 4%; }
-  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+  .main {
+    padding: 24px 4% 48px;
+    max-width: 1440px;
+    margin: 0 auto;
+    width: 100%;
+  }
 
-  /* Widgets Centrais da Topbar */
-  .topbar-center-widgets { display: flex; align-items: center; gap: 12px; }
+  /* ==========================================================================
+     TOPBAR & NAVEGAÇÃO SUPERIOR
+     ========================================================================== */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .topbar-center-widgets {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
   .topbar-pill {
-    display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--radius-full);
-    font-size: .84rem; font-weight: 600; cursor: pointer; text-decoration: none;
-    background: var(--bg-elevated); border: 1px solid var(--border-color);
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: var(--radius-full);
+    font-size: .84rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); white-space: nowrap;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
     color: var(--text-primary);
   }
   .topbar-pill:hover {
@@ -51,76 +111,185 @@
     box-shadow: var(--shadow-soft);
   }
   .widget-streak {
-    color: #b45309; border-color: rgba(234, 179, 8, 0.35);
+    color: #b45309;
+    border-color: rgba(234, 179, 8, 0.35);
     background: rgba(254, 240, 138, 0.35);
   }
-  .widget-streak:hover { border-color: rgba(234, 179, 8, 0.6); box-shadow: 0 4px 16px rgba(234, 179, 8, 0.2); }
+  .widget-streak:hover {
+    border-color: rgba(234, 179, 8, 0.6);
+    box-shadow: 0 4px 16px rgba(234, 179, 8, 0.2);
+  }
   .widget-countdown {
-    color: #4338ca; border-color: rgba(99, 102, 241, 0.35);
+    color: #4338ca;
+    border-color: rgba(99, 102, 241, 0.35);
     background: rgba(224, 231, 255, 0.45);
   }
-  .widget-countdown:hover { border-color: rgba(99, 102, 241, 0.6); box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2); }
+  .widget-countdown:hover {
+    border-color: rgba(99, 102, 241, 0.6);
+    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
+  }
   
   [data-theme='dark'] .topbar-pill {
-    background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.09);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.06);
   }
   [data-theme='dark'] .topbar-pill:hover {
-    background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.12);
   }
   [data-theme='dark'] .widget-streak {
-    color: #fef08a; border-color: rgba(234, 179, 8, 0.25);
+    color: #fef08a;
+    border-color: rgba(234, 179, 8, 0.25);
     background: linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(249, 115, 22, 0.15) 100%);
   }
   [data-theme='dark'] .widget-countdown {
-    color: #e0e7ff; border-color: rgba(99, 102, 241, 0.28);
+    color: #e0e7ff;
+    border-color: rgba(99, 102, 241, 0.28);
     background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.14) 100%);
   }
-  @media (max-width: 1050px) { .topbar-center-widgets { display: none; } }
-  .topbar-actions { display: flex; align-items: center; gap: 14px; }
-  .icon-btn { width: 40px; height: 40px; border-radius: var(--radius-full); border: 1px solid var(--border-color); background: var(--bg-elevated); cursor: pointer; position: relative; flex-shrink: 0; }
-  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; cursor: pointer; }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-color);
+    background: var(--bg-elevated);
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.05rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-primary);
+  }
+  .icon-btn:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-primary-500);
+    box-shadow: var(--shadow-soft);
+  }
+  .icon-btn:focus-visible {
+    outline: 2px solid var(--color-primary-500);
+    outline-offset: 2px;
+  }
+
+  .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(124, 58, 237, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .avatar:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.5);
+  }
 
   .user-menu { position: relative; }
   .user-dropdown {
-    position: absolute; top: 50px; right: 0; min-width: 180px; padding: 8px;
-    background: #ffffff !important; border: 1px solid rgba(15, 23, 42, 0.12) !important;
-    border-radius: var(--radius-md); box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
-    display: none; flex-direction: column; gap: 4px; z-index: 9999;
+    position: absolute;
+    top: 50px;
+    right: 0;
+    min-width: 190px;
+    padding: 8px;
+    background: #ffffff !important;
+    border: 1px solid rgba(15, 23, 42, 0.12) !important;
+    border-radius: var(--radius-md);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease;
   }
   [data-theme='dark'] .user-dropdown {
-    background: #120f20 !important; border-color: rgba(255, 255, 255, 0.14) !important;
+    background: #120f20 !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
   }
   .user-dropdown.open { display: flex; }
   .dropdown-item {
-    display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
-    color: var(--text-primary); font-size: .88rem; font-weight: 500; cursor: pointer;
-    transition: background var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: .88rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
   }
-  .dropdown-item:hover { background: var(--glass-bg); }
+  .dropdown-item:hover {
+    background: var(--glass-bg);
+    color: var(--color-primary-500);
+  }
 
-  .search-box { flex: 1 1 360px; max-width: 480px; position: relative; z-index: 100; }
-  .search-box input { padding-left: 40px; }
-  .search-box::before { content: '🔎'; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .85rem; z-index: 1; pointer-events: none; }
+  .search-box {
+    flex: 1 1 340px;
+    max-width: 480px;
+    position: relative;
+    z-index: 100;
+  }
+  .search-box input {
+    padding-left: 42px;
+    height: 42px;
+    border-radius: var(--radius-full);
+    font-size: 0.88rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  .search-box::before {
+    content: '🔎';
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: .88rem;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.7;
+  }
 
-  /* Dropdown de resultados da busca */
   .busca-dropdown {
-    position: absolute; top: 48px; left: 0;
-    width: max(100%, 520px); max-width: 600px;
-    background: #ffffff !important; border: 1px solid rgba(15, 23, 42, 0.12) !important;
-    border-radius: var(--radius-md); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
-    max-height: 480px; overflow-y: auto; overflow-x: hidden; display: none; flex-direction: column;
-    padding: 8px; z-index: 9999;
+    position: absolute;
+    top: 50px;
+    left: 0;
+    width: max(100%, 480px);
+    max-width: 580px;
+    background: #ffffff !important;
+    border: 1px solid rgba(15, 23, 42, 0.12) !important;
+    border-radius: var(--radius-md);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.22);
+    max-height: 480px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: none;
+    flex-direction: column;
+    padding: 8px;
+    z-index: 9999;
     scrollbar-width: thin;
     scrollbar-color: var(--color-primary-500) transparent;
   }
   .busca-dropdown::-webkit-scrollbar { width: 6px; }
   .busca-dropdown::-webkit-scrollbar-thumb { background: rgba(124, 58, 237, 0.5); border-radius: var(--radius-full); }
-  .busca-dropdown::-webkit-scrollbar-thumb:hover { background: rgba(124, 58, 237, 0.8); }
   .busca-dropdown::-webkit-scrollbar-track { background: transparent; }
-
   [data-theme='dark'] .busca-dropdown {
     background: #120f20 !important;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85);
@@ -128,158 +297,864 @@
   }
   .busca-dropdown.open { display: flex; }
   .busca-grupo-titulo {
-    font-size: .76rem; text-transform: uppercase; letter-spacing: .05em;
-    color: var(--color-primary-500); padding: 12px 14px 4px; font-weight: 800;
+    font-size: .76rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--color-primary-500);
+    padding: 12px 14px 4px;
+    font-weight: 800;
   }
   .busca-item {
-    display: block; padding: 10px 14px; border-radius: var(--radius-sm);
-    color: var(--text-primary); font-size: .88rem; line-height: 1.5;
-    word-break: break-word; overflow-wrap: anywhere; white-space: normal;
+    display: block;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: .88rem;
+    line-height: 1.5;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: normal;
     transition: background var(--transition-fast), color var(--transition-fast);
   }
-  .busca-item:hover { background: rgba(124, 58, 237, 0.1); color: var(--color-primary-500); }
-  .busca-vazio { padding: 24px 14px; text-align: center; color: var(--text-secondary); font-size: .88rem; }
+  .busca-item:hover {
+    background: rgba(124, 58, 237, 0.1);
+    color: var(--color-primary-500);
+  }
+  .busca-vazio {
+    padding: 24px 14px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: .88rem;
+  }
 
-  /* Sininho de notificações */
+  /* Notificações */
   .notif-btn-wrap { position: relative; }
   .notif-badge {
-    position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 3px;
-    border-radius: var(--radius-full); background: #ef4444; color: #fff; font-size: .62rem;
-    font-weight: 700; display: none; align-items: center; justify-content: center; line-height: 1;
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: var(--radius-full);
+    background: #ef4444;
+    color: #fff;
+    font-size: .62rem;
+    font-weight: 800;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    border: 2px solid var(--bg-base);
   }
   .notif-badge.show { display: flex; }
   .notif-dropdown {
-    position: absolute; top: 50px; right: 0; width: 340px;
-    background: #ffffff !important; border: 1px solid rgba(15, 23, 42, 0.12) !important;
-    border-radius: var(--radius-md); box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
-    max-height: 380px; overflow-y: auto; display: none; flex-direction: column;
-    padding: 8px; z-index: 9999;
+    position: absolute;
+    top: 50px;
+    right: 0;
+    width: 350px;
+    background: #ffffff !important;
+    border: 1px solid rgba(15, 23, 42, 0.12) !important;
+    border-radius: var(--radius-md);
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.18);
+    max-height: 400px;
+    overflow-y: auto;
+    display: none;
+    flex-direction: column;
+    padding: 8px;
+    z-index: 9999;
   }
   [data-theme='dark'] .notif-dropdown {
-    background: #120f20 !important; border-color: rgba(255, 255, 255, 0.14) !important;
+    background: #120f20 !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
   }
   .notif-dropdown.open { display: flex; }
-  .notif-item { padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer; }
+  .notif-item {
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
   .notif-item:hover { background: var(--glass-bg); }
-  .notif-item.nao-lida { background: rgba(124,58,237,.08); }
+  .notif-item.nao-lida { background: rgba(124, 58, 237, .08); }
   .notif-item strong { font-size: .86rem; display: block; margin-bottom: 2px; }
   .notif-item p { font-size: .8rem; color: var(--text-secondary); margin: 0 0 4px; }
   .notif-item .notif-data { font-size: .7rem; color: var(--text-secondary); }
-  .notif-vazio { padding: 16px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
-  .notif-ver-todas { display: block; text-align: center; padding: 10px; font-size: .82rem; font-weight: 600; color: var(--color-primary-500); border-top: 1px solid var(--border-color); margin-top: 4px; }
+  .notif-vazio { padding: 20px 10px; text-align: center; color: var(--text-secondary); font-size: .85rem; }
+  .notif-ver-todas {
+    display: block;
+    text-align: center;
+    padding: 10px;
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--color-primary-500);
+    border-top: 1px solid var(--border-color);
+    margin-top: 4px;
+  }
 
+  /* ==========================================================================
+     A. CABEÇALHO & SAUDAÇÃO (WELCOME HERO CARD)
+     ========================================================================== */
   .welcome-card {
-    padding: 28px;
+    padding: 28px 32px;
     border-radius: var(--radius-lg);
-    background: linear-gradient(135deg, rgba(124, 58, 237, 0.78) 0%, rgba(59, 130, 246, 0.72) 100%) !important;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.22) !important;
-    box-shadow: 0 8px 32px rgba(124, 58, 237, 0.35);
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.88) 0%, rgba(59, 130, 246, 0.78) 100%) !important;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.28) !important;
+    box-shadow: 0 12px 38px rgba(124, 58, 237, 0.32), inset 0 1px 1px rgba(255, 255, 255, 0.35);
     color: #fff;
     margin-bottom: 24px;
     position: relative;
     overflow: hidden;
   }
-  .welcome-card h2 { font-size: 1.4rem; margin-bottom: 6px; }
-  .welcome-card p { opacity: .9; font-size: .92rem; }
-  .xp-bar-track { background: rgba(255,255,255,.25); border-radius: var(--radius-full); height: 10px; margin-top: 16px; overflow: hidden; }
-  .xp-bar-fill { height: 100%; background: #fff; border-radius: var(--radius-full); transition: width .6s ease; }
+  .welcome-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 380px;
+    height: 380px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.15), transparent 70%);
+    pointer-events: none;
+  }
 
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
-  .stat-card { text-align: center; }
+  .welcome-top-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .welcome-date-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    letter-spacing: 0.01em;
+  }
+  .welcome-card h2 {
+    font-size: 1.65rem;
+    font-weight: 800;
+    margin-bottom: 6px;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+  }
+  .welcome-card p.welcome-motivational {
+    opacity: .94;
+    font-size: .94rem;
+    max-width: 680px;
+    line-height: 1.5;
+    margin-bottom: 18px;
+  }
+
+  /* Barra de XP e Nível */
+  .xp-box {
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-md);
+    padding: 14px 18px;
+    margin-bottom: 20px;
+  }
+  .xp-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.86rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .xp-level-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+  .xp-bar-track {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-full);
+    height: 10px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  .xp-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ffffff 0%, #a7f3d0 100%);
+    border-radius: var(--radius-full);
+    transition: width .7s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+  }
+
+  /* Ações Rápidas no Cabeçalho */
+  .quick-actions-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+  }
+  .quick-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: var(--radius-full);
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    backdrop-filter: blur(10px);
+  }
+  .quick-action-btn:hover {
+    background: rgba(255, 255, 255, 0.26);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    border-color: rgba(255, 255, 255, 0.5);
+  }
+  .quick-action-btn:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+  }
+
+  /* ==========================================================================
+     B. INDICADORES PRINCIPAIS (STATS GRID COM EFEITO 3D REFINADO)
+     ========================================================================== */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    position: relative;
+    padding: 20px 18px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+  .stat-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(124, 58, 237, 0.35);
+    box-shadow: 0 12px 30px rgba(124, 58, 237, 0.12);
+  }
+  .stat-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .stat-icon-wrap {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  }
+  .stat-icon-horas { background: rgba(59, 130, 246, 0.12); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.25); }
+  .stat-icon-questoes { background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.25); }
+  .stat-icon-simulados { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.25); }
+  .stat-icon-streak { background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); }
+
+  .stat-card strong {
+    font-size: 1.85rem;
+    font-family: var(--font-display);
+    font-weight: 800;
+    display: block;
+    line-height: 1.1;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+  }
+  .stat-card span.stat-title {
+    color: var(--text-secondary);
+    font-size: .84rem;
+    font-weight: 600;
+    display: block;
+  }
+  .stat-card span.stat-sub {
+    color: var(--text-secondary);
+    font-size: .74rem;
+    opacity: 0.8;
+    margin-top: 2px;
+    display: block;
+  }
+
+  /* Card de Cotas */
   .stat-card-cotas {
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    padding: 12px 14px;
+    justify-content: space-between;
+    padding: 16px 18px;
     text-align: left;
+    grid-column: span 1;
+    min-width: 220px;
   }
   .cotas-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 6px;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
   }
   .cotas-titulo {
-    font-size: .75rem;
+    font-size: .76rem;
     font-weight: 700;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: .05em;
+    letter-spacing: .06em;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .cotas-subtag {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--color-primary-500);
+    background: rgba(124, 58, 237, 0.08);
+    padding: 2px 6px;
+    border-radius: var(--radius-full);
   }
   .cotas-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px 8px;
+    gap: 8px 10px;
   }
   .cota-mini {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     font-size: .78rem;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    background: rgba(124, 58, 237, 0.04);
+    border: 1px solid var(--border-color);
   }
   .cota-icone {
-    font-size: .85rem;
+    font-size: .95rem;
     line-height: 1;
     flex-shrink: 0;
   }
   .cota-num {
     font-weight: 800;
-    font-size: .88rem;
-    color: #38bdf8;
+    font-size: .95rem;
+    color: var(--color-neon-blue);
     font-family: var(--font-display, sans-serif);
   }
   .cota-rotulo {
     color: var(--text-secondary);
-    font-size: .72rem;
+    font-size: .73rem;
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .stat-card strong { font-size: 1.6rem; font-family: var(--font-display); display: block; }
-  .stat-card span { color: var(--text-secondary); font-size: .82rem; }
 
-  .section-row { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-  .panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-  .panel-title h3 { font-size: 1.05rem; }
-  .see-all { font-size: .82rem; color: var(--color-primary-500); font-weight: 600; }
+  /* ==========================================================================
+     C. SEÇÃO "SEU PRÓXIMO PASSO" (SPOTLIGHT HEROICO)
+     ========================================================================== */
+  .proximo-passo-container {
+    margin-bottom: 24px;
+  }
+  .proximo-passo-card {
+    padding: 24px 28px;
+    border-radius: var(--radius-lg);
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(59, 130, 246, 0.06) 100%);
+    border: 1px solid rgba(124, 58, 237, 0.28);
+    box-shadow: 0 8px 26px rgba(124, 58, 237, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .proximo-passo-card:hover {
+    border-color: rgba(124, 58, 237, 0.45);
+    box-shadow: 0 10px 30px rgba(124, 58, 237, 0.16);
+    transform: translateY(-2px);
+  }
+  .proximo-passo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--color-primary-500);
+    background: rgba(124, 58, 237, 0.1);
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    width: fit-content;
+    border: 1px solid rgba(124, 58, 237, 0.2);
+  }
+  .proximo-passo-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .proximo-passo-info {
+    flex: 1 1 400px;
+  }
+  .proximo-passo-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .proximo-passo-titulo {
+    font-size: 1.22rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  .proximo-passo-materia-tag {
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #fff;
+    background: var(--gradient-primary);
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+  }
+  .proximo-passo-desc {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 4px 0 10px;
+  }
+  .proximo-passo-meta {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+  .proximo-passo-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .btn-proximo-passo {
+    padding: 10px 20px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
 
-  .materia-list { display: flex; flex-direction: column; gap: 10px; }
-  .materia-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
-  .materia-dot { width: 10px; height: 10px; border-radius: 50%; }
-  .materia-item .prog-track { flex: 1; height: 6px; border-radius: var(--radius-full); background: var(--border-color); overflow: hidden; }
-  .materia-item .prog-fill { height: 100%; border-radius: var(--radius-full); background: var(--gradient-neon); }
+  /* ==========================================================================
+     D & F. SEÇÃO CENTRAL EM GRADE (PROJETOS & TUTOR IA)
+     ========================================================================== */
+  .section-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  .panel-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .panel-title h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .see-all {
+    font-size: .84rem;
+    color: var(--color-primary-500);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: transform var(--transition-fast);
+  }
+  .see-all:hover {
+    transform: translateX(3px);
+    text-decoration: underline;
+  }
 
-  .ranking-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-color); font-size: .9rem; }
-  .ranking-item:last-child { border-bottom: none; }
-  .ranking-pos { width: 22px; text-align: center; font-weight: 700; color: var(--text-secondary); }
+  /* Card do Tutor IA */
+  .tutor-ia-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(135deg, rgba(124, 58, 237, 0.14) 0%, rgba(59, 130, 246, 0.1) 100%) !important;
+    border: 1px solid rgba(124, 58, 237, 0.35) !important;
+    position: relative;
+    overflow: hidden;
+  }
+  .tutor-ia-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 140px;
+    height: 140px;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.25), transparent 70%);
+    pointer-events: none;
+  }
+  .tutor-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #22c55e;
+    background: rgba(34, 197, 94, 0.1);
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+  .tutor-status-beacon {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+    animation: beaconPulse 2s infinite ease-in-out;
+  }
+  @keyframes beaconPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.3); }
+  }
+
+  .tutor-shortcuts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 14px 0 18px;
+  }
+  .tutor-shortcut-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .tutor-shortcut-btn:hover {
+    transform: translateY(-2px);
+    border-color: var(--color-primary-500);
+    background: rgba(124, 58, 237, 0.08);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.15);
+  }
+
+  /* Projetos de Estudo */
+  .projeto-item-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .projeto-item-card:hover {
+    border-color: var(--color-primary-500);
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.1);
+  }
+  .projeto-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .projeto-titulo {
+    font-weight: 700;
+    font-size: 0.94rem;
+    color: var(--text-primary);
+  }
+  .projeto-tag-materia {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--color-primary-500);
+    background: rgba(124, 58, 237, 0.1);
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+  }
+  .projeto-meta-texto {
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    margin: 0;
+  }
+  .projeto-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    padding-top: 6px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  /* ==========================================================================
+     E. PROGRESSO POR MATÉRIA & G. RANKING
+     ========================================================================== */
+  .materia-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .materia-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: rgba(124, 58, 237, 0.02);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+  }
+  .materia-item:hover {
+    background: rgba(124, 58, 237, 0.06);
+    border-color: rgba(124, 58, 237, 0.25);
+  }
+  .materia-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .materia-nome {
+    flex: 0 0 110px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .materia-prog-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .materia-item .prog-track {
+    flex: 1;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background: var(--border-color);
+    overflow: hidden;
+  }
+  .materia-item .prog-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .materia-tempo {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 48px;
+    text-align: right;
+  }
+
+  /* Ranking Geral */
+  .ranking-list-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .ranking-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    font-size: .88rem;
+    transition: all 0.2s ease;
+  }
+  .ranking-item:hover {
+    transform: translateX(3px);
+    border-color: rgba(124, 58, 237, 0.3);
+  }
+  .ranking-pos-badge {
+    min-width: 32px;
+    font-weight: 800;
+    font-size: 0.82rem;
+    text-align: center;
+  }
+  .pos-ouro { color: #f59e0b; }
+  .pos-prata { color: #94a3b8; }
+  .pos-bronze { color: #d97706; }
+  .pos-padrao { color: var(--text-secondary); }
+
   .ranking-avatar-mini {
-    width: 28px; height: 28px; border-radius: 50%; background: var(--gradient-primary);
-    display: flex; align-items: center; justify-content: center; color: #fff;
-    font-weight: 700; font-size: .72rem; flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: .78rem;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(124, 58, 237, 0.25);
+  }
+  .ranking-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .ranking-nome {
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tag-voce {
+    font-size: 0.68rem;
+    font-weight: 800;
+    color: #fff;
+    background: var(--gradient-primary);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+    text-transform: uppercase;
+  }
+  .ranking-xp {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--color-primary-500);
+    white-space: nowrap;
+  }
+  .ranking-item-voce {
+    border-color: var(--color-primary-500) !important;
+    background: rgba(124, 58, 237, 0.08) !important;
+    box-shadow: 0 2px 10px rgba(124, 58, 237, 0.12);
   }
 
-  .empty-state { text-align: center; padding: 30px 10px; color: var(--text-secondary); font-size: .88rem; }
+  /* Estados Vazios Elegantes */
+  .empty-state-moderno {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .empty-icon-wrap {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: rgba(124, 58, 237, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary-500);
+    margin-bottom: 4px;
+    border: 1px dashed rgba(124, 58, 237, 0.3);
+  }
+  .empty-state-moderno h4 {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  .empty-state-moderno p {
+    font-size: 0.84rem;
+    max-width: 360px;
+    line-height: 1.45;
+    margin: 0;
+  }
+  .btn-sm {
+    padding: 8px 16px;
+    font-size: 0.82rem;
+    margin-top: 4px;
+  }
 
-  /* ===== Menu hambúrguer (só aparece no celular) ===== */
+  /* ==========================================================================
+     RESPONSIVIDADE & ACESSIBILIDADE
+     ========================================================================== */
   .menu-toggle { display: none; }
-
-  /* ===== Fundo escuro atrás do menu, quando ele está aberto no celular ===== */
   .sidebar-backdrop {
-    position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 55;
-    opacity: 0; pointer-events: none; transition: opacity var(--transition-base);
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .6);
+    z-index: 990;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-base);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
-  .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+  .sidebar-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  @media (max-width: 1100px) {
+    .section-row { grid-template-columns: 1fr; }
+    .topbar-center-widgets { display: none; }
+  }
 
   @media (max-width: 900px) {
     .app-layout { grid-template-columns: 1fr; }
-
-    /* O menu vira uma gaveta que fica fora da tela (à esquerda) até ser aberto */
     .sidebar {
-      position: fixed; top: 0; left: 0; height: 100vh; height: 100dvh; width: 280px; max-width: 85vw;
-      z-index: 1000; border-radius: 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      height: 100dvh;
+      width: 280px;
+      max-width: 85vw;
+      z-index: 1000;
+      border-radius: 0;
       background: #ffffff !important;
       transform: translateX(-100%);
       transition: transform var(--transition-base);
@@ -290,62 +1165,73 @@
     }
     [data-theme='dark'] .sidebar {
       background: #0d0a17 !important;
-      border-right: 1px solid rgba(255,255,255,0.12);
-      box-shadow: 0 0 50px rgba(0,0,0,0.85);
+      border-right: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 0 50px rgba(0, 0, 0, 0.85);
     }
     .sidebar.open { transform: translateX(0); }
-
-    .sidebar-backdrop { z-index: 990; }
-
-    .menu-toggle { display: inline-flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
-
-    .section-row { grid-template-columns: 1fr; }
-
-    .topbar {
-      display: flex;
+    .menu-toggle {
+      display: inline-flex;
       align-items: center;
-      gap: 10px;
-      flex-wrap: nowrap;
+      justify-content: center;
+      font-size: 1.25rem;
+      flex-shrink: 0;
     }
-    .search-box {
-      flex: 1 1 auto;
-      min-width: 0;
-      max-width: none;
-    }
-    .search-box input {
-      width: 100%;
-      font-size: 0.85rem;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      overflow: hidden;
-    }
+    .main { padding: 18px 16px 36px; }
+    .welcome-card { padding: 22px 20px; }
+    .welcome-card h2 { font-size: 1.4rem; }
+    .proximo-passo-actions { width: 100%; justify-content: flex-start; }
+    .proximo-passo-card { padding: 18px 20px; }
   }
 
-  /* Ajuste mobile: dropdowns fixos e limitados à largura da tela, evitando corte nas bordas */
-  @media (max-width: 600px) {
-    .notif-dropdown,
-    .busca-dropdown {
+  @media (max-width: 640px) {
+    .stats-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .stat-card-cotas {
+      grid-column: span 2;
+    }
+    .topbar-actions { gap: 8px; }
+    .quick-actions-bar {
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      padding-bottom: 6px;
+      scrollbar-width: none;
+    }
+    .quick-actions-bar::-webkit-scrollbar { display: none; }
+    .notif-dropdown, .busca-dropdown {
       position: fixed;
-      top: 70px;
+      top: 68px;
       left: 12px;
       right: 12px;
       width: auto;
       max-width: none;
     }
-    .notif-dropdown { max-height: 70vh; }
     .user-dropdown {
       position: fixed;
-      top: 70px;
+      top: 68px;
       right: 12px;
-      left: auto;
+    }
+  }
+
+  /* Acessibilidade para redução de movimento */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 </style>
 </head>
 <body>
   <div class="app-layout">
+    <!-- MENU LATERAL / SIDEBAR -->
     <aside class="sidebar glass" id="sidebar">
-      <div class="logo"><div class="dot">V+</div>Vestibular+</div>
+      <div class="logo">
+        <div class="dot">V+</div>
+        Vestibular+
+      </div>
       <div class="nav-item active">🏠 Dashboard</div>
       <a class="nav-item" href="./resumos.html">📚 Resumos</a>
       <a class="nav-item" href="./questoes.html">✅ Questões</a>
@@ -363,54 +1249,124 @@
 
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
+    <!-- CONTEÚDO PRINCIPAL -->
     <main class="main">
-      <div class="topbar">
-        <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Abrir menu">☰</button>
+      <!-- TOPBAR -->
+      <header class="topbar">
+        <button id="menu-toggle" class="icon-btn menu-toggle" aria-label="Abrir menu lateral">☰</button>
+        
         <div class="search-box">
-          <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questões, flashcards, vestibulares..." />
-          <div class="busca-dropdown" id="busca-dropdown"></div>
+          <input class="input-field" type="text" id="busca-input" autocomplete="off" placeholder="Pesquisar resumos, questões, simulados, vestibulares..." aria-label="Pesquisar conteúdo" />
+          <div class="busca-dropdown" id="busca-dropdown" role="region" aria-live="polite"></div>
         </div>
 
         <div class="topbar-center-widgets">
           <div class="topbar-pill widget-streak" title="Sua ofensiva diária de estudos">
             <span>🔥</span>
-            <span id="topbar-streak">1 dia seguido</span>
+            <span id="topbar-streak">Carregando...</span>
           </div>
           <a href="./vestibulares.html" class="topbar-pill widget-countdown" title="Ver calendário de vestibulares">
             <span>📅</span>
             <span id="topbar-countdown">Carregando prova...</span>
           </a>
         </div>
+
         <div class="topbar-actions">
-          <button id="theme-toggle" class="icon-btn">🌙</button>
-          <a href="./precos.html" class="btn btn-primary" style="display:flex; align-items:center; gap:6px; height:40px; padding:0 16px; border-radius:var(--radius-full); text-decoration:none; font-size:.88rem; font-weight:600; white-space:nowrap;">💎 Planos</a>
+          <button id="theme-toggle" class="icon-btn" title="Alternar tema visual" aria-label="Alternar tema">🌙</button>
+          <a href="./precos.html" class="btn btn-primary" style="display:flex; align-items:center; gap:6px; height:40px; padding:0 16px; border-radius:var(--radius-full); text-decoration:none; font-size:.86rem; font-weight:600; white-space:nowrap;">💎 Planos</a>
+          
           <div class="notif-btn-wrap">
-            <button id="notif-btn" class="icon-btn">🔔<span class="notif-badge" id="notif-badge"></span></button>
+            <button id="notif-btn" class="icon-btn" aria-label="Notificações" title="Notificações">
+              🔔
+              <span class="notif-badge" id="notif-badge"></span>
+            </button>
             <div class="notif-dropdown" id="notif-dropdown"></div>
           </div>
+
           <div class="user-menu">
-            <div class="avatar" id="avatar-inicial">A</div>
+            <div class="avatar" id="avatar-inicial" title="Menu do Usuário" role="button" tabindex="0">A</div>
             <div class="user-dropdown" id="user-dropdown">
               <a class="dropdown-item" href="./perfil.html">👤 Perfil</a>
-              <div class="dropdown-item" id="logout-btn">🚪 Sair</div>
+              <div class="dropdown-item" id="logout-btn" role="button">🚪 Sair</div>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div class="welcome-card fade-up">
+      <!-- A. CABEÇALHO & SAUDAÇÃO -->
+      <section class="welcome-card fade-up" aria-label="Painel de Boas-vindas">
+        <div class="welcome-top-meta">
+          <span class="welcome-date-badge" id="data-hoje">📅 Carregando data...</span>
+        </div>
         <h2 id="saudacao">Olá! 👋</h2>
-        <p id="nivel-info">Carregando seu progresso...</p>
-        <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar" style="width:0%"></div></div>
-      </div>
+        <p class="welcome-motivational" id="mensagem-motivacional">
+          Carregando seu ambiente de estudos...
+        </p>
 
-      <div class="stats-grid fade-up">
-        <div class="card stat-card"><strong id="stat-horas">0h</strong><span>Horas estudadas</span></div>
-        <div class="card stat-card"><strong id="stat-questoes">0</strong><span>Questões resolvidas</span></div>
-        <div class="card stat-card"><strong id="stat-simulados">0</strong><span>Simulados feitos</span></div>
-                <div class="card stat-card stat-card-cotas">
+        <!-- Barra de XP / Nível -->
+        <div class="xp-box">
+          <div class="xp-header">
+            <span id="nivel-info">Carregando seu progresso...</span>
+            <span class="xp-level-tag">✨ Evolução Ativa</span>
+          </div>
+          <div class="xp-bar-track">
+            <div class="xp-bar-fill" id="xp-bar" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Acesso rápido a funcionalidades-chave -->
+        <div class="quick-actions-bar" aria-label="Acesso Rápido">
+          <span style="font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; opacity:0.85;">Acesso Rápido:</span>
+          <a href="./questoes.html" class="quick-action-btn">📝 Praticar Questões</a>
+          <a href="./chat.html" class="quick-action-btn">🤖 Tutor IA</a>
+          <a href="./simulados.html" class="quick-action-btn">⏱️ Fazer Simulado</a>
+          <a href="./resumos.html" class="quick-action-btn">📚 Ler Resumos</a>
+        </div>
+      </section>
+
+      <!-- B. INDICADORES PRINCIPAIS (STATS GRID) -->
+      <section class="stats-grid fade-up" aria-label="Indicadores Principais">
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-title">Horas Estudadas</span>
+            <div class="stat-icon-wrap stat-icon-horas">⏱️</div>
+          </div>
+          <strong id="stat-horas">0h</strong>
+          <span class="stat-sub">Tempo total registrado</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-title">Questões Feitas</span>
+            <div class="stat-icon-wrap stat-icon-questoes">✅</div>
+          </div>
+          <strong id="stat-questoes">0</strong>
+          <span class="stat-sub">Exercícios respondidos</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-title">Simulados Feitos</span>
+            <div class="stat-icon-wrap stat-icon-simulados">🏆</div>
+          </div>
+          <strong id="stat-simulados">0</strong>
+          <span class="stat-sub">Provas cronometradas</span>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-top">
+            <span class="stat-title">Ofensiva Diária</span>
+            <div class="stat-icon-wrap stat-icon-streak">🔥</div>
+          </div>
+          <strong id="stat-streak-dias">0 dias</strong>
+          <span class="stat-sub">Sequência consecutiva</span>
+        </div>
+
+        <!-- Card de Recursos e Cotas Diárias -->
+        <div class="stat-card stat-card-cotas">
           <div class="cotas-header">
-            <span class="cotas-titulo">⚡ Disponível</span>
+            <span class="cotas-titulo">⚡ Disponível Hoje</span>
+            <span class="cotas-subtag">Uso Diário</span>
           </div>
           <div class="cotas-grid">
             <div class="cota-mini" title="Questões diárias restantes">
@@ -425,7 +1381,7 @@
             </div>
             <div class="cota-mini" title="Perguntas com IA restantes hoje">
               <span class="cota-icone">🤖</span>
-              <span class="cota-num" id="cota-chat">10</span>
+              <span class="cota-num" id="cota-chat">5</span>
               <span class="cota-rotulo">IA chat</span>
             </div>
             <div class="cota-mini" title="Simulados semanais restantes">
@@ -435,44 +1391,113 @@
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
+      <!-- C. SEÇÃO "SEU PRÓXIMO PASSO" (SPOTLIGHT) -->
+      <section class="proximo-passo-container" id="proximo-passo-container">
+        <!-- Injetado dinamicamente por carregarProjetosEstudo / atualizarProximoPasso -->
+      </section>
+
+      <!-- D & F. PROJETOS DE ESTUDO & TUTOR IA -->
       <div class="section-row">
+        <!-- D. Projetos de Estudo -->
         <div class="card fade-up">
           <div class="panel-title">
             <h3>🎯 Projetos & Metas de Estudo</h3>
             <a class="see-all" href="./chat.html">Criar com IA 💬</a>
           </div>
           <div id="projetos-estudo-list">
-            <div class="empty-state">Nenhum projeto ativo. Converse com o Chat IA para gerar cronogramas e projetos personalizados!</div>
+            <div class="empty-state-moderno">
+              <div class="empty-icon-wrap">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                </svg>
+              </div>
+              <h4>Nenhum projeto ativo</h4>
+              <p>Converse com o Chat IA para gerar cronogramas e projetos personalizados para seu vestibular.</p>
+              <a href="./chat.html" class="btn btn-primary btn-sm">Criar Projeto com IA 💬</a>
+            </div>
           </div>
         </div>
 
-        <div class="card fade-up" style="background: linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%); border: 1px solid rgba(124, 58, 237, 0.3);">
-          <div class="panel-title">
-            <h3>💬 Tutor IA Vestibular+</h3>
+        <!-- F. Tutor IA -->
+        <div class="card fade-up tutor-ia-card">
+          <div>
+            <div class="panel-title" style="border-bottom:none; margin-bottom:10px;">
+              <h3>💬 Tutor IA Vestibular+</h3>
+              <span class="tutor-status-badge">
+                <span class="tutor-status-beacon"></span> Online
+              </span>
+            </div>
+            <p style="font-size: .88rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+              Dúvidas em matérias difíceis? Peça resoluções comentadas, crie flashcards ou gere cronogramas inteligentes sob medida.
+            </p>
+
+            <div class="tutor-shortcuts-grid">
+              <a href="./chat.html" class="tutor-shortcut-btn" title="Conversar diretamente com a IA">
+                <span>💬</span> <span>Tirar Dúvida</span>
+              </a>
+              <a href="./flashcards.html" class="tutor-shortcut-btn" title="Revisar cartões inteligentes">
+                <span>🧠</span> <span>Flashcards</span>
+              </a>
+              <a href="./resumos.html" class="tutor-shortcut-btn" title="Acessar resumos focados">
+                <span>📚</span> <span>Resumos</span>
+              </a>
+              <a href="./cronograma.html" class="tutor-shortcut-btn" title="Organizar cronograma semanal">
+                <span>📅</span> <span>Cronograma</span>
+              </a>
+            </div>
           </div>
-          <p style="font-size: .88rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 14px;">
-            Dúvidas em matérias difíceis? Peça resumos, flashcards inteligentes ou planos de estudo sob medida.
-          </p>
-          <a href="./chat.html" class="btn" style="background: var(--gradient-primary); color: #fff; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px; border-radius: var(--radius-md); font-weight: 600; font-size: .9rem;">
+
+          <a href="./chat.html" class="btn btn-primary" style="display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:12px; font-weight:700; text-decoration:none;">
             Abrir Chat com IA 🚀
           </a>
         </div>
       </div>
 
-      <div class="section-row" style="margin-top: 20px;">
+      <!-- E & G. PROGRESSO POR MATÉRIA & RANKING -->
+      <div class="section-row">
+        <!-- E. Progresso por Matéria -->
         <div class="card fade-up">
-          <div class="panel-title"><h3>Progresso por matéria</h3><a class="see-all" href="./progresso.html">ver tudo</a></div>
+          <div class="panel-title">
+            <h3>📊 Progresso por matéria</h3>
+            <a class="see-all" href="./progresso.html">ver tudo</a>
+          </div>
           <div class="materia-list" id="materia-list">
-            <div class="empty-state">Assim que houver matérias cadastradas, seu progresso aparece aqui.</div>
+            <div class="empty-state-moderno">
+              <div class="empty-icon-wrap">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10"/>
+                  <line x1="12" y1="20" x2="12" y2="4"/>
+                  <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+              </div>
+              <h4>Nenhum progresso registrado ainda</h4>
+              <p>Assim que você resolver questões ou ler resumos, seu avanço por matéria aparecerá aqui em tempo real.</p>
+              <a href="./questoes.html" class="btn btn-primary btn-sm">Começar a Praticar 📝</a>
+            </div>
           </div>
         </div>
 
+        <!-- G. Ranking -->
         <div class="card fade-up">
-          <div class="panel-title"><h3>Ranking</h3><a class="see-all" href="./ranking.html">ver tudo</a></div>
-          <div id="ranking-list">
-            <div class="empty-state">O ranking aparece assim que outros alunos começarem a estudar 🚀</div>
+          <div class="panel-title">
+            <h3>🏆 Ranking Geral</h3>
+            <a class="see-all" href="./ranking.html">ver tudo</a>
+          </div>
+          <div class="ranking-list-wrap" id="ranking-list">
+            <div class="empty-state-moderno">
+              <div class="empty-icon-wrap">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="8" r="7"/>
+                  <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
+                </svg>
+              </div>
+              <h4>Seja o primeiro a pontuar</h4>
+              <p>O ranking se renova conforme os alunos acumulam XP com questões, resumos e simulados.</p>
+              <a href="./questoes.html" class="btn btn-primary btn-sm">Ganhar XP Agora ⚡</a>
+            </div>
           </div>
         </div>
       </div>
@@ -482,24 +1507,23 @@
   <script type="module" src="../scripts/theme.js"></script>
   <script type="module" src="../scripts/dashboard.js"></script>
 
-  <!-- Controla abrir/fechar o menu no celular. Não mexe em dashboard.js. -->
+  <!-- Controla abrir/fechar o menu no celular sem interferir na lógica de dados -->
   <script type="module">
     const sidebar = document.getElementById('sidebar');
     const backdrop = document.getElementById('sidebar-backdrop');
     const botaoMenu = document.getElementById('menu-toggle');
 
     function abrirMenu() {
-      sidebar.classList.add('open');
-      backdrop.classList.add('open');
+      sidebar?.classList.add('open');
+      backdrop?.classList.add('open');
     }
     function fecharMenu() {
-      sidebar.classList.remove('open');
-      backdrop.classList.remove('open');
+      sidebar?.classList.remove('open');
+      backdrop?.classList.remove('open');
     }
 
     botaoMenu?.addEventListener('click', abrirMenu);
     backdrop?.addEventListener('click', fecharMenu);
-    // Fecha o menu automaticamente ao clicar em qualquer item (útil no celular)
     sidebar?.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', fecharMenu);
     });
