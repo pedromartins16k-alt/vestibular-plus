@@ -150,18 +150,28 @@ function abrirModalProjeto(projetoId) {
   if (elPrazo) elPrazo.textContent = `📅 Prazo: ${proj.prazo || '30 dias'}`;
   if (elDesc) elDesc.textContent = proj.descricao || proj.meta || 'Plano de estudos intensivo para seu vestibular.';
 
-  // Botão global "Praticar Questões": leva a matéria do projeto como contexto
-  if (elBtnPraticar) {
-    const materiaParam = encodeURIComponent(proj.materia || '');
-    elBtnPraticar.href = materiaParam
-      ? `./questoes.html?materia=${materiaParam}`
-      : './questoes.html';
-  }
-
   const tarefasNorm = (proj.tarefas || proj.etapas || []).map(normalizarTarefa);
   const total = tarefasNorm.length;
   const concluidas = tarefasNorm.filter(t => t.concluida).length;
   const percentual = total > 0 ? Math.round((concluidas / total) * 100) : (proj.progresso ?? 25);
+
+  // Identifica a primeira atividade ainda não concluída (ou fallback para o conteúdo/título do projeto)
+  const primeiraPendente = tarefasNorm.find(t => !t.concluida) || tarefasNorm[0];
+  const conteudoContexto = primeiraPendente?.titulo || proj.titulo || proj.objetivo || '';
+
+  // Configura botão principal "Praticar Questões" com contexto da matéria e da atividade pendente
+  if (elBtnPraticar) {
+    const paramsPraticar = new URLSearchParams();
+    if (proj.materia && proj.materia !== 'Geral') {
+      paramsPraticar.set('materia', proj.materia);
+    }
+    if (conteudoContexto) {
+      paramsPraticar.set('busca', conteudoContexto);
+      paramsPraticar.set('assunto', conteudoContexto);
+    }
+    const qs = paramsPraticar.toString();
+    elBtnPraticar.href = qs ? `./questoes.html?${qs}` : './questoes.html';
+  }
 
   if (elStatus) {
     if (percentual === 100) {
@@ -180,12 +190,16 @@ function abrirModalProjeto(projetoId) {
     if (tarefasNorm.length === 0) {
       elTarefasLista.innerHTML = `<p style="font-size:0.86rem; color:var(--text-secondary);">Nenhuma atividade cadastrada para este projeto.</p>`;
     } else {
-      const materiaParam = encodeURIComponent(proj.materia || '');
       elTarefasLista.innerHTML = tarefasNorm.map((t, idx) => {
-        const assuntoParam = encodeURIComponent(t.titulo || '');
-        const urlPraticar = materiaParam
-          ? `./questoes.html?materia=${materiaParam}&assunto=${assuntoParam}`
-          : `./questoes.html?assunto=${assuntoParam}`;
+        const paramsTarefa = new URLSearchParams();
+        if (proj.materia && proj.materia !== 'Geral') {
+          paramsTarefa.set('materia', proj.materia);
+        }
+        if (t.titulo) {
+          paramsTarefa.set('busca', t.titulo);
+          paramsTarefa.set('assunto', t.titulo);
+        }
+        const urlPraticar = `./questoes.html?${paramsTarefa.toString()}`;
         return `
         <div class="modal-tarefa-item ${t.concluida ? 'concluida' : ''}" data-task-idx="${idx}" title="Clique para alternar status">
           <span class="modal-tarefa-check">${t.concluida ? '✓' : ''}</span>
@@ -415,6 +429,16 @@ function atualizarProximoPasso(projetos, sessoes) {
     const prazo = primeiroProjeto.prazo || 'Em andamento';
     const progresso = primeiroProjeto.progresso ?? 25;
 
+    const paramsHero = new URLSearchParams();
+    if (materia && materia !== 'Geral') {
+      paramsHero.set('materia', materia);
+    }
+    if (proximaTarefaTexto) {
+      paramsHero.set('busca', proximaTarefaTexto);
+      paramsHero.set('assunto', proximaTarefaTexto);
+    }
+    const urlHeroPraticar = paramsHero.toString() ? `./questoes.html?${paramsHero.toString()}` : './questoes.html';
+
     container.innerHTML = `
       <div class="proximo-passo-card fade-up">
         <div class="proximo-passo-badge">🎯 SEU PRÓXIMO PASSO RECOMENDADO</div>
@@ -436,7 +460,7 @@ function atualizarProximoPasso(projetos, sessoes) {
             <button type="button" class="btn btn-primary btn-proximo-passo btn-abrir-projeto-hero" data-projeto-id="${primeiroProjeto.id}">
               Abrir Projeto 📋
             </button>
-            <a href="./questoes.html" class="btn btn-ghost btn-proximo-passo">
+            <a href="${urlHeroPraticar}" class="btn btn-ghost btn-proximo-passo">
               Praticar Questões 📝
             </a>
           </div>

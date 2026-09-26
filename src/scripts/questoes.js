@@ -194,94 +194,177 @@ async function iniciar() {
 
   renderFiltros(materiasCache);
 
-  // ── Leitura de parâmetros de contexto de projeto ─────────────────────────
-  // Suportamos dois formatos:
-  //  • ?materia=<UUID>    — vindo de "Progresso por matéria" no dashboard (legado)
-  //  • ?materia=<nome>    — vindo do botão "Praticar" de projetos (ex: "História")
-  //  • ?assunto=<texto>   — título da tarefa do projeto (ex: "Governo Provisório")
+  // ── Leitura de parâmetros de contexto de projeto ou busca ─────────────────
+  // Suportamos:
+  //  • ?materia=<UUID> ou <nome>  — vindo do dashboard ou projeto (ex: "História", "matematica")
+  //  • ?busca=<texto> ou ?assunto=<texto> — título da atividade/etapa (ex: "Revolução Constitucionalista de 1932 em São Paulo")
   // ─────────────────────────────────────────────────────────────────────────
   const params = new URLSearchParams(window.location.search);
   const paramMateria = params.get('materia');
-  const paramAssunto = params.get('assunto');
+  const paramAssunto = params.get('busca') || params.get('assunto');
+
+  const normalizar = str => (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Função utilitária para exibir aviso de contexto na interface
+  const exibirBannerContexto = (tag, htmlDesc, ehAlerta = false) => {
+    const elBanner = document.getElementById('contexto-projeto-banner');
+    const elTag = document.getElementById('contexto-banner-tag');
+    const elDesc = document.getElementById('contexto-banner-desc');
+    const elFechar = document.getElementById('contexto-banner-fechar');
+    if (!elBanner) return;
+
+    if (elTag) elTag.textContent = tag;
+    if (elDesc) elDesc.innerHTML = htmlDesc;
+    elBanner.className = `contexto-projeto-banner ativo ${ehAlerta ? 'alerta' : ''}`;
+    elFechar?.addEventListener('click', () => {
+      elBanner.classList.remove('ativo');
+    }, { once: true });
+  };
 
   if (paramMateria && paramMateria !== 'todas') {
-    // 1. Tenta match exato por UUID (comportamento legado — Progresso por matéria)
+    // 1. Tenta match exato por UUID
     let chipAlvo = filtroContainer.querySelector(`.chip[data-materia="${paramMateria}"]`);
+    let materiaIdFinal = chipAlvo ? paramMateria : null;
+    let materiaObjFinal = null;
 
-    // 2. Se não achou por UUID, tenta match por nome (case-insensitive, sem acentos)
+    // 2. Se não achou por UUID, resolve por nome (case-insensitive, sem acentos, trim)
     if (!chipAlvo) {
-      const normalizar = str => (str || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .trim();
-
       const nomeAlvo = normalizar(paramMateria);
-      const materiaEncontrada = materiasCache.find(m => normalizar(m.nome) === nomeAlvo);
-      if (materiaEncontrada) {
-        chipAlvo = filtroContainer.querySelector(`.chip[data-materia="${materiaEncontrada.id}"]`);
+      materiaObjFinal = materiasCache.find(m => normalizar(m.nome) === nomeAlvo);
+      if (materiaObjFinal) {
+        materiaIdFinal = materiaObjFinal.id;
+        chipAlvo = filtroContainer.querySelector(`.chip[data-materia="${materiaIdFinal}"]`);
+      } else {
+        console.warn(`[questoes] Matéria informada "${paramMateria}" não foi encontrada no catálogo.`);
       }
+    } else {
+      materiaObjFinal = materiasCache.find(m => m.id === paramMateria);
     }
 
-    if (chipAlvo) {
-      // Ativa o filtro de matéria (seta materiaAtiva, mostra temas)
+    if (chipAlvo && materiaIdFinal) {
+      // Ativa o chip da matéria correspondente
       chipAlvo.click();
 
-      // 3. Se veio ?assunto=, tenta selecionar a aula (tema) mais próxima
-      if (paramAssunto) {
-        // Pequeno delay para garantir que renderTemas() já terminou de inserir os .tema-card
+      // 3. Se veio ?assunto= ou ?busca=, faz correspondência temática segura com as aulas da MESMA matéria
+      if (paramAssunto && paramAssunto.trim().length > 0) {
         setTimeout(() => {
-          const normalizar = str => (str || '')
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .trim();
+          const assuntoTexto = paramAssunto.trim();
+          const assuntoNorm = normalizar(assuntoTexto);
 
-          const assuntoNorm = normalizar(paramAssunto);
-          // Extrai palavras com 4+ caracteres como palavras-chave
-          const palavrasChave = assuntoNorm
-            .split(/\s+/)
-            .filter(p => p.length >= 4);
+          // Stopwords e termos genéricos que NÃO devem ser usados para match
+          const stopwords = new Set([
+            'revisar', 'estudar', 'resolver', 'fazer', 'questoes', 'exercicios', 'resumo',
+            'fundamentos', 'teoricos', 'conceitos', 'chave', 'elaborar', 'esquematico',
+            'mapa', 'mental', 'flashcards', 'fixacao', 'ativa', 'simulado', 'tematico',
+            'diagnosticar', 'pontos', 'maior', 'taxa', 'erro', 'sobre', 'para', 'com',
+            'pelo', 'pela', 'como', 'mais', 'menos', 'seus', 'suas', 'esse', 'esta',
+            'enem', 'vestibular', 'vestibulares', 'geral', 'etapa', 'atividade', 'aula'
+          ]);
 
-          // Pontua cada aula pelo número de palavras-chave que seu título contém
-          let melhorAulaId = null;
-          let melhorPontuacao = 0;
+          const tokensAssunto = assuntoNorm
+            .split(' ')
+            .filter(t => t.length >= 3 && !stopwords.has(t));
 
           const aulasDaMateria = aulasCache.filter(a => a.materia_id === materiaAtiva);
+          let melhorAula = null;
+          let melhorScore = 0;
+
+          // Dicionário temático histórico/educacional para associar eventos a aulas conhecidas
+          const sinonimosTematicos = [
+            {
+              termos: ['1932', 'constitucionalista', 'revolucao de 32', 'vargas', 'getulio', 'provisorio', 'estado novo'],
+              aulaKeyword: 'vargas'
+            },
+            {
+              termos: ['ditadura', 'ai 5', 'militares', '1964', 'redemocratizacao'],
+              aulaKeyword: 'ditadura'
+            },
+            {
+              termos: ['guerra fria', 'muro de berlim', 'urss', 'eua', 'polarizacao'],
+              aulaKeyword: 'guerra fria'
+            },
+            {
+              termos: ['newton', 'inercia', 'dinamica', 'leis de newton'],
+              aulaKeyword: 'newton'
+            },
+            {
+              termos: ['estequiometria', 'mol', 'massa molar', 'reacao quimica'],
+              aulaKeyword: 'estequiometria'
+            },
+            {
+              termos: ['citologia', 'celula', 'mitocondria', 'membrana'],
+              aulaKeyword: 'citologia'
+            }
+          ];
 
           for (const aula of aulasDaMateria) {
             const tituloNorm = normalizar(aula.titulo);
-            let pontos = 0;
-            for (const palavra of palavrasChave) {
-              if (tituloNorm.includes(palavra)) pontos++;
+            let score = 0;
+
+            // 1. Termos específicos diretos do assunto presentes no título da aula
+            for (const token of tokensAssunto) {
+              if (tituloNorm.includes(token)) {
+                score += token.length >= 6 ? 3 : 2;
+              }
             }
-            // Bonus se o assunto contém o título da aula (correspondência reversa)
-            if (assuntoNorm.includes(tituloNorm) && tituloNorm.length > 4) pontos += 2;
-            if (pontos > melhorPontuacao) {
-              melhorPontuacao = pontos;
-              melhorAulaId = aula.id;
+
+            // 2. Se o título da aula está contido no assunto
+            if (assuntoNorm.includes(tituloNorm) && tituloNorm.length >= 5) {
+              score += 5;
+            }
+
+            // 3. Correspondência contextual via sinônimos temáticos comprovados
+            for (const sin of sinonimosTematicos) {
+              const temTermoAssunto = sin.termos.some(t => assuntoNorm.includes(t));
+              const aulaBate = tituloNorm.includes(sin.aulaKeyword);
+              if (temTermoAssunto && aulaBate) {
+                score += 4;
+              }
+            }
+
+            if (score > melhorScore) {
+              melhorScore = score;
+              melhorAula = aula;
             }
           }
 
-          if (melhorAulaId && melhorPontuacao > 0) {
-            // Clica no card do tema correspondente, se existir no DOM
-            const cardTema = container.querySelector(`.tema-card[data-tema="${melhorAulaId}"]`);
+          const materiaNome = materiaObjFinal?.nome || 'Matéria';
+
+          // Se encontramos uma aula com correspondência comprovada (score >= 2)
+          if (melhorAula && melhorScore >= 2) {
+            const cardTema = container.querySelector(`.tema-card[data-tema="${melhorAula.id}"]`);
             if (cardTema) {
               cardTema.click();
             } else {
-              // Seleciona diretamente via variável e renderiza
-              temaAtivo = melhorAulaId;
+              temaAtivo = melhorAula.id;
               mostrandoTemas = false;
               indiceAtual = 0;
               renderQuestaoAtual();
             }
+
+            exibirBannerContexto(
+              `🎯 Projeto: ${materiaNome}`,
+              `Exibindo questões de <strong>${melhorAula.titulo}</strong> com base na sua atividade <em>"${assuntoTexto}"</em>.`
+            );
+          } else {
+            // FALLBACK SEGURO: nenhuma correspondência específica confiável encontrada.
+            // Permanece nos temas da mesma matéria SEM inventar aula e SEM mostrar outras disciplinas.
+            exibirBannerContexto(
+              `ℹ️ ${materiaNome}`,
+              `Não encontramos questões específicas para a atividade <em>"${assuntoTexto}"</em>. Escolha um dos temas de <strong>${materiaNome}</strong> abaixo para praticar.`,
+              true
+            );
           }
-          // Se não encontrou aula específica: mantém a visão de temas da matéria
-          // → o estudante vê todas as questões da matéria (nunca mistura disciplinas)
         }, 50);
       }
 
-      return; // renderTemas() já cuida da renderização inicial
+      return; // renderTemas() já cuida da renderização
     }
   }
 
