@@ -999,13 +999,6 @@ async function enviarMensagem(mensagem) {
   historico.push({ role: 'usuario', texto: mensagem });
   renderCarregando();
 
-  // Registra uso no banco
-  supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'chat' }).then(({ data: usoRes }) => {
-    if (usoRes) {
-      const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
-      definirBadge(usoRes.usado ?? 0, usoRes.limite ?? limiteOficial);
-    }
-  }).catch(() => {});
 
   const msgLower = (mensagem || '').toLowerCase();
   const solicitouFlashcards = /\b(flashcards?|cards?)\b/i.test(msgLower) && /\b(cri[ae]|ger[ae]|fa[çz]|mont[ae]|elabor[ae]|10|5|quantos)\b/i.test(msgLower);
@@ -1019,193 +1012,153 @@ async function enviarMensagem(mensagem) {
   );
 
   try {
-    const { data, error } = await supabase.functions.invoke('chat-ia', {
-      body: {
-        mensagem,
-        historico,
-        materia: materiaAtiva.nome || undefined,
-      },
-    });
+    let data = null;
+    let error = null;
+    let statusErro = null;
+    let corpoErro = null;
+
+    // Retry com backoff exponencial para sobrecarga temporária (máximo 2 tentativas: 1s, 2s)
+    const MAX_TENTATIVAS = 2;
+    for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+      const resposta = await supabase.functions.invoke('chat-ia', {
+        body: {
+          mensagem,
+          historico,
+          materia: materiaAtiva.nome || undefined,
+        },
+      });
+
+      data = resposta.data;
+      error = resposta.error;
+
+      if (data?.resposta) {
+        break; // Sucesso
+      }
+
+      if (error) {
+        // Tenta ler o status e corpo do erro
+        try {
+          if (error.context && typeof error.context.json === 'function') {
+            corpoErro = await error.context.clone().json();
+          }
+          if (error.context?.status) {
+            statusErro = error.context.status;
+          }
+        } catch (_) {
+          try {
+            if (error.context && typeof error.context.text === 'function') {
+              const textoErro = await error.context.clone().text();
+              corpoErro = { raw: textoErro };
+            }
+          } catch (__) {}
+        }
+
+        const isRateLimit = statusErro === 429 ||
+          error.message?.includes('429') ||
+          corpoErro?.erro === 'rate_limit' ||
+          corpoErro?.code === 429;
+
+        // Se for erro de rate limit temporário e ainda tiver tentativas, espera com backoff
+        if (isRateLimit && tentativa < MAX_TENTATIVAS) {
+          const esperaMs = tentativa * 1500;
+          console.warn(`[Chat IA] Rate limit temporário detectado (429). Tentativa ${tentativa}/${MAX_TENTATIVAS}. Aguardando ${esperaMs}ms...`);
+          await new Promise(r => setTimeout(r, esperaMs));
+          continue;
+        }
+
+        // Se for outro erro ou esgotou tentativas, interrompe o loop
+        break;
+      }
+    }
 
     removerCarregando();
 
     if (data?.resposta) {
       renderMensagem('tutor', data.resposta);
       historico.push({ role: 'assistente', texto: data.resposta });
+
+      // Registra consumo da cota diária no banco APENAS após resposta bem-sucedida da IA
+      supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'chat' }).then(({ data: usoRes }) => {
+        if (usoRes) {
+          const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
+          definirBadge(usoRes.usado ?? 0, usoRes.limite ?? limiteOficial);
+        }
+      }).catch((errUso) => {
+        console.warn('[Chat IA] Erro ao registrar uso no banco:', errUso);
+      });
+
       if (solicitouFlashcards) {
         integrarChatParaFlashcards(data.resposta);
       }
       if (solicitouProjeto) {
         integrarChatParaProjeto(data.resposta, mensagem);
       }
-    } else if (error) {
-      console.warn('[Chat IA] Edge Function retornou erro, usando tutor educacional:', error);
-      const respostaFallback = gerarRespostaTutorFallback(mensagem, materiaAtiva.nome);
-      renderMensagem('tutor', respostaFallback);
-      historico.push({ role: 'assistente', texto: respostaFallback });
-      if (solicitouFlashcards) {
-        integrarChatParaFlashcards(respostaFallback);
+
+      if (data?.uso) {
+        definirBadge(data.uso.usado, data.uso.limite);
       }
-      if (solicitouProjeto) {
-        integrarChatParaProjeto(respostaFallback, mensagem);
+    } else if (error) {
+      // Diagnóstico detalhado no console
+      console.error('[Chat IA] Falha na Edge Function chat-ia:', {
+        status: statusErro,
+        error,
+        corpo: corpoErro,
+      });
+
+      // Diferenciação clara entre:
+      // a) Limite legítimo do plano do usuário (cota comercial atingida)
+      // b) Rate limit técnico do provedor de IA / Edge Function (429)
+      // c) Falha de autenticação (401)
+      // d) Erro genérico de conexão/servidor
+
+      const isRateLimit = statusErro === 429 ||
+        error.message?.includes('429') ||
+        corpoErro?.erro === 'rate_limit' ||
+        corpoErro?.code === 429;
+
+      const isAuthError = statusErro === 401 ||
+        corpoErro?.erro === 'nao_autenticado' ||
+        error.message?.includes('401');
+
+      const isCotaExcedida = corpoErro?.motivo === 'limite_diario' ||
+        corpoErro?.permitido === false;
+
+      if (isCotaExcedida) {
+        const limite = corpoErro?.limite || getPlanLimit('chat_dia', planoInfo.nome) || 5;
+        if (planoInfo.isUltimate || planoInfo.ordem >= 3) {
+          renderErro(`Você atingiu o limite diário de ${limite} perguntas do Chat IA no seu plano Ultimate. O contador reseta à meia-noite.`);
+        } else {
+          renderErro(`Você atingiu o limite diário de perguntas do Chat IA (${limite} perguntas/dia) para o seu plano. Faça upgrade para continuar!`);
+          const linkUpgrade = document.createElement('div');
+          linkUpgrade.style.margin = '10px 0 0 28px';
+          linkUpgrade.innerHTML = `<a href="./precos.html?upgrade=chat" class="btn btn-primary" style="display:inline-flex; padding:8px 16px; font-size:0.9rem;">Fazer upgrade do plano</a>`;
+          mensagensEl.appendChild(linkUpgrade);
+        }
+      } else if (isAuthError) {
+        renderErro('Sua sessão expirou ou não foi reconhecida. Por favor, recarregue a página ou faça login novamente.');
+      } else if (isRateLimit) {
+        renderErro('O Tutor IA está recebendo muitas requisições no momento. Aguarde alguns segundos e tente novamente.');
+      } else {
+        const mensagemAmigavel = corpoErro?.mensagem || corpoErro?.error || 'Não consegui consultar o Tutor IA agora. Tente novamente em alguns segundos.';
+        renderErro(mensagemAmigavel);
       }
     } else {
-      renderErro('Não recebi uma resposta válida do tutor. Tente novamente.');
-    }
-
-    if (data?.uso) {
-      definirBadge(data.uso.usado, data.uso.limite);
+      renderErro('Não recebi uma resposta válida do tutor. Tente novamente em alguns segundos.');
     }
   } catch (err) {
     removerCarregando();
-    console.warn('[Chat IA] Falha de conexão com a função, usando tutor educacional:', err);
-    const respostaFallback = gerarRespostaTutorFallback(mensagem, materiaAtiva.nome);
-    renderMensagem('tutor', respostaFallback);
-    historico.push({ role: 'assistente', texto: respostaFallback });
-    if (solicitouFlashcards) {
-      integrarChatParaFlashcards(respostaFallback);
-    }
-    if (solicitouProjeto) {
-      integrarChatParaProjeto(respostaFallback, mensagem);
-    }
+    console.error('[Chat IA] Erro inesperado ao comunicar com o Tutor IA:', err);
+    renderErro('Não consegui consultar o Tutor IA agora. Verifique sua conexão e tente novamente em alguns segundos.');
   }
 }
 
-// Respostas estruturadas de alta qualidade para apoio de estudo caso a Edge Function esteja offline
-function gerarRespostaTutorFallback(mensagem, materia) {
-  const m = (mensagem || '').toLowerCase();
 
-  if (m.includes('função afim') || m.includes('funcao afim')) {
-    if (m.includes('flashcard') || m.includes('card')) {
-      return `Aqui estão **10 Flashcards Essenciais sobre Função Afim** para sua revisão do ENEM e vestibulares:
-
-| Frente (Pergunta) | Verso (Resposta) |
-| --- | --- |
-| Qual é a lei geral de formação de uma função afim? | f(x) = ax + b, com a e b pertencentes aos reais e a ≠ 0. |
-| O que representa o coeficiente angular 'a'? | Representa a taxa de variação e a inclinação da reta no gráfico. |
-| O que ocorre se o coeficiente angular 'a' for positivo (a > 0)? | A função é estritamente crescente; conforme x aumenta, f(x) também aumenta. |
-| O que ocorre se o coeficiente angular 'a' for negativo (a < 0)? | A função é estritamente decrescente; conforme x aumenta, f(x) diminui. |
-| Qual o significado geométrico do coeficiente linear 'b'? | É o ponto exato onde a reta intercepta o eixo das ordenadas (y), no ponto (0, b). |
-| O que caracteriza uma Função Linear? | É uma função afim em que b = 0, ou seja, f(x) = ax, passando obrigatoriamente pela origem (0, 0). |
-| O que caracteriza uma Função Constante? | É quando a = 0 (f(x) = b), formando uma reta paralela ao eixo x (não é classificada como função de 1º grau). |
-| Como se calcula a raiz ou zero da função afim? | Igualando f(x) a 0: ax + b = 0 → x = -b / a. Geometricamente, intercepta o eixo x em (-b/a, 0). |
-| Qual a taxa de variação média em uma função afim? | A taxa de variação é constante e igual a Δy / Δx = (y2 - y1) / (x2 - x1) = a. |
-| Como a função afim é cobrada no ENEM? | Em situações cotidianas com uma parte fixa mais uma variável (ex: corridas de app: tarifa base + preço/km). |`;
-    }
-
-    return `Uma **função afim** (ou função polinomial do 1º grau) é qualquer função com a lei de formação:
-
-\`f(x) = ax + b\` (com a ≠ 0)
-
-### Conceitos Essenciais para o Vestibular:
-- **Coeficiente angular (a)**: determina a inclinação da reta e a taxa de variação. Se \`a > 0\`, a função é estritamente crescente; se \`a < 0\`, a função é decrescente.
-- **Coeficiente linear (b)**: indica o ponto exato onde o gráfico intercepta o eixo vertical y, ou seja, \`(0, b)\`.
-- **Raiz ou zero da função**: o valor de x que faz \`f(x) = 0\`, obtido pela fórmula \`x = -b / a\`.
-
-💡 **Como cai no ENEM e grandes vestibulares:**
-Geralmente aparece em problemas práticos do cotidiano com taxas fixas somadas a valores variáveis (como contas de luz, corridas de aplicativo ou custos de produção).`;
-  }
-
-  if (m.includes('balanceamento') || m.includes('equações químicas') || m.includes('quimica') || m.includes('química')) {
-    return `O **balanceamento de equações químicas** garante que a quantidade de átomos de cada elemento nos reagentes seja exatamente igual à quantidade nos produtos (obedecendo à Lei de Conservação das Massas de Lavoisier).
-
-### Método das Tentativas — Regra do MACHO:
-Balanceie os elementos nesta sequência:
-1. **M**etais
-2. **A**metais
-3. **C**arbono
-4. **H**idrogênio
-5. **O**xigênio
-
-Exemplo clássico de combustão completa:
-\`C3H8 + 5 O2 → 3 CO2 + 4 H2O\`
-- Carbono: 3 reagentes = 3 produtos
-- Hidrogênio: 8 reagentes = 8 produtos (4 × 2)
-- Oxigênio: 10 reagentes (5 × 2) = 10 produtos (3 × 2 + 4 × 1)`;
-  }
-
-  if (m.includes('redação') || m.includes('redacao') || m.includes('dissertativo')) {
-    return `Para alcançar a **Nota 1000 na Redação do ENEM**, seu texto dissertativo-argumentativo deve dominar as **5 Competências Avaliativas**:
-
-1. **Competência 1**: Domínio da norma padrão da língua escrita.
-2. **Competência 2**: Compreensão da proposta temática e repertório sociocultural produtivo e legitimado.
-3. **Competência 3**: Projeto de texto estratégico, seleção e organização coerente dos argumentos.
-4. **Competência 4**: Coesão textual rica com operadores argumentativos interparágrafos e intraparágrafos.
-5. **Competência 5**: Proposta de intervenção completa com os **5 elementos obrigatórios**:
-   - Agente (Quem?)
-   - Ação (O que?)
-   - Meio/Modo (Como?)
-   - Efeito/Finalidade (Para que?)
-   - Detalhamento de um dos elementos.`;
-  }
-
-  if (m.includes('figura') || m.includes('linguagem') || m.includes('portugues') || m.includes('português')) {
-    return `As **figuras de linguagem** mais frequentes nas provas de Português e Literatura:
-
-1. **Metáfora**: comparação implícita sem conectivo comparativo (*"Seus olhos são dois faróis"*).
-2. **Metonímia**: substituição fundada numa relação de contiguidade (*"Li Machado de Assis"*, trocando autor pela obra).
-3. **Antítese**: aproximação de termos de sentidos contrários (*"A tristeza e a alegria caminham juntas"*).
-4. **Paradoxo**: proposição que une ideias aparentemente inconciliáveis (*"Amor é fogo que arde sem se ver"*).
-5. **Hipérbole**: exagero expressivo (*"Estou morrendo de sede"*).
-6. **Eufemismo**: suavização de expressões pesadas ou chocantes (*"Descansou em paz"*).`;
-  }
-
-  if (m.includes('vargas') || m.includes('historia') || m.includes('história')) {
-    return `A **Era Vargas (1930 – 1945)** é um divisor de águas na história do Brasil republicano. Dividida em 3 fases:
-
-1. **Governo Provisório (1930–1934)**:
-   - Centralização política e nomeação de tenentes interventores.
-   - Revolução Constitucionalista de 1932 em São Paulo.
-   - Promulgação da Constituição de 1934 com voto secreto e voto feminino.
-
-2. **Governo Constitucional (1934–1937)**:
-   - Polarização radical entre a AIB (integralistas) e a ANL (aliancistas).
-   - O pretexto do falso "Plano Cohen" (1937) foi utilizado para decretar o golpe de Estado.
-
-3. **Estado Novo (1937–1945)**:
-   - Ditadura com censura prévia através do DIP (Departamento de Imprensa e Propaganda).
-   - Criação da CLT (1943) e bases da industrialização pesada (CSN, Vale).
-   - Envio da FEB para a 2ª Guerra Mundial ao lado das democracias ocidentais, o que acelerou a queda do regime.`;
-  }
-
-  if (m.includes('newton') || m.includes('fisica') || m.includes('física')) {
-    return `As **Três Leis de Newton** que regem a Mecânica Clássica:
-
-1. **1ª Lei — Inércia**: Todo corpo permanece em seu estado de repouso ou de movimento retilíneo uniforme a menos que uma força resultante não nula atue sobre ele.
-2. **2ª Lei — Princípio Fundamental da Dinâmica**: A força resultante aplicada a um corpo é proporcional à taxa de variação de sua velocidade:
-   \`F_res = m · a\`
-3. **3ª Lei — Ação e Reação**: Para toda força de ação exercida por um corpo sobre outro, existe uma força de reação exercida pelo segundo sobre o primeiro, com a mesma intensidade, mesma direção e sentidos opostos. (Nunca se anulam porque atuam em corpos diferentes!).`;
-  }
-
-  if (m.includes('mitose') || m.includes('meiose') || m.includes('biologia')) {
-    return `Diferenças fundamentais entre **Mitose** e **Meiose**:
-
-- **Mitose (Divisão Equacional)**:
-  - Célula 2n gera **2 células 2n idênticas**.
-  - Ocorre em células somáticas.
-  - Finalidades: crescimento do organismo, regeneração e reposição tecidual.
-
-- **Meiose (Divisão Reducional)**:
-  - Célula 2n gera **4 células n (haploides)** com variabilidade genética.
-  - Ocorre na formação de gametas e esporos.
-  - Apresenta o **crossing-over** (permutação gênica) na Prófase I, garantindo a diversidade da espécie.`;
-  }
-
-  const materiaNome = materia || 'Geral';
-  return `Excelente pergunta sobre **${materiaNome}**!
-
-### Como dominar esse conteúdo:
-1. **Identifique a base teórica**: verifique quais fórmulas, definições e termos fundamentam o enunciado.
-2. **Atenção aos dados fornecidos**: separe o que a questão pede do que já foi informado.
-3. **Pratique com questões reais**: resolver provas anteriores do ENEM e vestibulares é a melhor forma de fixar.
-
-Se você tiver uma questão específica de vestibular com alternativas, digite ou cole aqui para resolvermos juntos passo a passo!`;
-}
 
 // Configuração das sugestões na tela inicial
 function configurarSugestoesIniciais() {
   sugestoesGrid?.querySelectorAll('.sugestao-btn').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (enviando) return;
       const pergunta = btn.dataset.pergunta;
       inputEl.value = pergunta;
       ajustarAlturaTextarea();
@@ -1408,6 +1361,7 @@ function configurarEventosUI() {
 
     enviando = true;
     btnEnviar.disabled = true;
+    inputEl.disabled = true;
     inputEl.value = '';
     ajustarAlturaTextarea();
 
@@ -1416,6 +1370,7 @@ function configurarEventosUI() {
     } finally {
       enviando = false;
       btnEnviar.disabled = false;
+      inputEl.disabled = false;
       inputEl.focus();
     }
   });
