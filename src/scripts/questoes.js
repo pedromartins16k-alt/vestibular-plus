@@ -7,7 +7,9 @@ import { buscarFavoritos, alternarFavorito } from './favoritos-global.js';
 import {
   obterOrdemPlano,
   canAccessDifficulty,
-  getPlanoMinimoParaDificuldade
+  getPlanoMinimoParaDificuldade,
+  PLAN_LIMITS,
+  isUltimate
 } from '../lib/permissions.js';
 
 const container = document.getElementById('questao-container');
@@ -139,6 +141,14 @@ async function buscarNomePlanoUsuario() {
 }
 
 async function checarLimiteQuestao() {
+  const ordem = obterOrdemPlano(nomePlanoUsuario);
+  const limitePlano = PLAN_LIMITS[(nomePlanoUsuario || 'free').toLowerCase()]?.questoes_dia;
+
+  // Planos com questões ilimitadas (Basic, Pro, Ultimate) nunca são bloqueados
+  if (limitePlano === null || ordem >= 1) {
+    return { permitido: true, ilimitado: true };
+  }
+
   const { data: uso, error } = await supabase.rpc('consultar_uso_diario', { p_tipo: 'questao' });
   if (error) {
     return { permitido: true };

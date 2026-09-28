@@ -7,7 +7,9 @@ import { buscarFavoritos, alternarFavorito } from './favoritos-global.js';
 import {
   obterOrdemPlano,
   canAccessDifficulty,
-  getPlanoMinimoParaDificuldade
+  getPlanoMinimoParaDificuldade,
+  PLAN_LIMITS,
+  isUltimate
 } from '../lib/permissions.js';
 
 const grid = document.getElementById('resumo-grid');
@@ -18,6 +20,7 @@ let resumosCache = [];
 let materiaAtiva = 'todas';
 let favoritosSet = new Set();
 let resumoModalAtual = null;
+let nomePlanoUsuario = 'free';
 
 function getPlanoExclusivo(resumo) {
   const dif = resumo?.nivel_dificuldade || 'facil';
@@ -124,6 +127,7 @@ async function iniciar() {
   const resumos = resResumos.data || [];
 
   resumosCache = marcarResumosLiberadosEBloqueados(resumos, nomePlano);
+  nomePlanoUsuario = nomePlano;
   favoritosSet = favoritos || new Set();
 
   renderFiltros(materias);
@@ -209,6 +213,16 @@ function renderResumos() {
 
 // Checa o limite diário do plano antes de deixar o aluno ler o resumo.
 async function handleAbrirResumo(resumo) {
+  const ordem = obterOrdemPlano(nomePlanoUsuario);
+  const limitePlano = PLAN_LIMITS[(nomePlanoUsuario || 'free').toLowerCase()]?.resumos_dia;
+
+  // Planos com resumos ilimitados (Basic, Pro, Ultimate) nunca são bloqueados
+  if (limitePlano === null || ordem >= 1) {
+    supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'resumo' }).catch(() => {});
+    abrirModal(resumo);
+    return;
+  }
+
   const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'resumo' });
 
   if (error) {
@@ -219,7 +233,7 @@ async function handleAbrirResumo(resumo) {
 
   if (!uso.permitido) {
     const msg = uso.motivo === 'limite_diario'
-      ? `Você atingiu o limite de ${uso.limite} resumos por dia do seu plano atual.`
+      ? `Você atingiu o limite de ${uso.limite || 10} resumos por dia do seu plano atual.`
       : 'Não foi possível verificar seu acesso agora. Tenta de novo em instantes.';
     mostrarModalUpgrade(msg, { nome: 'Basic', gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)' });
     return;

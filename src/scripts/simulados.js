@@ -5,7 +5,9 @@ import { exigirAutenticacao } from '../lib/authGuard.js';
 import {
   obterOrdemPlano,
   canAccessDifficulty,
-  getPlanoMinimoParaDificuldade
+  getPlanoMinimoParaDificuldade,
+  PLAN_LIMITS,
+  isUltimate
 } from '../lib/permissions.js';
 
 const conteudo = document.getElementById('conteudo');
@@ -293,6 +295,16 @@ function renderListaSimulados(simulados) {
 
 // Checa o limite semanal do plano ANTES de deixar o aluno começar a prova.
 async function handleIniciarSimulado(simulado) {
+  const ordem = obterOrdemPlano(nomePlanoUsuario);
+  const limitePlano = PLAN_LIMITS[(nomePlanoUsuario || 'free').toLowerCase()]?.simulados_semana;
+
+  // Ultimate tem simulados ILIMITADOS! Nunca bloqueia.
+  if (limitePlano === null || ordem >= 3 || isUltimate(nomePlanoUsuario)) {
+    supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'simulado' }).catch(() => {});
+    iniciarSimulado(simulado);
+    return;
+  }
+
   const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'simulado' });
 
   if (error) {
@@ -303,7 +315,7 @@ async function handleIniciarSimulado(simulado) {
 
   if (!uso.permitido) {
     const msg = uso.motivo === 'limite_semanal'
-      ? `Você já fez ${uso.usado} de ${uso.limite} simulados essa semana no seu plano atual.`
+      ? `Você já fez ${uso.usado} de ${uso.limite || 5} simulados essa semana no seu plano atual.`
       : 'Não foi possível verificar seu acesso agora. Tenta de novo em instantes.';
     mostrarModalUpgrade(msg, { nome: 'Basic', gradiente: 'linear-gradient(135deg, #0284c7, #38bdf8)' });
     return;

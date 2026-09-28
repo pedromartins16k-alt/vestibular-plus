@@ -541,9 +541,10 @@
      ========================================================================== */
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 16px;
     margin-bottom: 24px;
+    align-items: stretch;
   }
   .stat-card {
     position: relative;
@@ -556,7 +557,7 @@
     flex-direction: column;
     justify-content: space-between;
     transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
+    min-height: 100%;
   }
   .stat-card:hover {
     transform: translateY(-4px);
@@ -614,8 +615,8 @@
     justify-content: space-between;
     padding: 16px 18px;
     text-align: left;
-    grid-column: span 1;
-    min-width: 220px;
+    min-width: 0;
+    overflow: visible;
   }
   .cotas-header {
     display: flex;
@@ -624,6 +625,8 @@
     margin-bottom: 10px;
     padding-bottom: 6px;
     border-bottom: 1px solid var(--border-color);
+    flex-wrap: wrap;
+    gap: 4px;
   }
   .cotas-titulo {
     font-size: .76rem;
@@ -634,6 +637,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
+    white-space: nowrap;
   }
   .cotas-subtag {
     font-size: 0.68rem;
@@ -642,40 +646,51 @@
     background: rgba(124, 58, 237, 0.08);
     padding: 2px 6px;
     border-radius: var(--radius-full);
+    white-space: nowrap;
   }
   .cotas-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px 10px;
   }
   .cota-mini {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: .78rem;
-    padding: 4px 6px;
+    gap: 7px;
+    font-size: .8rem;
+    padding: 6px 8px;
     border-radius: var(--radius-sm);
     background: rgba(124, 58, 237, 0.04);
     border: 1px solid var(--border-color);
+    min-width: 0;
   }
   .cota-icone {
-    font-size: .95rem;
+    font-size: 1rem;
     line-height: 1;
     flex-shrink: 0;
   }
+  .cota-info {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
   .cota-num {
     font-weight: 800;
-    font-size: .95rem;
+    font-size: .98rem;
     color: var(--color-neon-blue);
     font-family: var(--font-display, sans-serif);
+    line-height: 1;
+    flex-shrink: 0;
   }
   .cota-rotulo {
     color: var(--text-secondary);
-    font-size: .73rem;
+    font-size: .74rem;
     font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    line-height: 1.25;
+    word-break: normal;
   }
 
   /* ==========================================================================
@@ -1183,13 +1198,32 @@
     .proximo-passo-card { padding: 18px 20px; }
   }
 
-  @media (max-width: 640px) {
+  @media (min-width: 1200px) {
     .stats-grid {
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(4, 1fr) minmax(230px, 1.25fr);
+    }
+  }
+
+  @media (max-width: 1199px) and (min-width: 769px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
     }
     .stat-card-cotas {
       grid-column: span 2;
     }
+  }
+
+  @media (max-width: 768px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .stat-card-cotas {
+      grid-column: span 2;
+    }
+  }
+
+  @media (max-width: 640px) {
     .topbar-actions { gap: 8px; }
     .quick-actions-bar {
       overflow-x: auto;
@@ -1210,6 +1244,52 @@
       position: fixed;
       top: 68px;
       right: 12px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .stat-card {
+      padding: 14px 12px;
+    }
+    .stat-card strong {
+      font-size: 1.5rem;
+    }
+    .stat-card-cotas {
+      grid-column: span 2;
+      padding: 14px 12px;
+    }
+    .cotas-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .cota-mini {
+      padding: 6px 6px;
+      gap: 5px;
+    }
+    .cota-icone {
+      font-size: .9rem;
+    }
+    .cota-num {
+      font-size: .9rem;
+    }
+    .cota-rotulo {
+      font-size: .72rem;
+    }
+  }
+
+  @media (max-width: 360px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+    .stat-card-cotas {
+      grid-column: span 1;
+    }
+    .cotas-grid {
+      grid-template-columns: 1fr;
     }
   }
 
@@ -1615,24 +1695,32 @@
           </div>
           <div class="cotas-grid">
             <div class="cota-mini" title="Questões diárias restantes">
-              <span class="cota-icone">✅</span>
-              <span class="cota-num" id="cota-questoes">15</span>
-              <span class="cota-rotulo">questões</span>
+              <span class="cota-icone">📝</span>
+              <div class="cota-info">
+                <span class="cota-num" id="cota-questoes">—</span>
+                <span class="cota-rotulo">questões</span>
+              </div>
             </div>
             <div class="cota-mini" title="Resumos diários restantes">
               <span class="cota-icone">📚</span>
-              <span class="cota-num" id="cota-resumos">10</span>
-              <span class="cota-rotulo">resumos</span>
+              <div class="cota-info">
+                <span class="cota-num" id="cota-resumos">—</span>
+                <span class="cota-rotulo">resumos</span>
+              </div>
             </div>
             <div class="cota-mini" title="Perguntas com IA restantes hoje">
               <span class="cota-icone">🤖</span>
-              <span class="cota-num" id="cota-chat">5</span>
-              <span class="cota-rotulo">IA chat</span>
+              <div class="cota-info">
+                <span class="cota-num" id="cota-chat">—</span>
+                <span class="cota-rotulo">IA chat</span>
+              </div>
             </div>
             <div class="cota-mini" title="Simulados semanais restantes">
               <span class="cota-icone">⏱️</span>
-              <span class="cota-num" id="cota-simulados">5</span>
-              <span class="cota-rotulo">simulados</span>
+              <div class="cota-info">
+                <span class="cota-num" id="cota-simulados">—</span>
+                <span class="cota-rotulo">simulados</span>
+              </div>
             </div>
           </div>
         </div>

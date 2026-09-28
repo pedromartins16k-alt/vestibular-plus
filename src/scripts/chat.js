@@ -220,7 +220,7 @@ async function atualizarBadgeInicial(userId) {
       return;
     }
 
-    definirBadge(uso.usado ?? 0, uso.limite ?? limiteOficial);
+    definirBadge(uso.usado ?? 0, limiteOficial);
   } catch (e) {
     const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
     definirBadge(0, limiteOficial);
@@ -1148,8 +1148,8 @@ async function enviarMensagem(mensagem) {
     const { data: checagem } = await supabase.rpc('consultar_uso_diario', { p_tipo: 'chat' });
     const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
 
-    if (checagem && checagem.permitido === false) {
-      const limiteExibido = checagem.limite || limiteOficial;
+    if (checagem && checagem.permitido === false && (checagem.usado === undefined || checagem.usado >= limiteOficial)) {
+      const limiteExibido = limiteOficial;
       if (planoInfo.isUltimate || planoInfo.ordem >= 3) {
         renderErro(`Você atingiu o limite diário de ${limiteExibido} perguntas do Chat IA no plano Ultimate. O contador reseta à meia-noite.`);
       } else {
@@ -1264,7 +1264,7 @@ async function enviarMensagem(mensagem) {
       supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'chat' }).then(({ data: usoRes }) => {
         if (usoRes) {
           const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
-          definirBadge(usoRes.usado ?? 0, usoRes.limite ?? limiteOficial);
+          definirBadge(usoRes.usado ?? 0, limiteOficial);
         }
       }).catch((errUso) => {
         console.warn('[Chat IA] Erro ao registrar uso no banco:', errUso);
@@ -1278,7 +1278,8 @@ async function enviarMensagem(mensagem) {
       }
 
       if (data?.uso) {
-        definirBadge(data.uso.usado, data.uso.limite);
+        const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
+        definirBadge(data.uso.usado, limiteOficial);
       }
     } else if (error) {
       // Diagnóstico detalhado no console
@@ -1307,7 +1308,7 @@ async function enviarMensagem(mensagem) {
         corpoErro?.permitido === false;
 
       if (isCotaExcedida) {
-        const limite = corpoErro?.limite || getPlanLimit('chat_dia', planoInfo.nome) || 5;
+        const limite = getPlanLimit('chat_dia', planoInfo.nome) || 5;
         if (planoInfo.isUltimate || planoInfo.ordem >= 3) {
           renderErro(`Você atingiu o limite diário de ${limite} perguntas do Chat IA no seu plano Ultimate. O contador reseta à meia-noite.`);
         } else {

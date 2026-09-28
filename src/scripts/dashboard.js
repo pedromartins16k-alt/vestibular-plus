@@ -5,13 +5,14 @@ import { calcularProgressoNivel } from '../utils/xp.js';
 import { iniciarBusca } from './busca-global.js';
 import { verificarConquistas } from './conquistas.js';
 import { aplicarCadeadosSidebar } from './plano-sidebar.js';
-import { isUltimate } from '../lib/permissions.js';
+import { isUltimate, obterPlanoUsuario, PLAN_LIMITS, obterOrdemPlano } from '../lib/permissions.js';
 import { getCache, setCache } from '../lib/cache.js';
 
 let currentUserId = null;
 let isCarregandoCotas = false;
 let ultimoFetchCotas = 0;
 let canalCotasRealtime = null;
+let planoUsuarioCache = null;
 
 // Cache em memória de dados carregados na sessão do dashboard
 let dadosProjetosCache = [];
@@ -379,6 +380,7 @@ async function carregarPerfil(userId) {
     if (!profile) return null;
 
     const planoNome = profile.planos?.nome || 'free';
+    planoUsuarioCache = planoNome;
     const ehUltimate = isUltimate(planoNome);
 
     const nomeExibicao = profile.nome_usuario || profile.nome?.split(' ')[0] || 'Aluno(a)';
@@ -674,40 +676,65 @@ async function carregarCotasDisponiveis(userId, planoNome = null) {
   const elC = document.getElementById('cota-chat');
   const elS = document.getElementById('cota-simulados');
 
-  if (planoNome && ['pro', 'premium', 'ultimate'].includes(planoNome.toLowerCase())) {
-    if (elQ) elQ.textContent = '∞';
-    if (elR) elR.textContent = '∞';
-    if (elC) elC.textContent = '∞';
-    if (elS) elS.textContent = '∞';
-    return;
+  if (planoNome) {
+    planoUsuarioCache = planoNome;
+  } else if (!planoUsuarioCache) {
+    const planoRes = await obterPlanoUsuario(userId);
+    planoUsuarioCache = planoRes.nome;
   }
+
+  const planoKey = (planoUsuarioCache || 'free').toLowerCase();
+  const limitesPlano = PLAN_LIMITS[planoKey] || PLAN_LIMITS.free;
+
+  // Imediatamente atualiza os indicadores ilimitados (null) para evitar flash de valores antigos
+  if (limitesPlano.questoes_dia === null && elQ) elQ.textContent = '∞';
+  if (limitesPlano.resumos_dia === null && elR) elR.textContent = '∞';
+  if (limitesPlano.simulados_semana === null && elS) elS.textContent = '∞';
 
   isCarregandoCotas = true;
   ultimoFetchCotas = Date.now();
 
   try {
-    const [usoQ, usoR, usoC, usoS] = await Promise.all([
-      supabase.rpc('consultar_uso_diario', { p_tipo: 'questao' }),
-      supabase.rpc('consultar_uso_diario', { p_tipo: 'resumo' }),
-      supabase.rpc('consultar_uso_diario', { p_tipo: 'chat' }),
-      supabase.rpc('consultar_uso_diario', { p_tipo: 'simulado' })
-    ]);
+    const rpcs = [];
+    if (limitesPlano.questoes_dia !== null) {
+      rpcs.push(supabase.rpc('consultar_uso_diario', { p_tipo: 'questao' }));
+    } else {
+      rpcs.push(Promise.resolve({ data: { ilimitado: true } }));
+    }
 
-    const formatarCota = (res, fallbackLimite, tipo) => {
-      if (res?.error || !res?.data) return fallbackLimite;
-      const d = res.data;
-      if (tipo !== 'chat' && d.ilimitado === true) return '∞';
-      const lim = d.limite ?? fallbackLimite;
-      const usado = d.usado ?? 0;
-      return Math.max(0, lim - usado);
+    if (limitesPlano.resumos_dia !== null) {
+      rpcs.push(supabase.rpc('consultar_uso_diario', { p_tipo: 'resumo' }));
+    } else {
+      rpcs.push(Promise.resolve({ data: { ilimitado: true } }));
+    }
+
+    // Chat sempre tem limite numérico (100 para ultimate, 30 para pro, 15 para basic, 5 para free)
+    rpcs.push(supabase.rpc('consultar_uso_diario', { p_tipo: 'chat' }));
+
+    if (limitesPlano.simulados_semana !== null) {
+      rpcs.push(supabase.rpc('consultar_uso_diario', { p_tipo: 'simulado' }));
+    } else {
+      rpcs.push(Promise.resolve({ data: { ilimitado: true } }));
+    }
+
+    const [usoQ, usoR, usoC, usoS] = await Promise.all(rpcs);
+
+    const calcularRestante = (res, limiteOficial) => {
+      if (limiteOficial === null) return '∞';
+      const usado = res?.data?.usado ?? 0;
+      return Math.max(0, limiteOficial - usado);
     };
 
-    if (elQ) elQ.textContent = formatarCota(usoQ, 15, 'questao');
-    if (elR) elR.textContent = formatarCota(usoR, 10, 'resumo');
-    if (elC) elC.textContent = formatarCota(usoC, 5, 'chat');
-    if (elS) elS.textContent = formatarCota(usoS, 5, 'simulado');
+    if (elQ) elQ.textContent = limitesPlano.questoes_dia === null ? '∞' : calcularRestante(usoQ, limitesPlano.questoes_dia);
+    if (elR) elR.textContent = limitesPlano.resumos_dia === null ? '∞' : calcularRestante(usoR, limitesPlano.resumos_dia);
+    if (elC) elC.textContent = calcularRestante(usoC, limitesPlano.chat_dia);
+    if (elS) elS.textContent = limitesPlano.simulados_semana === null ? '∞' : calcularRestante(usoS, limitesPlano.simulados_semana);
   } catch (err) {
     console.error('Erro ao carregar cotas:', err);
+    if (elQ) elQ.textContent = limitesPlano.questoes_dia === null ? '∞' : limitesPlano.questoes_dia;
+    if (elR) elR.textContent = limitesPlano.resumos_dia === null ? '∞' : limitesPlano.resumos_dia;
+    if (elC) elC.textContent = limitesPlano.chat_dia;
+    if (elS) elS.textContent = limitesPlano.simulados_semana === null ? '∞' : limitesPlano.simulados_semana;
   } finally {
     isCarregandoCotas = false;
   }
@@ -872,7 +899,7 @@ async function carregarRanking(userId) {
 function iniciarSincronizacaoRealtime(userId) {
   const verificarFoco = () => {
     if (document.visibilityState === 'visible' && Date.now() - ultimoFetchCotas > 30000) {
-      carregarCotasDisponiveis(userId);
+      carregarCotasDisponiveis(userId, planoUsuarioCache);
     }
   };
 
@@ -888,7 +915,7 @@ function iniciarSincronizacaoRealtime(userId) {
         table: 'uso_recursos',
         filter: `user_id=eq.${userId}`
       }, () => {
-        carregarCotasDisponiveis(userId);
+        carregarCotasDisponiveis(userId, planoUsuarioCache);
       })
       .subscribe();
 

@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles/base.css" />
 <style>
-  .page-wrap { padding: 32px 5% 80px; max-width: 1180px; margin: 0 auto; }
+  .page-wrap { padding: 32px 24px 80px; max-width: 1240px; margin: 0 auto; }
   .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 12px; }
   .back-link { color: var(--text-secondary); font-size: .9rem; }
   .back-link:hover { color: var(--text-primary); }
@@ -40,12 +40,25 @@
   }
 
   .planos-grid {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
-    max-width: 1100px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    align-items: stretch;
   }
   .plano-card {
-    display: flex; flex-direction: column; padding: 28px 22px; position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 32px 22px 28px;
+    position: relative;
     border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow-soft);
+    min-height: 100%;
+    overflow: visible;
+    box-sizing: border-box;
   }
   .plano-card.destaque {
     border: 1px solid var(--color-primary-500);
@@ -58,23 +71,24 @@
     position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
     background: var(--gradient-primary); color: #fff; font-size: .7rem; font-weight: 700;
     padding: 5px 14px; border-radius: var(--radius-full); white-space: nowrap; box-shadow: var(--shadow-glow);
+    z-index: 2;
   }
   .plano-selo.atual-selo { background: var(--color-success); }
 
-  .plano-nome { font-size: 1.15rem; font-weight: 800; margin-bottom: 4px; }
-  .plano-desc { color: var(--text-secondary); font-size: .82rem; min-height: 32px; margin-bottom: 18px; }
+  .plano-nome { font-size: 1.25rem; font-weight: 800; margin-bottom: 6px; }
+  .plano-desc { color: var(--text-secondary); font-size: .84rem; line-height: 1.45; min-height: 42px; margin-bottom: 18px; }
 
-  .plano-preco { display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px; }
+  .plano-preco { display: flex; align-items: baseline; gap: 4px; margin-bottom: 4px; flex-wrap: wrap; }
   .plano-preco .moeda { font-size: 1rem; font-weight: 700; color: var(--text-secondary); }
-  .plano-preco .valor { font-size: 2.3rem; font-weight: 800; font-family: var(--font-display); }
+  .plano-preco .valor { font-size: 2.2rem; font-weight: 800; font-family: var(--font-display); line-height: 1; }
   .plano-preco .periodo { color: var(--text-secondary); font-size: .85rem; }
   .plano-preco-anual-obs { font-size: .76rem; color: var(--text-secondary); margin-bottom: 20px; min-height: 16px; }
 
-  .plano-btn { width: 100%; margin-bottom: 22px; }
+  .plano-btn { width: 100%; margin-bottom: 22px; padding: 12px 16px; font-weight: 700; }
 
-  .plano-recursos { display: flex; flex-direction: column; gap: 11px; flex: 1; }
-  .plano-recurso { display: flex; align-items: flex-start; gap: 9px; font-size: .85rem; line-height: 1.4; }
-  .plano-recurso .check { flex-shrink: 0; color: var(--color-success); font-weight: 800; }
+  .plano-recursos { display: flex; flex-direction: column; gap: 12px; flex: 1; margin-top: 4px; }
+  .plano-recurso { display: flex; align-items: flex-start; gap: 10px; font-size: .86rem; line-height: 1.45; word-break: break-word; }
+  .plano-recurso .check { flex-shrink: 0; color: var(--color-success); font-weight: 800; font-size: .92rem; line-height: 1.2; margin-top: 1px; }
   .plano-recurso.indisponivel { color: var(--text-secondary); opacity: .55; }
   .plano-recurso.indisponivel .check { color: var(--text-secondary); }
 
@@ -92,12 +106,27 @@
 
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
 
-  @media (max-width: 980px) {
-    .planos-grid { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 1140px) {
+    .planos-grid {
+      grid-template-columns: repeat(2, 1fr);
+      max-width: 760px;
+      gap: 28px 24px;
+    }
     .plano-card.destaque { transform: none; }
   }
-  @media (max-width: 620px) {
-    .planos-grid { grid-template-columns: 1fr; max-width: 380px; }
+  @media (max-width: 640px) {
+    .page-wrap { padding: 24px 16px 60px; }
+    .planos-grid {
+      grid-template-columns: 1fr;
+      max-width: 440px;
+      gap: 24px;
+    }
+    .plano-card {
+      padding: 28px 20px 24px;
+    }
+    .plano-preco .valor {
+      font-size: 2rem;
+    }
   }
 </style>
 </head>

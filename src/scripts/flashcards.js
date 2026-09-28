@@ -83,8 +83,7 @@ function renderLimiteAtingido(limite) {
 async function checarELimitarFlashcard() {
   const { data: uso, error } = await supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'flashcard' });
 
-  if (error) {
-    console.error('[uso flashcard]', error);
+  if (error || !uso?.permitido) {
     return { permitido: true };
   }
   return uso;
