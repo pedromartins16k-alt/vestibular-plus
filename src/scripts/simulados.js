@@ -300,7 +300,7 @@ async function handleIniciarSimulado(simulado) {
 
   // Ultimate tem simulados ILIMITADOS! Nunca bloqueia.
   if (limitePlano === null || ordem >= 3 || isUltimate(nomePlanoUsuario)) {
-    supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'simulado' }).catch(() => {});
+    supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'simulado' }).then(null, () => {});
     iniciarSimulado(simulado);
     return;
   }

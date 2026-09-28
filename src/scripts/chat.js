@@ -1266,7 +1266,7 @@ async function enviarMensagem(mensagem) {
           const limiteOficial = getPlanLimit('chat_dia', planoInfo.nome) || 5;
           definirBadge(usoRes.usado ?? 0, limiteOficial);
         }
-      }).catch((errUso) => {
+      }, (errUso) => {
         console.warn('[Chat IA] Erro ao registrar uso no banco:', errUso);
       });
 

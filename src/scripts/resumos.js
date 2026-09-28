@@ -218,7 +218,7 @@ async function handleAbrirResumo(resumo) {
 
   // Planos com resumos ilimitados (Basic, Pro, Ultimate) nunca são bloqueados
   if (limitePlano === null || ordem >= 1) {
-    supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'resumo' }).catch(() => {});
+    supabase.rpc('verificar_e_registrar_uso', { p_tipo: 'resumo' }).then(null, () => {});
     abrirModal(resumo);
     return;
   }
