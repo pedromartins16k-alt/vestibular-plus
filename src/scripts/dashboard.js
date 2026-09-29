@@ -141,7 +141,9 @@ function atualizarIndicePreparacaoUI(sessoes) {
   if (!elValor) return;
 
   const listaSessoes = Array.isArray(sessoes) ? sessoes : [];
-  const totalQuestoes = listaSessoes.filter(s => s.tipo === 'questoes').length;
+  const sessoesQuestoes = listaSessoes.filter(s => s.tipo === 'questoes');
+  const totalQuestoes = sessoesQuestoes.length;
+  const totalAcertos = sessoesQuestoes.filter(s => s.acertou === true).length;
   const totalSimulados = listaSessoes.filter(s => s.tipo === 'simulado').length;
   const totalFlashcards = listaSessoes.filter(s => s.tipo === 'flashcards').length;
   const totalResumos = listaSessoes.filter(s => s.tipo === 'resumo').length;
@@ -154,7 +156,7 @@ function atualizarIndicePreparacaoUI(sessoes) {
     streakDias: streakReal,
     sessoes: listaSessoes,
     totalQuestoes: totalQuestoes,
-    totalAcertos: Math.round(totalQuestoes * 0.75), // Proporção estimada com base no histórico
+    totalAcertos: totalAcertos,
     totalSimulados: totalSimulados,
     materiasEstudadas: materiasUnicas,
     totalMaterias: 7,
@@ -714,7 +716,7 @@ async function carregarEstatisticas(userId) {
   try {
     const { data: sessoes, error } = await supabase
       .from('sessoes_estudo')
-      .select('duracao_minutos, tipo, materia_id, criado_em')
+      .select('duracao_minutos, tipo, materia_id, criado_em, acertou')
       .eq('user_id', userId);
 
     if (error) {

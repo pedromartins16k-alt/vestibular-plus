@@ -80,7 +80,22 @@ const LIVROS_FUVEST_REFERENCIA = [
   }
 ];
 
-const LS_KEY = 'vestibular_leituras_status_v1';
+import { supabase } from '../lib/supabaseClient.js';
+
+let currentUserId = 'guest';
+
+async function initUserContext() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) currentUserId = user.id;
+  } catch (_) {}
+}
+
+const LS_KEY_PREFIX = 'vestibular_leituras_status_';
+
+function getStorageKey() {
+  return `${LS_KEY_PREFIX}${currentUserId}`;
+}
 
 // Status possíveis
 const STATUS = {
@@ -90,12 +105,12 @@ const STATUS = {
 };
 
 // ---------------------------------------------------------------
-// Persistência (localStorage)
+// Persistência (localStorage isolado por usuário)
 // ---------------------------------------------------------------
 
 function lerStatus() {
   try {
-    return JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    return JSON.parse(localStorage.getItem(getStorageKey()) || '{}');
   } catch (_) {
     return {};
   }
@@ -103,7 +118,7 @@ function lerStatus() {
 
 function salvarStatus(statusMap) {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(statusMap));
+    localStorage.setItem(getStorageKey(), JSON.stringify(statusMap));
   } catch (_) {}
 }
 
@@ -206,5 +221,7 @@ document.querySelectorAll('.leit-tab').forEach(tab => {
   });
 });
 
-// Inicializa
-renderizarLivros();
+// Inicializa com contexto do usuário
+initUserContext().then(() => {
+  renderizarLivros();
+});

@@ -14,7 +14,11 @@
 
 import { supabase } from '../lib/supabaseClient.js';
 
-const LS_KEY = 'vestibular_objetivo_v1';
+const LS_KEY_PREFIX = 'vestibular_objetivo_';
+
+function getStorageKey(userId) {
+  return `${LS_KEY_PREFIX}${userId || 'guest'}`;
+}
 
 // ----------------------------------------------------------------
 // Dados de vestibulares (importados do JSON configurável)
@@ -49,19 +53,24 @@ export async function salvarObjetivo(objetivo) {
     configurado_em: new Date().toISOString()
   };
 
-  // Sempre salva localmente como fallback
+  let currentUid = 'guest';
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify(payload));
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) currentUid = user.id;
+  } catch (_) {}
+
+  // Sempre salva localmente com chave isolada por usuário
+  try {
+    localStorage.setItem(getStorageKey(currentUid), JSON.stringify(payload));
   } catch (_) {}
 
   // Tenta salvar no Supabase (requer migration executada)
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    if (currentUid !== 'guest') {
       const { error } = await supabase
         .from('profiles')
         .update({ objetivo_json: payload })
-        .eq('id', user.id);
+        .eq('id', currentUid);
 
       if (error && error.code !== 'PGRST116') {
         // PGRST116 = coluna não existe ainda (migration pendente)
@@ -76,13 +85,16 @@ export async function salvarObjetivo(objetivo) {
 }
 
 /**
- * Lê o objetivo: tenta Supabase, fallback localStorage.
+ * Lê o objetivo: tenta Supabase, fallback localStorage isolado por usuário.
  */
 export async function lerObjetivo() {
+  let currentUid = 'guest';
+
   // Tenta ler do Supabase
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    if (user?.id) {
+      currentUid = user.id;
       const { data, error } = await supabase
         .from('profiles')
         .select('objetivo_json')
@@ -90,16 +102,16 @@ export async function lerObjetivo() {
         .single();
 
       if (!error && data?.objetivo_json) {
-        // Sincroniza com localStorage
-        try { localStorage.setItem(LS_KEY, JSON.stringify(data.objetivo_json)); } catch (_) {}
+        // Sincroniza com localStorage isolado
+        try { localStorage.setItem(getStorageKey(currentUid), JSON.stringify(data.objetivo_json)); } catch (_) {}
         return data.objetivo_json;
       }
     }
   } catch (_) {}
 
-  // Fallback: localStorage
+  // Fallback: localStorage isolado por usuário
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = localStorage.getItem(getStorageKey(currentUid));
     if (raw) return JSON.parse(raw);
   } catch (_) {}
 
@@ -110,16 +122,19 @@ export async function lerObjetivo() {
  * Remove o objetivo do usuário.
  */
 export async function limparObjetivo() {
-  try { localStorage.removeItem(LS_KEY); } catch (_) {}
+  let currentUid = 'guest';
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
+    if (user?.id) {
+      currentUid = user.id;
       await supabase
         .from('profiles')
         .update({ objetivo_json: null })
         .eq('id', user.id);
     }
   } catch (_) {}
+
+  try { localStorage.removeItem(getStorageKey(currentUid)); } catch (_) {}
 }
 
 // ----------------------------------------------------------------
