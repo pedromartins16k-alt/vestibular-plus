@@ -66,9 +66,12 @@ const sessao = {
 // ----------------------------------------------------------------
 
 async function iniciar() {
-  const session = await exigirAutenticacao();
-  if (!session) return;
-  sessionUserId = session.user.id;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    sessionUserId = session?.user?.id || null;
+  } catch (_) {
+    sessionUserId = null;
+  }
 
   configurarEventosFiltros();
 
