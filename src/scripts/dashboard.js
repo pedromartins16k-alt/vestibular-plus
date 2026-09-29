@@ -1,3 +1,17 @@
+/**
+ * dashboard.js — Centro de Comando do Aluno (Vestibular+)
+ *
+ * Integra e orquestra todos os 8 blocos de inteligência e progresso do aluno:
+ * 1. Cabeçalho & Saudação Personalizada
+ * 2. Contagem Regressiva Oficial Dinâmica
+ * 3. Índice de Preparação Real (0 a 100)
+ * 4. O Que Fazer Hoje (Recomendações Prioritárias Adaptativas)
+ * 5. Progresso & Domínio por Matéria
+ * 6. Revisões Espaçadas (Spaced Repetition / SM-2)
+ * 7. Seu Desempenho (Horas, Taxa de Acerto %, Simulados, Streak)
+ * 8. Seu Próximo Passo (Spotlight Central)
+ */
+
 import { iniciarNotificacoes } from './notificacoes-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao, sair } from '../lib/authGuard.js';
@@ -5,10 +19,11 @@ import { calcularProgressoNivel } from '../utils/xp.js';
 import { iniciarBusca } from './busca-global.js';
 import { verificarConquistas } from './conquistas.js';
 import { aplicarCadeadosSidebar } from './plano-sidebar.js';
-import { isUltimate, obterPlanoUsuario, PLAN_LIMITS, obterOrdemPlano } from '../lib/permissions.js';
+import { isUltimate, obterPlanoUsuario, PLAN_LIMITS } from '../lib/permissions.js';
 import { getCache, setCache } from '../lib/cache.js';
 import { lerObjetivo, abrirModalObjetivo, calcularDiasRestantes, formatarContagem } from './objetivo.js';
-import { calcularIndicePreparacao } from '../utils/indice-preparacao.js';
+import { calcularIndicePreparacao, renderizarIndice } from '../utils/indice-preparacao.js';
+import { lerRevisoesPendentes } from '../utils/revisao.js';
 
 let currentUserId = null;
 let isCarregandoCotas = false;
@@ -16,9 +31,10 @@ let ultimoFetchCotas = 0;
 let canalCotasRealtime = null;
 let planoUsuarioCache = null;
 
-// Cache em memória de dados carregados na sessão do dashboard
-let dadosProjetosCache = [];
+// Cache em memória de dados carregados
 let dadosSessoesCache = [];
+let dadosDiagnosticoCache = null;
+let dadosRevisoesCache = [];
 
 async function iniciarDashboard() {
   const session = await exigirAutenticacao();
@@ -28,117 +44,190 @@ async function iniciarDashboard() {
 
   document.getElementById('logout-btn')?.addEventListener('click', sair);
 
-  // Inicializa data atual e mensagem motivacional contextual
-  atualizarDataEMotivacao();
+  // Data atual formatada no topo
+  atualizarDataTopo();
 
-  // Configura eventos de fechamento do modal de detalhes do projeto
-  configurarEventosModalProjeto();
-
-  // Inicia Notificações (passando userId para evitar nova chamada a getSession)
+  // Inicia Notificações
   iniciarNotificacoes(userId);
 
-  // Carrega e atualiza o Objetivo do Aluno
-  await inicializarPainelObjetivo(userId);
+  // 1. PRIORIDADE ALTA: Carregar e renderizar Objetivo do Aluno e Contagem Regressiva
+  const promessaObjetivo = inicializarPainelObjetivo(userId);
 
-  // 1. PRIORIDADE ALTA: Perfil do usuário (saudação, avatar, XP, cadeados)
+  // 2. PRIORIDADE ALTA: Carregar Perfil do Usuário (Nome, Nível, XP, Cadeados)
   const promessaPerfil = carregarPerfil(userId);
 
-  // 2. PRIORIDADE ALTA: Sessões de estudo (horas, questões, simulados, streak)
+  // 3. PRIORIDADE ALTA: Carregar Sessões de Estudo & Estatísticas Reais
   const promessaSessoes = carregarEstatisticas(userId);
 
-  // 3. PRIORIDADE MÉDIA: Cotas de recursos (questões, resumos, chat, simulados)
-  const promessaCotas = promessaPerfil.then(perfil => {
+  // 4. PRIORIDADE MÉDIA: Carregar Diagnóstico e Revisões Espaçadas
+  const promessaDiagnostico = carregarDiagnostico(userId);
+  const promessaRevisoes = carregarRevisoes(userId);
+
+  // 5. PRIORIDADE MÉDIA: Cotas de Recursos (Questões, Resumos, Chat, Simulados)
+  promessaPerfil.then(perfil => {
     const planoNome = perfil?.planos?.nome;
-    return carregarCotasDisponiveis(userId, planoNome);
+    carregarCotasDisponiveis(userId, planoNome);
   });
 
-  // 4. PRIORIDADE MÉDIA: Carregar Projetos de Estudo do usuário e atualizar "Seu Próximo Passo"
-  const projetosCarregados = carregarProjetosEstudo(userId);
-  dadosProjetosCache = projetosCarregados || [];
+  // 6. PRIORIDADE MÉDIA: Contagem de vestibulares no topbar
+  carregarContagemVestibulares(promessaObjetivo);
 
-  // Se houver projeto na URL (ex: ao vir do Chat IA ou após F5), abre os detalhes
-  verificarProjetoNaUrl(dadosProjetosCache);
+  // 7. Renderiza Índice de Preparação, Recomendações e Matérias quando os dados chegarem
+  Promise.allSettled([promessaSessoes, promessaDiagnostico, promessaRevisoes, promessaObjetivo]).then(
+    ([resSessoes, resDiag, resRev, resObj]) => {
+      const sessoes = resSessoes.status === 'fulfilled' ? resSessoes.value : [];
+      const diag = resDiag.status === 'fulfilled' ? resDiag.value : null;
+      const revisoes = resRev.status === 'fulfilled' ? resRev.value : [];
+      const objetivo = resObj.status === 'fulfilled' ? resObj.value : null;
 
-  // 5. PRIORIDADE MÉDIA: Progresso por matéria (usa dados de sessões quando prontos)
-  const promessaMaterias = carregarMateriasEProgresso(promessaSessoes);
+      dadosSessoesCache = sessoes;
+      dadosDiagnosticoCache = diag;
+      dadosRevisoesCache = revisoes;
 
-  // 6. PRIORIDADE MÉDIA: Contagem regressiva de vestibulares/ENEM
-  const promessaVestibulares = carregarContagemVestibulares();
+      // Renderiza Bloco 3: Índice de Preparação
+      atualizarIndicePreparacaoUI(sessoes, diag);
 
-  // 7. PRIORIDADE BAIXA: Ranking (top 5) e Conquistas em segundo plano
-  const promessaRanking = carregarRanking(userId);
+      // Renderiza Bloco 4: Recomendado para Hoje
+      atualizarRecomendacoesHoje(sessoes, diag, revisoes, objetivo);
 
-  // Atualiza o spotlight "Seu Próximo Passo" assim que projetos ou sessões estiverem prontos
-  promessaSessoes.then(sessoes => {
-    dadosSessoesCache = sessoes || [];
-    atualizarProximoPasso(dadosProjetosCache, dadosSessoesCache);
-    atualizarIndicePreparacaoUI(sessoes || []);
-  });
+      // Renderiza Bloco 5: Progresso das Matérias
+      carregarMateriasEProgresso(sessoes, diag);
 
-  // Executa verificação de conquistas em background aproveitando dados já carregados
+      // Renderiza Bloco 8: Seu Próximo Passo
+      atualizarProximoPasso(sessoes, diag, revisoes, objetivo);
+
+      // Gerencia Onboarding para Aluno Novo
+      gerenciarOnboarding(sessoes, objetivo, diag);
+    }
+  );
+
+  // 8. Ranking Geral Top 5
+  carregarRanking(userId);
+
+  // 9. Verificação de Conquistas em Background
   Promise.allSettled([promessaPerfil, promessaSessoes]).then(([resPerfil, resSessoes]) => {
     const perfil = resPerfil.status === 'fulfilled' ? resPerfil.value : null;
-    const sessoes = resSessoes.status === 'fulfilled' ? resSessoes.value : null;
+    const sessoes = resSessoes.status === 'fulfilled' ? resSessoes.value : [];
     verificarConquistas(userId, {
       sessoes: sessoes || [],
       metaDiaria: perfil?.meta_diaria_minutos || 60
     }).catch(err => console.warn('Erro em verificarConquistas:', err));
   });
 
-  // Inicia sincronização Realtime e listener de visibilidade
+  // 10. Realtime
   iniciarSincronizacaoRealtime(userId);
 }
 
-/**
- * Inicializa a exibição do Objetivo do Aluno no Dashboard
- */
+// ----------------------------------------------------------------
+// BLOCO 1 & BLOCO 2: CABEÇALHO DO ALUNO & CONTAGEM REGRESSIVA
+// ----------------------------------------------------------------
+
+function atualizarDataTopo() {
+  const elData = document.getElementById('data-hoje');
+  if (!elData) return;
+  const agora = new Date();
+  try {
+    const opcoes = { weekday: 'long', day: 'numeric', month: 'long' };
+    const formatada = agora.toLocaleDateString('pt-BR', opcoes);
+    elData.textContent = `📅 ${formatada.charAt(0).toUpperCase() + formatada.slice(1)}`;
+  } catch (_) {
+    elData.textContent = '📅 Hoje';
+  }
+}
+
 async function inicializarPainelObjetivo(userId) {
   const btnAlterar = document.getElementById('btn-alterar-objetivo');
   if (btnAlterar) {
     btnAlterar.addEventListener('click', () => {
       abrirModalObjetivo((novoObj) => {
         atualizarVisualObjetivo(novoObj);
+        carregarContagemVestibulares(Promise.resolve(novoObj));
+        atualizarRecomendacoesHoje(dadosSessoesCache, dadosDiagnosticoCache, dadosRevisoesCache, novoObj);
       });
     });
   }
 
   const objetivo = await lerObjetivo();
   atualizarVisualObjetivo(objetivo);
+  return objetivo;
 }
 
 function atualizarVisualObjetivo(obj) {
   const elTitulo = document.getElementById('obj-titulo');
   const elSubtitulo = document.getElementById('obj-subtitulo');
-  const elCountdown = document.getElementById('obj-countdown-tag');
+  const elDiasVal = document.getElementById('countdown-dias-val');
+  const elDataVal = document.getElementById('countdown-data-val');
+  const elRotulo = document.getElementById('countdown-rotulo');
 
   if (!obj) {
-    if (elTitulo) elTitulo.textContent = 'FUVEST 2027 — USP (Padrão)';
-    if (elSubtitulo) elSubtitulo.textContent = 'Clique em "Alterar Objetivo" para personalizar seu vestibular e curso.';
-    if (elCountdown) {
-      const dias = calcularDiasRestantes('2026-11-01');
-      elCountdown.textContent = `⏳ ${formatarContagem(dias)} para a 1ª fase`;
+    if (elTitulo) elTitulo.textContent = '🎯 Defina seu vestibular alvo';
+    if (elSubtitulo) {
+      elSubtitulo.innerHTML = 'Personalize sua meta de vestibular e curso para receber um plano sob medida. <a href="#" id="link-definir-obj" style="color:#a7f3d0;font-weight:700;">Configurar objetivo →</a>';
+      document.getElementById('link-definir-obj')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        abrirModalObjetivo((novo) => atualizarVisualObjetivo(novo));
+      });
     }
+    if (elDiasVal) elDiasVal.textContent = '—';
+    if (elDataVal) elDataVal.textContent = 'Data da prova a definir';
+    if (elRotulo) elRotulo.textContent = '⏳ CONTAGEM REGRESSIVA';
     return;
   }
 
+  const vestNome = obj.vestibular_nome || 'Vestibular';
+  const univNome = obj.universidade ? ` · ${obj.universidade}` : '';
+  const cursoNome = obj.curso ? ` · ${obj.curso}` : '';
+
   if (elTitulo) {
-    elTitulo.textContent = `${obj.vestibular_nome || 'Vestibular'} — ${obj.universidade || 'Universidade'}`;
+    elTitulo.textContent = `${vestNome}${univNome}${cursoNome}`;
   }
   if (elSubtitulo) {
-    elSubtitulo.textContent = obj.curso ? `Curso de interesse: ${obj.curso}` : 'Preparação geral para a prova';
+    elSubtitulo.textContent = obj.curso
+      ? `Preparação estratégica focada para aprovação em ${obj.curso}.`
+      : 'Plano intensivo de estudos para o vestibular.';
   }
-  if (elCountdown) {
-    const dias = calcularDiasRestantes(obj.data_prova || '2026-11-01');
-    elCountdown.textContent = dias !== null ? `⏳ ${formatarContagem(dias)} para a prova` : '⏳ Data a confirmar';
+
+  // Calcula contagem regressiva
+  const dataProva = obj.data_prova || '2026-11-01';
+  const diasRestantes = calcularDiasRestantes(dataProva);
+
+  if (elDiasVal) {
+    if (diasRestantes === null) {
+      elDiasVal.textContent = '—';
+    } else if (diasRestantes <= 0) {
+      elDiasVal.textContent = diasRestantes === 0 ? 'HOJE' : '0';
+    } else {
+      elDiasVal.textContent = diasRestantes;
+    }
+  }
+
+  if (elRotulo) {
+    elRotulo.textContent = diasRestantes !== null && diasRestantes <= 1
+      ? '🚨 PROVA CHEGOU!'
+      : `⏳ DIAS PARA A 1ª FASE (${obj.vestibular_id?.toUpperCase() || 'PROVA'})`;
+  }
+
+  if (elDataVal) {
+    if (obj.data_prova) {
+      try {
+        const d = new Date(obj.data_prova + 'T00:00:00');
+        elDataVal.textContent = `📅 Data oficial: ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}`;
+      } catch (_) {
+        elDataVal.textContent = `📅 Prova em ${obj.data_prova}`;
+      }
+    } else {
+      elDataVal.textContent = '📅 Data a confirmar no edital oficial';
+    }
   }
 }
 
-/**
- * Atualiza o card de Índice de Preparação no Dashboard com dados 100% reais do usuário
- */
-function atualizarIndicePreparacaoUI(sessoes) {
-  const elValor = document.getElementById('valor-indice-prep');
-  if (!elValor) return;
+// ----------------------------------------------------------------
+// BLOCO 3: ÍNDICE DE PREPARAÇÃO REAL
+// ----------------------------------------------------------------
+
+function atualizarIndicePreparacaoUI(sessoes, diagnostico) {
+  const container = document.getElementById('container-indice-preparacao');
+  if (!container) return;
 
   const listaSessoes = Array.isArray(sessoes) ? sessoes : [];
   const sessoesQuestoes = listaSessoes.filter(s => s.tipo === 'questoes');
@@ -149,10 +238,25 @@ function atualizarIndicePreparacaoUI(sessoes) {
   const totalResumos = listaSessoes.filter(s => s.tipo === 'resumo').length;
   const streakReal = calcularSequencia(listaSessoes.map(s => s.criado_em));
 
-  // Matérias únicas estudadas
+  // Matérias únicas praticadas
   const materiasUnicas = Array.from(new Set(listaSessoes.map(s => s.materia_id).filter(Boolean)));
 
-  const res = calcularIndicePreparacao({
+  // Se o aluno não tiver nenhuma atividade registrada
+  if (totalQuestoes === 0 && totalSimulados === 0 && streakReal === 0 && !diagnostico) {
+    container.innerHTML = `
+      <div style="text-align:center; width:100%; color:var(--text-secondary); padding:20px 10px;">
+        <span style="font-size:2.4rem; font-weight:900; font-family:var(--font-display); color:var(--text-primary); display:block; line-height:1; margin-bottom:8px;">— / 100</span>
+        <div style="font-weight:700; font-size:0.9rem; color:var(--color-primary-400); margin-bottom:4px;">Índice em aguardo</div>
+        <p style="font-size:0.82rem; margin:0; line-height:1.4;">Resolva suas primeiras questões ou faça o diagnóstico para gerar seu índice de preparação real.</p>
+        <div style="margin-top:14px;">
+          <a href="./diagnostico.html" class="btn btn-primary" style="padding:7px 16px; font-size:0.8rem;">Iniciar Diagnóstico 🧠</a>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const resIndice = calcularIndicePreparacao({
     streakDias: streakReal,
     sessoes: listaSessoes,
     totalQuestoes: totalQuestoes,
@@ -164,554 +268,253 @@ function atualizarIndicePreparacaoUI(sessoes) {
     totalResumosVistos: totalResumos
   });
 
-  elValor.textContent = `${res.total}/100`;
-  elValor.style.color = res.interpretacao.cor;
+  renderizarIndice(container, resIndice);
 }
 
+// ----------------------------------------------------------------
+// BLOCO 4: O QUE FAZER HOJE (RECOMENDADO PARA HOJE)
+// ----------------------------------------------------------------
 
-/**
- * Normaliza qualquer tarefa (string ou objeto) para garantir estrutura previsível
- */
-function normalizarTarefa(t) {
-  if (!t) return { titulo: 'Atividade de estudo', concluida: false };
-  if (typeof t === 'string') return { titulo: t, concluida: false };
-  if (typeof t === 'object') {
-    return {
-      titulo: t.titulo || t.nome || t.texto || t.descricao || 'Atividade de estudo',
-      concluida: Boolean(t.concluida)
-    };
-  }
-  return { titulo: String(t), concluida: false };
-}
-
-/**
- * Salva a lista de projetos em ambas as chaves de localStorage
- */
-function salvarProjetosLocalStorage(projetos) {
-  try {
-    const storageKey = currentUserId ? `vestibular_projetos_${currentUserId}` : 'vestibular_projetos_guest';
-    localStorage.setItem(storageKey, JSON.stringify(projetos));
-    localStorage.setItem('vestibular_projetos_guest', JSON.stringify(projetos));
-  } catch (err) {
-    console.warn('Erro ao salvar projetos no localStorage:', err);
-  }
-}
-
-/**
- * Abre o modal de visualização e consulta das atividades de um projeto específico
- */
-function abrirModalProjeto(projetoId) {
-  const modal = document.getElementById('modal-projeto-detalhes');
-  if (!modal) return;
-
-  const storageKey = currentUserId ? `vestibular_projetos_${currentUserId}` : 'vestibular_projetos_guest';
-  let projetos = [];
-  try {
-    projetos = JSON.parse(localStorage.getItem(storageKey) || localStorage.getItem('vestibular_projetos_guest') || '[]');
-  } catch (_) {
-    projetos = [];
-  }
-
-  const proj = projetos.find(p => p.id === projetoId) || projetos[0];
-  if (!proj) return;
-
-  // Atualiza a URL com o ID do projeto para permitir F5 sem perder o contexto
-  try {
-    const urlAtual = new URL(window.location.href);
-    urlAtual.searchParams.set('projeto', proj.id);
-    window.history.replaceState({}, '', urlAtual.toString());
-  } catch (_) {}
-
-  const elTitulo = document.getElementById('modal-proj-titulo');
-  const elMateria = document.getElementById('modal-proj-materia');
-  const elStatus = document.getElementById('modal-proj-status');
-  const elPrazo = document.getElementById('modal-proj-prazo');
-  const elDesc = document.getElementById('modal-proj-desc');
-  const elProgTexto = document.getElementById('modal-proj-prog-texto');
-  const elProgFill = document.getElementById('modal-proj-prog-fill');
-  const elTarefasLista = document.getElementById('modal-proj-tarefas-lista');
-  const elBtnPraticar = document.getElementById('modal-proj-btn-praticar');
-
-  if (elTitulo) elTitulo.textContent = proj.titulo || proj.objetivo || 'Plano de Estudos';
-  if (elMateria) elMateria.textContent = proj.materia || 'Geral';
-  if (elPrazo) elPrazo.textContent = `📅 Prazo: ${proj.prazo || '30 dias'}`;
-  if (elDesc) elDesc.textContent = proj.descricao || proj.meta || 'Plano de estudos intensivo para seu vestibular.';
-
-  const tarefasNorm = (proj.tarefas || proj.etapas || []).map(normalizarTarefa);
-  const total = tarefasNorm.length;
-  const concluidas = tarefasNorm.filter(t => t.concluida).length;
-  const percentual = total > 0 ? Math.round((concluidas / total) * 100) : (proj.progresso ?? 25);
-
-  // Identifica a primeira atividade ainda não concluída (ou fallback para o conteúdo/título do projeto)
-  const primeiraPendente = tarefasNorm.find(t => !t.concluida) || tarefasNorm[0];
-  const conteudoContexto = primeiraPendente?.titulo || proj.titulo || proj.objetivo || '';
-
-  // Configura botão principal "Praticar Questões" com contexto da matéria e da atividade pendente
-  if (elBtnPraticar) {
-    const paramsPraticar = new URLSearchParams();
-    if (proj.materia && proj.materia !== 'Geral') {
-      paramsPraticar.set('materia', proj.materia);
-    }
-    if (conteudoContexto) {
-      paramsPraticar.set('busca', conteudoContexto);
-      paramsPraticar.set('assunto', conteudoContexto);
-    }
-    const qs = paramsPraticar.toString();
-    elBtnPraticar.href = qs ? `./questoes.html?${qs}` : './questoes.html';
-  }
-
-  if (elStatus) {
-    if (percentual === 100) {
-      elStatus.textContent = 'Concluído';
-      elStatus.className = 'modal-projeto-status concluido';
-    } else {
-      elStatus.textContent = 'Em andamento';
-      elStatus.className = 'modal-projeto-status';
-    }
-  }
-
-  if (elProgTexto) elProgTexto.textContent = `${percentual}% concluído (${concluidas}/${total} atividades)`;
-  if (elProgFill) elProgFill.style.width = `${percentual}%`;
-
-  if (elTarefasLista) {
-    if (tarefasNorm.length === 0) {
-      elTarefasLista.innerHTML = `<p style="font-size:0.86rem; color:var(--text-secondary);">Nenhuma atividade cadastrada para este projeto.</p>`;
-    } else {
-      elTarefasLista.innerHTML = tarefasNorm.map((t, idx) => {
-        const paramsTarefa = new URLSearchParams();
-        if (proj.materia && proj.materia !== 'Geral') {
-          paramsTarefa.set('materia', proj.materia);
-        }
-        if (t.titulo) {
-          paramsTarefa.set('busca', t.titulo);
-          paramsTarefa.set('assunto', t.titulo);
-        }
-        const urlPraticar = `./questoes.html?${paramsTarefa.toString()}`;
-        return `
-        <div class="modal-tarefa-item ${t.concluida ? 'concluida' : ''}" data-task-idx="${idx}" title="Clique para alternar status">
-          <span class="modal-tarefa-check">${t.concluida ? '✓' : ''}</span>
-          <span class="modal-tarefa-texto">${t.titulo}</span>
-          <a class="modal-tarefa-praticar-btn" href="${urlPraticar}" title="Praticar questões desta atividade" onclick="event.stopPropagation()">
-            Praticar →
-          </a>
-        </div>
-      `}).join('');
-
-      // Adiciona interatividade para alternar o status das tarefas
-      elTarefasLista.querySelectorAll('.modal-tarefa-item').forEach(item => {
-        item.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const idx = parseInt(item.dataset.taskIdx, 10);
-          tarefasNorm[idx].concluida = !tarefasNorm[idx].concluida;
-
-          proj.tarefas = tarefasNorm;
-          proj.etapas = tarefasNorm;
-          const novasConcluidas = tarefasNorm.filter(t => t.concluida).length;
-          proj.progresso = Math.round((novasConcluidas / tarefasNorm.length) * 100);
-          proj.status = proj.progresso === 100 ? 'concluido' : 'em_andamento';
-
-          salvarProjetosLocalStorage(projetos);
-          dadosProjetosCache = projetos;
-
-          // Atualiza a visualização do modal
-          abrirModalProjeto(proj.id);
-
-          // Atualiza os cards da página sem recarregar
-          carregarProjetosEstudo(currentUserId);
-          atualizarProximoPasso(projetos, dadosSessoesCache);
-        });
-      });
-    }
-  }
-
-  modal.classList.add('open');
-}
-
-/**
- * Fecha o modal de projeto e remove o parâmetro ?projeto da URL sem recarregar a página
- */
-function fecharModalProjeto() {
-  const modal = document.getElementById('modal-projeto-detalhes');
-  if (modal) {
-    modal.classList.remove('open');
-  }
-  try {
-    const urlAtual = new URL(window.location.href);
-    urlAtual.searchParams.delete('projeto');
-    window.history.replaceState({}, '', urlAtual.pathname + (urlAtual.search ? urlAtual.search : ''));
-  } catch (_) {}
-}
-
-/**
- * Configura os listeners dos botões de fechar, backdrop e tecla ESC
- */
-function configurarEventosModalProjeto() {
-  const modal = document.getElementById('modal-projeto-detalhes');
-  const btnFechar = document.getElementById('modal-proj-fechar');
-  const btnVoltar = document.getElementById('modal-proj-btn-voltar');
-
-  btnFechar?.addEventListener('click', fecharModalProjeto);
-  btnVoltar?.addEventListener('click', fecharModalProjeto);
-
-  modal?.addEventListener('click', (e) => {
-    if (e.target === modal) fecharModalProjeto();
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && modal?.classList.contains('open')) {
-      fecharModalProjeto();
-    }
-  });
-}
-
-/**
- * Abre o projeto automaticamente se houver parâmetro ?projeto na URL
- */
-function verificarProjetoNaUrl(projetos) {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const projId = params.get('projeto');
-    if (projId && Array.isArray(projetos) && projetos.length > 0) {
-      const existe = projetos.find(p => p.id === projId);
-      if (existe) {
-        abrirModalProjeto(existe.id);
-      } else {
-        abrirModalProjeto(projetos[0].id);
-      }
-    }
-  } catch (_) {}
-}
-
-/**
- * Atualiza o cabeçalho com a data atual formatada e uma saudação/motivação contextual.
- */
-function atualizarDataEMotivacao() {
-  const elData = document.getElementById('data-hoje');
-  const elMotivacao = document.getElementById('mensagem-motivacional');
-
-  const agora = new Date();
-  if (elData) {
-    try {
-      const opcoes = { weekday: 'long', day: 'numeric', month: 'long' };
-      const dataFormatada = agora.toLocaleDateString('pt-BR', opcoes);
-      elData.textContent = `📅 ${dataFormatada.charAt(0).toUpperCase() + dataFormatada.slice(1)}`;
-    } catch (_) {
-      elData.textContent = '📅 Hoje';
-    }
-  }
-
-  if (elMotivacao) {
-    const hora = agora.getHours();
-    let msg = 'Mantenha a consistência! Cada hora de foco aproxima você do resultado no vestibular.';
-    if (hora >= 5 && hora < 12) {
-      msg = 'Bom dia! Mantenha a constância e o foco na sua sessão matinal de estudos.';
-    } else if (hora >= 12 && hora < 18) {
-      msg = 'Boa tarde! Continue firme nos seus objetivos de estudos de hoje.';
-    } else {
-      msg = 'Boa noite! Revise os tópicos essenciais e consolide sua retenção.';
-    }
-    elMotivacao.textContent = msg;
-  }
-}
-
-/**
- * Carrega e renderiza os dados do perfil: nome, avatar, XP e aplica cadeados na barra lateral.
- */
-async function carregarPerfil(userId) {
-  try {
-    let { data: profile, error } = await supabase
-      .from('profiles')
-      .select('nome, nome_usuario, nivel, xp, meta_diaria_minutos, planos(nome, ordem)')
-      .eq('id', userId)
-      .maybeSingle();
-
-    // Se o usuário ainda não possui perfil (usuário novo via OAuth)
-    if (!profile) {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && user.id === userId) {
-          const meta = user.user_metadata || {};
-          const nomeInicial = meta.full_name || meta.name || meta.nome || user.email?.split('@')[0] || 'Aluno(a)';
-
-          const { data: planoFree } = await supabase
-            .from('planos')
-            .select('id')
-            .eq('nome', 'free')
-            .maybeSingle();
-
-          await supabase
-            .from('profiles')
-            .upsert({
-              id: userId,
-              nome: nomeInicial,
-              plano_id: planoFree?.id || null,
-              nivel: 1,
-              xp: 0,
-              meta_diaria_minutos: 60
-            }, { onConflict: 'id', ignoreDuplicates: true });
-
-          const { data: perfilNovo } = await supabase
-            .from('profiles')
-            .select('nome, nome_usuario, nivel, xp, meta_diaria_minutos, planos(nome, ordem)')
-            .eq('id', userId)
-            .maybeSingle();
-
-          profile = perfilNovo;
-        }
-      } catch (errNovo) {
-        console.warn('Erro ao provisionar perfil para novo usuário:', errNovo);
-      }
-    }
-
-    if (!profile) return null;
-
-    const planoNome = profile.planos?.nome || 'free';
-    planoUsuarioCache = planoNome;
-    const ehUltimate = isUltimate(planoNome);
-
-    const nomeExibicao = profile.nome_usuario || profile.nome?.split(' ')[0] || 'Aluno(a)';
-    const elSaudacao = document.getElementById('saudacao');
-    const elAvatar = document.getElementById('avatar-inicial');
-    const elNivelInfo = document.getElementById('nivel-info');
-    const elXpBar = document.getElementById('xp-bar');
-
-    if (elSaudacao) {
-      elSaudacao.innerHTML = `Olá, ${nomeExibicao}! 👋 ${
-        ehUltimate
-          ? `<span style="display:inline-block; font-size:.75rem; background:linear-gradient(135deg, #f59e0b, #ec4899); color:#fff; font-weight:800; padding:3px 10px; border-radius:999px; vertical-align:middle; margin-left:6px; letter-spacing:0.04em; box-shadow:0 2px 10px rgba(245,158,11,0.4);">✦ ULTIMATE</span>`
-          : ''
-      }`;
-    }
-    if (elAvatar) elAvatar.textContent = nomeExibicao[0]?.toUpperCase() || 'A';
-
-    const { necessario, percentual } = calcularProgressoNivel(profile.xp, profile.nivel);
-    if (elNivelInfo) {
-      elNivelInfo.textContent = `Nível ${profile.nivel} · ${profile.xp}/${necessario} XP para o próximo nível`;
-    }
-    if (elXpBar) elXpBar.style.width = `${percentual}%`;
-
-    // Aplica cadeados na sidebar usando a ordem já obtida
-    aplicarCadeadosSidebar(userId, profile.planos?.ordem ?? 0);
-
-    return profile;
-  } catch (err) {
-    console.error('Erro ao carregar perfil:', err);
-    return null;
-  }
-}
-
-/**
- * Atualiza dinamicamente a seção de destaque "Seu Próximo Passo" com base nos dados reais disponíveis.
- */
-function atualizarProximoPasso(projetos, sessoes) {
-  const container = document.getElementById('proximo-passo-container');
+function atualizarRecomendacoesHoje(sessoes, diagnostico, revisoes, objetivo) {
+  const container = document.getElementById('recomendacoes-hoje-lista');
   if (!container) return;
 
-  const primeiroProjeto = Array.isArray(projetos) && projetos.length > 0 ? projetos[0] : null;
+  const itens = [];
+  const pendentesHoje = Array.isArray(revisoes) ? revisoes.length : 0;
 
-  if (primeiroProjeto) {
-    const tarefasNorm = (primeiroProjeto.tarefas || primeiroProjeto.etapas || []).map(normalizarTarefa);
-    const proximaPendente = tarefasNorm.find(t => !t.concluida) || tarefasNorm[0];
-    const proximaTarefaTexto = proximaPendente ? proximaPendente.titulo : (primeiroProjeto.meta || 'Revisar exercícios da matéria');
-    const materia = primeiroProjeto.materia || 'Geral';
-    const prazo = primeiroProjeto.prazo || 'Em andamento';
-    const progresso = primeiroProjeto.progresso ?? 25;
-
-    const paramsHero = new URLSearchParams();
-    if (materia && materia !== 'Geral') {
-      paramsHero.set('materia', materia);
-    }
-    if (proximaTarefaTexto) {
-      paramsHero.set('busca', proximaTarefaTexto);
-      paramsHero.set('assunto', proximaTarefaTexto);
-    }
-    const urlHeroPraticar = paramsHero.toString() ? `./questoes.html?${paramsHero.toString()}` : './questoes.html';
-
-    container.innerHTML = `
-      <div class="proximo-passo-card fade-up">
-        <div class="proximo-passo-badge">🎯 SEU PRÓXIMO PASSO RECOMENDADO</div>
-        <div class="proximo-passo-content">
-          <div class="proximo-passo-info">
-            <div class="proximo-passo-header">
-              <h3 class="proximo-passo-titulo">${primeiroProjeto.titulo || primeiroProjeto.objetivo || 'Projeto de Estudos Ativo'}</h3>
-              <span class="proximo-passo-materia-tag">${materia}</span>
-            </div>
-            <p class="proximo-passo-desc">
-              <strong>Próxima atividade:</strong> ${proximaTarefaTexto}
-            </p>
-            <div class="proximo-passo-meta">
-              <span>📅 Prazo: ${prazo}</span>
-              <span>📊 Progresso: ${progresso}%</span>
-            </div>
-          </div>
-          <div class="proximo-passo-actions">
-            <button type="button" class="btn btn-primary btn-proximo-passo btn-abrir-projeto-hero" data-projeto-id="${primeiroProjeto.id}">
-              Abrir Projeto 📋
-            </button>
-            <a href="${urlHeroPraticar}" class="btn btn-ghost btn-proximo-passo">
-              Praticar Questões 📝
-            </a>
-          </div>
-        </div>
-      </div>
-    `;
-
-    container.querySelector('.btn-abrir-projeto-hero')?.addEventListener('click', () => {
-      abrirModalProjeto(primeiroProjeto.id);
+  // 1. PRIORIDADE 1: Revisões espaçadas pendentes
+  if (pendentesHoje > 0) {
+    itens.push({
+      icone: '🧠',
+      corIcone: '#ef4444',
+      bgIcone: 'rgba(239, 68, 68, 0.15)',
+      titulo: `Revisão Espaçada (${pendentesHoje} ite${pendentesHoje === 1 ? 'm' : 'ns'})`,
+      motivo: 'Itens que atingiram a data ideal de repetição para não serem esquecidos.',
+      tempoEstimado: `⏱️ ~${Math.max(5, pendentesHoje * 2)} min`,
+      ctaTexto: 'Revisar Agora →',
+      ctaUrl: './questoes.html'
     });
-    return;
   }
 
-  // Se não houver projetos, mas houver sessões registradas
-  const listaSessoes = Array.isArray(sessoes) ? sessoes : [];
-  if (listaSessoes.length > 0) {
-    container.innerHTML = `
-      <div class="proximo-passo-card fade-up">
-        <div class="proximo-passo-badge">🚀 CONTINUE SUA JORNADA DE ESTUDOS</div>
-        <div class="proximo-passo-content">
-          <div class="proximo-passo-info">
-            <h3 class="proximo-passo-titulo">Pronto para mais uma rodada de foco?</h3>
-            <p class="proximo-passo-desc">
-              Você já acumulou horas de dedicação. O próximo passo ideal é testar seus conhecimentos em novas questões ou tirar dúvidas conceituais com o Tutor IA.
-            </p>
-          </div>
-          <div class="proximo-passo-actions">
-            <a href="./questoes.html" class="btn btn-primary btn-proximo-passo">
-              Resolver Questões 📝
-            </a>
-            <a href="./chat.html" class="btn btn-ghost btn-proximo-passo">
-              Tirar Dúvidas no Chat 💬
-            </a>
-          </div>
-        </div>
-      </div>
-    `;
-    return;
-  }
+  // 2. PRIORIDADE 2: Diagnóstico Inicial (se ainda não fez)
+  if (!diagnostico) {
+    itens.push({
+      icone: '📊',
+      corIcone: '#8b5cf6',
+      bgIcone: 'rgba(139, 92, 246, 0.15)',
+      titulo: 'Diagnóstico Inicial Adaptativo',
+      motivo: 'Descubra seus pontos fortes e fracos em cada matéria do vestibular.',
+      tempoEstimado: '⏱️ ~15 min · 21 questões',
+      ctaTexto: 'Iniciar Diagnóstico →',
+      ctaUrl: './diagnostico.html'
+    });
+  } else {
+    // Se fez diagnóstico, encontra a matéria de menor pontuação
+    const resultados = diagnostico.resultado || diagnostico.resultados_por_materia || {};
+    const materiasPontuacao = Object.entries(resultados)
+      .filter(([, v]) => v && v.total > 0)
+      .map(([materia, v]) => ({
+        materia,
+        pct: Math.round((v.acertos / v.total) * 100)
+      }))
+      .sort((a, b) => a.pct - b.pct);
 
-  // Se for aluno novo (sem projetos e sem sessões)
-  container.innerHTML = `
-    <div class="proximo-passo-card fade-up">
-      <div class="proximo-passo-badge">✨ COMECE POR AQUI</div>
-      <div class="proximo-passo-content">
-        <div class="proximo-passo-info">
-          <h3 class="proximo-passo-titulo">Planeje sua rotina de aprovação com o Tutor IA</h3>
-          <p class="proximo-passo-desc">
-            Defina suas metas e matérias prioritárias para receber um cronograma de estudos sob medida com objetivos semanais claros.
-          </p>
-        </div>
-        <div class="proximo-passo-actions">
-          <a href="./chat.html" class="btn btn-primary btn-proximo-passo">
-            Criar Plano com IA 💬
-          </a>
-          <a href="./questoes.html" class="btn btn-ghost btn-proximo-passo">
-            Explorar Questões 📝
-          </a>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-/**
- * Remove projetos duplicados da lista, mantendo o de maior progresso.
- * Critério de duplicidade: mesmo titulo + materia (case-insensitive).
- */
-function deduplicarProjetos(lista) {
-  if (!Array.isArray(lista)) return [];
-  const mapa = new Map();
-  for (const p of lista) {
-    if (!p) continue;
-    const chave = `${(p.titulo || p.objetivo || '').trim().toLowerCase()}::${(p.materia || 'geral').trim().toLowerCase()}`;
-    if (!mapa.has(chave)) {
-      mapa.set(chave, p);
-    } else {
-      const anterior = mapa.get(chave);
-      if ((p.progresso || 0) > (anterior.progresso || 0)) {
-        mapa.set(chave, p);
-      }
+    if (materiasPontuacao.length > 0 && materiasPontuacao[0].pct < 70) {
+      const fraca = materiasPontuacao[0];
+      itens.push({
+        icone: '🎯',
+        corIcone: '#f59e0b',
+        bgIcone: 'rgba(245, 158, 11, 0.15)',
+        titulo: `Reforçar ${fraca.materia}`,
+        motivo: `Seu domínio está em ${fraca.pct}% no diagnóstico. Pratique questões comentadas para subir de nível.`,
+        tempoEstimado: '⏱️ ~20 min · 10 questões',
+        ctaTexto: `Praticar ${fraca.materia} →`,
+        ctaUrl: `./questoes.html`
+      });
     }
   }
-  return Array.from(mapa.values());
+
+  // 3. PRIORIDADE 3: Prática Geral ou Simulado Cronometrado
+  const totalQuestoesResolvidas = (sessoes || []).filter(s => s.tipo === 'questoes').length;
+  if (totalQuestoesResolvidas < 20) {
+    itens.push({
+      icone: '📝',
+      corIcone: '#3b82f6',
+      bgIcone: 'rgba(59, 130, 246, 0.15)',
+      titulo: 'Sessão de Prática de Questões',
+      motivo: 'Resolva questões reais comentadas com gabarito explicativo detalhado.',
+      tempoEstimado: '⏱️ 15 min',
+      ctaTexto: 'Resolver Questões →',
+      ctaUrl: './questoes.html'
+    });
+  } else {
+    itens.push({
+      icone: '⏱️',
+      corIcone: '#10b981',
+      bgIcone: 'rgba(16, 185, 129, 0.15)',
+      titulo: 'Simulado de Treino Cronometrado',
+      motivo: 'Teste sua velocidade e controle de tempo sob condições reais de prova.',
+      tempoEstimado: '⏱️ 30 a 60 min',
+      ctaTexto: 'Abrir Simulados →',
+      ctaUrl: './simulados.html'
+    });
+  }
+
+  // Renderiza até 3 itens prioritários
+  container.innerHTML = itens.slice(0, 3).map(it => `
+    <div class="recomendacao-card-item">
+      <div class="rec-info-left">
+        <div class="rec-icone-box" style="background:${it.bgIcone}; color:${it.corIcone};">
+          ${it.icone}
+        </div>
+        <div>
+          <div class="rec-titulo">${it.titulo}</div>
+          <div class="rec-motivo">${it.motivo}</div>
+          <div style="font-size:0.74rem; color:var(--text-secondary); margin-top:3px; font-weight:600;">${it.tempoEstimado}</div>
+        </div>
+      </div>
+      <a href="${it.ctaUrl}" class="btn btn-primary" style="padding:6px 14px; font-size:0.78rem; white-space:nowrap; flex-shrink:0;">
+        ${it.ctaTexto}
+      </a>
+    </div>
+  `).join('');
 }
 
-/**
- * Renderiza os projetos e cronogramas de estudo salvos localmente
- */
-function carregarProjetosEstudo(userId) {
-  const container = document.getElementById('projetos-estudo-list');
-  if (!container) return [];
+// ----------------------------------------------------------------
+// BLOCO 5: PROGRESSO & DOMÍNIO DAS MATÉRIAS
+// ----------------------------------------------------------------
+
+async function carregarMateriasEProgresso(sessoes, diagnostico) {
+  const elMateriaList = document.getElementById('materia-list');
+  if (!elMateriaList) return;
 
   try {
-    const storageKey = userId ? `vestibular_projetos_${userId}` : 'vestibular_projetos_guest';
-    const rawProjetos = localStorage.getItem(storageKey) || localStorage.getItem('vestibular_projetos_guest');
-    if (!rawProjetos) return [];
+    let materias = getCache('materias-catalogo');
+    if (!materias) {
+      const { data, error } = await supabase
+        .from('materias')
+        .select('id, nome, cor')
+        .order('ordem');
 
-    const projetosRaw = JSON.parse(rawProjetos);
-    if (!Array.isArray(projetosRaw) || !projetosRaw.length) return [];
-
-    // Deduplicação automática: limpa entradas repetidas já salvas no localStorage
-    const projetos = deduplicarProjetos(projetosRaw);
-    if (projetos.length < projetosRaw.length) {
-      // Persiste a lista limpa de volta
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(projetos));
-        localStorage.setItem('vestibular_projetos_guest', JSON.stringify(projetos));
-      } catch (_) {}
+      if (!error && data) {
+        materias = data;
+        setCache('materias-catalogo', materias, 300);
+      }
     }
 
-    container.innerHTML = `
-      <div style="display:flex; flex-direction:column; gap:12px;">
-        ${projetos.slice(0, 3).map((p, idx) => {
-          if (!p.id) p.id = 'proj_' + Date.now() + '_' + idx;
-          const tarefasNorm = (p.tarefas || p.etapas || []).map(normalizarTarefa);
-          const proximaPendente = tarefasNorm.find(t => !t.concluida) || tarefasNorm[0];
-          const proximaTarefaTexto = proximaPendente ? proximaPendente.titulo : (p.meta || 'Revisar exercícios');
-          const progresso = p.progresso ?? 25;
-          const concluidasCount = tarefasNorm.filter(t => t.concluida).length;
+    if (!materias || !materias.length) {
+      materias = [
+        { id: '1', nome: 'Matemática', cor: '#3b82f6' },
+        { id: '2', nome: 'Física', cor: '#8b5cf6' },
+        { id: '3', nome: 'Química', cor: '#ec4899' },
+        { id: '4', nome: 'Biologia', cor: '#10b981' },
+        { id: '5', nome: 'Português', cor: '#f59e0b' },
+        { id: '6', nome: 'História', cor: '#ef4444' },
+        { id: '7', nome: 'Geografia', cor: '#06b6d4' }
+      ];
+    }
 
-          return `
-          <div class="projeto-item-card" data-projeto-id="${p.id}" style="cursor:pointer;" title="Clique para abrir detalhes do projeto">
-            <div class="projeto-top">
-              <span class="projeto-titulo">${p.titulo || p.objetivo || 'Plano de Estudos'}</span>
-              <span class="projeto-tag-materia">${p.materia || 'Geral'}</span>
-            </div>
-            <p class="projeto-meta-texto">
-              <strong>Próxima etapa:</strong> ${proximaTarefaTexto}
-            </p>
-            <div style="margin: 4px 0 2px;">
-              <div style="height:6px; border-radius:999px; background:var(--border-color); overflow:hidden;">
-                <div style="height:100%; width:${progresso}%; background:var(--gradient-primary); border-radius:999px;"></div>
-              </div>
-            </div>
-            <div class="projeto-footer">
-              <span>📅 Prazo: ${p.prazo || '30 dias'}</span>
-              <span>Tarefas: ${concluidasCount}/${tarefasNorm.length} (${progresso}%)</span>
-              <span class="see-all" style="font-size:0.82rem; font-weight:700;">Abrir Projeto →</span>
-            </div>
+    const diagResultados = diagnostico?.resultado || diagnostico?.resultados_por_materia || {};
+
+    elMateriaList.innerHTML = materias.slice(0, 7).map(m => {
+      const cor = m.cor || '#7c3aed';
+      let pct = 0;
+
+      // Busca no resultado do diagnóstico
+      const diagMateria = Object.entries(diagResultados).find(([k]) =>
+        k.toLowerCase().includes(m.nome.toLowerCase().split(' ')[0])
+      );
+
+      if (diagMateria && diagMateria[1]?.total > 0) {
+        pct = Math.round((diagMateria[1].acertos / diagMateria[1].total) * 100);
+      } else {
+        // Fallback: calcula com base nas sessões
+        const sessoesMateria = (sessoes || []).filter(s => s.materia_id === m.id && s.tipo === 'questoes');
+        if (sessoesMateria.length > 0) {
+          const acertos = sessoesMateria.filter(s => s.acertou).length;
+          pct = Math.round((acertos / sessoesMateria.length) * 100);
+        }
+      }
+
+      return `
+        <div class="materia-prog-row">
+          <span class="materia-dot" style="background:${cor}; width:8px; height:8px; border-radius:50%; flex-shrink:0;"></span>
+          <span class="materia-prog-nome" title="${m.nome}">${m.nome}</span>
+          <div class="materia-prog-track">
+            <div class="materia-prog-fill" style="width:${pct}%; background:${cor};"></div>
           </div>
-        `;}).join('')}
-      </div>
-    `;
+          <span class="materia-prog-pct" style="color:${cor};">${pct > 0 ? pct + '%' : '0%'}</span>
+          <a href="./questoes.html?materia=${m.id}" class="see-all" style="font-size:0.75rem; margin-left:4px;" title="Praticar ${m.nome}">Praticar →</a>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Erro ao carregar progresso por matéria:', err);
+  }
+}
 
-    // Ao clicar em qualquer ponto do card ou no botão "Abrir Projeto", abre o modal de detalhes
-    container.querySelectorAll('.projeto-item-card').forEach(card => {
-      const projId = card.dataset.projetoId;
-      card.addEventListener('click', () => {
-        abrirModalProjeto(projId);
-      });
-    });
+// ----------------------------------------------------------------
+// BLOCO 6: REVISÕES ESPAÇADAS (Spaced Repetition)
+// ----------------------------------------------------------------
 
-    return projetos;
-  } catch (e) {
-    console.warn('Erro ao carregar projetos de estudo:', e);
+async function carregarRevisoes(userId) {
+  const elPendentes = document.getElementById('rev-num-pendentes');
+  const elConcluidas = document.getElementById('rev-num-concluidas');
+  const elTotal = document.getElementById('rev-num-total');
+  const elStatusTexto = document.getElementById('rev-status-texto');
+  const btnRevisar = document.getElementById('btn-revisar-agora');
+
+  try {
+    const pendentes = await lerRevisoesPendentes(userId);
+    const listaPendentes = Array.isArray(pendentes) ? pendentes : [];
+
+    // Busca total de itens agendados no Supabase
+    let totalItens = listaPendentes.length;
+    let concluidas = 0;
+
+    try {
+      const { data } = await supabase
+        .from('revisao_agendada')
+        .select('total_revisoes, acertos')
+        .eq('user_id', userId);
+
+      if (data && data.length) {
+        totalItens = data.length;
+        concluidas = data.filter(d => (d.total_revisoes || 0) > 0).length;
+      }
+    } catch (_) {}
+
+    if (elPendentes) elPendentes.textContent = listaPendentes.length;
+    if (elConcluidas) elConcluidas.textContent = concluidas;
+    if (elTotal) elTotal.textContent = totalItens;
+
+    if (elStatusTexto) {
+      if (listaPendentes.length === 0) {
+        elStatusTexto.textContent = '🎉 Tudo em dia! Nenhuma revisão atrasada hoje.';
+        if (btnRevisar) {
+          btnRevisar.textContent = 'Praticar Mais 📝';
+          btnRevisar.className = 'btn btn-ghost';
+        }
+      } else {
+        elStatusTexto.textContent = `🔴 ${listaPendentes.length} ite${listaPendentes.length === 1 ? 'm precisa' : 'ns precisam'} de revisão hoje.`;
+        if (btnRevisar) {
+          btnRevisar.textContent = '🚀 Revisar Agora';
+          btnRevisar.className = 'btn btn-primary';
+        }
+      }
+    }
+
+    return listaPendentes;
+  } catch (err) {
+    console.warn('Erro ao carregar revisões:', err);
     return [];
   }
 }
 
-/**
- * Carrega as sessões de estudo e calcula horas, questões, simulados e streak.
- */
+// ----------------------------------------------------------------
+// BLOCO 7: SEU DESEMPENHO (MÉTRICAS REAIS)
+// ----------------------------------------------------------------
+
 async function carregarEstatisticas(userId) {
   try {
     const { data: sessoes, error } = await supabase
@@ -727,22 +530,30 @@ async function carregarEstatisticas(userId) {
     const listaSessoes = sessoes || [];
     const totalMinutos = listaSessoes.reduce((soma, s) => soma + (s.duracao_minutos || 0), 0);
 
+    const sessoesQuestoes = listaSessoes.filter(s => s.tipo === 'questoes');
+    const totalQuestoes = sessoesQuestoes.length;
+    const totalAcertos = sessoesQuestoes.filter(s => s.acertou === true).length;
+    const taxaAcertoPct = totalQuestoes > 0 ? Math.round((totalAcertos / totalQuestoes) * 100) : 0;
+
+    const totalSimulados = listaSessoes.filter(s => s.tipo === 'simulado').length;
+
     const elHoras = document.getElementById('stat-horas');
     const elQuestoes = document.getElementById('stat-questoes');
+    const elAcertosPct = document.getElementById('stat-acertos-pct');
     const elSimulados = document.getElementById('stat-simulados');
-    const elStreakTopbar = document.getElementById('topbar-streak');
     const elStreakCard = document.getElementById('stat-streak-dias');
+    const elStreakTopbar = document.getElementById('topbar-streak');
 
     if (elHoras) elHoras.textContent = `${Math.round(totalMinutos / 60)}h`;
-    if (elQuestoes) elQuestoes.textContent = listaSessoes.filter(s => s.tipo === 'questoes').length;
-    if (elSimulados) elSimulados.textContent = listaSessoes.filter(s => s.tipo === 'simulado').length;
+    if (elQuestoes) elQuestoes.textContent = totalQuestoes;
+    if (elAcertosPct) elAcertosPct.textContent = `Taxa de acertos: ${taxaAcertoPct}%`;
+    if (elSimulados) elSimulados.textContent = totalSimulados;
 
     const seq = calcularSequencia(listaSessoes.map(s => s.criado_em));
-    const streakTexto = `${seq} ${seq === 1 ? 'dia seguido' : 'dias seguidos'}`;
-    const streakCardTexto = `${seq} ${seq === 1 ? 'dia' : 'dias'}`;
+    const streakTexto = `${seq} ${seq === 1 ? 'dia' : 'dias'}`;
 
     if (elStreakTopbar) elStreakTopbar.textContent = streakTexto;
-    if (elStreakCard) elStreakCard.textContent = streakCardTexto;
+    if (elStreakCard) elStreakCard.textContent = streakTexto;
 
     return listaSessoes;
   } catch (err) {
@@ -751,16 +562,216 @@ async function carregarEstatisticas(userId) {
   }
 }
 
-/**
- * Carrega a quantidade restante de cotas com proteção contra chamadas simultâneas.
- */
+// ----------------------------------------------------------------
+// BLOCO 8: SEU PRÓXIMO PASSO (SPOTLIGHT CENTRAL)
+// ----------------------------------------------------------------
+
+function atualizarProximoPasso(sessoes, diagnostico, revisoes, objetivo) {
+  const container = document.getElementById('proximo-passo-container');
+  if (!container) return;
+
+  const pendentesHoje = Array.isArray(revisoes) ? revisoes.length : 0;
+
+  // Cenário 1: Revisões pendentes
+  if (pendentesHoje > 0) {
+    container.innerHTML = `
+      <div style="flex:1; min-width:280px;">
+        <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#ef4444; margin-bottom:4px;">
+          🎯 SEU PRÓXIMO PASSO PRIORITÁRIO
+        </div>
+        <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin:0 0 4px;">
+          Conclua suas ${pendentesHoje} revisões de hoje
+        </h3>
+        <p style="font-size:0.86rem; color:var(--text-secondary); margin:0; line-height:1.4;">
+          Revise os itens agendados no ciclo SM-2 antes de iniciar novos assuntos para garantir máxima retenção.
+        </p>
+      </div>
+      <div>
+        <a href="./questoes.html" class="btn btn-primary" style="padding:10px 22px; font-weight:700;">
+          Iniciar Revisão Agora 🚀
+        </a>
+      </div>
+    `;
+    return;
+  }
+
+  // Cenário 2: Diagnóstico não realizado
+  if (!diagnostico) {
+    container.innerHTML = `
+      <div style="flex:1; min-width:280px;">
+        <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#8b5cf6; margin-bottom:4px;">
+          🧠 DIAGNÓSTICO PENDENTE
+        </div>
+        <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin:0 0 4px;">
+          Descubra seus pontos fortes e fracos
+        </h3>
+        <p style="font-size:0.86rem; color:var(--text-secondary); margin:0; line-height:1.4;">
+          Faça o teste adaptativo de 15 minutos para calibrar seu índice de preparação e mapa de domínio.
+        </p>
+      </div>
+      <div>
+        <a href="./diagnostico.html" class="btn btn-primary" style="padding:10px 22px; font-weight:700;">
+          Fazer Diagnóstico (15 min) 🧠
+        </a>
+      </div>
+    `;
+    return;
+  }
+
+  // Cenário 3: Jornada ativa de estudos
+  container.innerHTML = `
+    <div style="flex:1; min-width:280px;">
+      <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:#10b981; margin-bottom:4px;">
+        ⚡ PRONTO PARA AVANÇAR
+      </div>
+      <h3 style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin:0 0 4px;">
+        Mantenha o ritmo com uma sessão de questões
+      </h3>
+      <p style="font-size:0.86rem; color:var(--text-secondary); margin:0; line-height:1.4;">
+        Você está em dia com as revisões! Resolva mais 15 questões ou treine com um simulado completo.
+      </p>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a href="./questoes.html" class="btn btn-primary" style="padding:10px 20px; font-weight:700;">
+        Resolver Questões 📝
+      </a>
+      <a href="./simulados.html" class="btn btn-ghost" style="padding:10px 20px; font-weight:700;">
+        Fazer Simulado ⏱️
+      </a>
+    </div>
+  `;
+}
+
+// ----------------------------------------------------------------
+// ONBOARDING PROGRESSIVO PARA ALUNO NOVO
+// ----------------------------------------------------------------
+
+function gerenciarOnboarding(sessoes, objetivo, diagnostico) {
+  const container = document.getElementById('onboarding-novo-aluno');
+  if (!container) return;
+
+  const totalQuestoes = (sessoes || []).filter(s => s.tipo === 'questoes').length;
+  const totalSimulados = (sessoes || []).filter(s => s.tipo === 'simulado').length;
+
+  const stepObjFeito = Boolean(objetivo?.vestibular_id);
+  const stepDiagFeito = Boolean(diagnostico);
+  const stepQuestFeito = totalQuestoes >= 10;
+  const stepSimFeito = totalSimulados >= 1;
+
+  // Se o aluno já concluiu todas as 4 etapas, oculta o onboarding
+  if (stepObjFeito && stepDiagFeito && stepQuestFeito && stepSimFeito) {
+    container.style.display = 'none';
+    return;
+  }
+
+  // Atualiza os marcadores de cada etapa
+  const elCheckObj = document.getElementById('ob-check-objetivo');
+  const elCheckDiag = document.getElementById('ob-check-diagnostico');
+  const elCheckQuest = document.getElementById('ob-check-questoes');
+  const elCheckSim = document.getElementById('ob-check-simulado');
+
+  if (elCheckObj) {
+    elCheckObj.innerHTML = stepObjFeito ? '✅ Concluído' : '⚪ Etapa 1';
+    elCheckObj.style.color = stepObjFeito ? '#22c55e' : 'var(--text-secondary)';
+  }
+  if (elCheckDiag) {
+    elCheckDiag.innerHTML = stepDiagFeito ? '✅ Concluído' : '⚪ Etapa 2';
+    elCheckDiag.style.color = stepDiagFeito ? '#22c55e' : 'var(--text-secondary)';
+  }
+  if (elCheckQuest) {
+    elCheckQuest.innerHTML = stepQuestFeito ? '✅ Concluído' : `⚪ Etapa 3 (${totalQuestoes}/10)`;
+    elCheckQuest.style.color = stepQuestFeito ? '#22c55e' : 'var(--text-secondary)';
+  }
+  if (elCheckSim) {
+    elCheckSim.innerHTML = stepSimFeito ? '✅ Concluído' : '⚪ Etapa 4';
+    elCheckSim.style.color = stepSimFeito ? '#22c55e' : 'var(--text-secondary)';
+  }
+
+  document.getElementById('ob-step-objetivo')?.addEventListener('click', () => {
+    abrirModalObjetivo((novo) => {
+      atualizarVisualObjetivo(novo);
+      gerenciarOnboarding(sessoes, novo, diagnostico);
+    });
+  });
+
+  container.style.display = 'block';
+}
+
+// ----------------------------------------------------------------
+// HELPERS DE PERFIL, COTAS, RANKING E REALTIME
+// ----------------------------------------------------------------
+
+async function carregarPerfil(userId) {
+  try {
+    let { data: profile } = await supabase
+      .from('profiles')
+      .select('nome, nome_usuario, nivel, xp, meta_diaria_minutos, planos(nome, ordem)')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (!profile) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const meta = user.user_metadata || {};
+        const nomeInicial = meta.full_name || meta.name || meta.nome || user.email?.split('@')[0] || 'Aluno(a)';
+        profile = { nome: nomeInicial, nivel: 1, xp: 0 };
+      }
+    }
+
+    if (!profile) return null;
+
+    const planoNome = profile.planos?.nome || 'free';
+    planoUsuarioCache = planoNome;
+    const ehUltimate = isUltimate(planoNome);
+
+    const nomeExibicao = profile.nome_usuario || profile.nome?.split(' ')[0] || 'Aluno(a)';
+    const elSaudacao = document.getElementById('saudacao');
+    const elAvatar = document.getElementById('avatar-inicial');
+
+    if (elSaudacao) {
+      elSaudacao.innerHTML = `Olá, ${nomeExibicao}! 👋 ${
+        ehUltimate
+          ? `<span style="display:inline-block; font-size:.75rem; background:linear-gradient(135deg, #f59e0b, #ec4899); color:#fff; font-weight:800; padding:3px 10px; border-radius:999px; vertical-align:middle; margin-left:6px;">✦ ULTIMATE</span>`
+          : ''
+      }`;
+    }
+    if (elAvatar) elAvatar.textContent = nomeExibicao[0]?.toUpperCase() || 'A';
+
+    aplicarCadeadosSidebar(userId, profile.planos?.ordem ?? 0);
+    return profile;
+  } catch (err) {
+    console.error('Erro ao carregar perfil:', err);
+    return null;
+  }
+}
+
+async function carregarDiagnostico(userId) {
+  try {
+    const { data } = await supabase
+      .from('diagnostico_resultados')
+      .select('resultado, acertos, total_questoes, percentual, realizado_em')
+      .eq('user_id', userId)
+      .order('realizado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (data) return data;
+  } catch (_) {}
+
+  try {
+    const raw = localStorage.getItem(`vestibular_diagnostico_${userId}`);
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+
+  return null;
+}
+
 async function carregarCotasDisponiveis(userId, planoNome = null) {
   if (!userId || isCarregandoCotas) return;
 
   const elQ = document.getElementById('cota-questoes');
   const elR = document.getElementById('cota-resumos');
   const elC = document.getElementById('cota-chat');
-  const elS = document.getElementById('cota-simulados');
 
   if (planoNome) {
     planoUsuarioCache = planoNome;
@@ -772,10 +783,8 @@ async function carregarCotasDisponiveis(userId, planoNome = null) {
   const planoKey = (planoUsuarioCache || 'free').toLowerCase();
   const limitesPlano = PLAN_LIMITS[planoKey] || PLAN_LIMITS.free;
 
-  // Imediatamente atualiza os indicadores ilimitados (null) para evitar flash de valores antigos
   if (limitesPlano.questoes_dia === null && elQ) elQ.textContent = '∞';
   if (limitesPlano.resumos_dia === null && elR) elR.textContent = '∞';
-  if (limitesPlano.simulados_semana === null && elS) elS.textContent = '∞';
 
   isCarregandoCotas = true;
   ultimoFetchCotas = Date.now();
@@ -794,16 +803,9 @@ async function carregarCotasDisponiveis(userId, planoNome = null) {
       rpcs.push(Promise.resolve({ data: { ilimitado: true } }));
     }
 
-    // Chat sempre tem limite numérico (100 para ultimate, 30 para pro, 15 para basic, 5 para free)
     rpcs.push(supabase.rpc('consultar_uso_diario', { p_tipo: 'chat' }));
 
-    if (limitesPlano.simulados_semana !== null) {
-      rpcs.push(supabase.rpc('consultar_uso_diario', { p_tipo: 'simulado' }));
-    } else {
-      rpcs.push(Promise.resolve({ data: { ilimitado: true } }));
-    }
-
-    const [usoQ, usoR, usoC, usoS] = await Promise.all(rpcs);
+    const [usoQ, usoR, usoC] = await Promise.all(rpcs);
 
     const calcularRestante = (res, limiteOficial) => {
       if (limiteOficial === null) return '∞';
@@ -814,119 +816,35 @@ async function carregarCotasDisponiveis(userId, planoNome = null) {
     if (elQ) elQ.textContent = limitesPlano.questoes_dia === null ? '∞' : calcularRestante(usoQ, limitesPlano.questoes_dia);
     if (elR) elR.textContent = limitesPlano.resumos_dia === null ? '∞' : calcularRestante(usoR, limitesPlano.resumos_dia);
     if (elC) elC.textContent = calcularRestante(usoC, limitesPlano.chat_dia);
-    if (elS) elS.textContent = limitesPlano.simulados_semana === null ? '∞' : calcularRestante(usoS, limitesPlano.simulados_semana);
-  } catch (err) {
-    console.error('Erro ao carregar cotas:', err);
+  } catch (_) {
     if (elQ) elQ.textContent = limitesPlano.questoes_dia === null ? '∞' : limitesPlano.questoes_dia;
     if (elR) elR.textContent = limitesPlano.resumos_dia === null ? '∞' : limitesPlano.resumos_dia;
     if (elC) elC.textContent = limitesPlano.chat_dia;
-    if (elS) elS.textContent = limitesPlano.simulados_semana === null ? '∞' : limitesPlano.simulados_semana;
   } finally {
     isCarregandoCotas = false;
   }
 }
 
-/**
- * Carrega as matérias e renderiza as barras de progresso elegantes com tempos reais.
- */
-async function carregarMateriasEProgresso(promessaSessoes) {
-  try {
-    let materias = getCache('materias-catalogo');
-    if (!materias) {
-      const { data, error } = await supabase
-        .from('materias')
-        .select('id, nome, cor')
-        .order('ordem');
-
-      if (!error && data) {
-        materias = data;
-        setCache('materias-catalogo', materias, 300);
-      }
-    }
-
-    const sessoes = await promessaSessoes;
-    const listaSessoes = sessoes || [];
-    const totalMinutos = listaSessoes.reduce((soma, s) => soma + (s.duracao_minutos || 0), 0);
-
-    const elMateriaList = document.getElementById('materia-list');
-    if (!elMateriaList) return;
-
-    if (materias && materias.length) {
-      const minutosPorMateria = {};
-      listaSessoes.forEach(s => {
-        if (!s.materia_id) return;
-        minutosPorMateria[s.materia_id] = (minutosPorMateria[s.materia_id] || 0) + (s.duracao_minutos || 0);
-      });
-
-      if (totalMinutos > 0) {
-        elMateriaList.innerHTML = materias.map(m => {
-          const minutos = minutosPorMateria[m.id] || 0;
-          const percentual = Math.round((minutos / totalMinutos) * 100);
-          const cor = m.cor || '#7c3aed';
-          
-          let tempoFormatado = '0m';
-          if (minutos >= 60) {
-            const h = Math.floor(minutos / 60);
-            const mResto = minutos % 60;
-            tempoFormatado = mResto > 0 ? `${h}h ${mResto}m` : `${h}h`;
-          } else if (minutos > 0) {
-            tempoFormatado = `${minutos}m`;
-          }
-
-          return `
-            <div class="materia-item">
-              <span class="materia-dot" style="background:${cor}; color:${cor};"></span>
-              <span class="materia-nome" title="${m.nome}">${m.nome}</span>
-              <div class="materia-prog-wrapper">
-                <div class="prog-track">
-                  <div class="prog-fill" style="width:${percentual}%; background:${cor};"></div>
-                </div>
-                <span class="materia-tempo">${tempoFormatado}</span>
-              </div>
-              <a href="./questoes.html?materia=${m.id}" class="see-all" style="font-size:0.75rem;" title="Praticar ${m.nome}">Praticar →</a>
-            </div>
-          `;
-        }).join('');
-      } else {
-        elMateriaList.innerHTML = materias.slice(0, 6).map(m => {
-          const cor = m.cor || '#7c3aed';
-          return `
-            <div class="materia-item">
-              <span class="materia-dot" style="background:${cor}; color:${cor};"></span>
-              <span class="materia-nome" title="${m.nome}">${m.nome}</span>
-              <div class="materia-prog-wrapper">
-                <div class="prog-track">
-                  <div class="prog-fill" style="width:0%; background:${cor};"></div>
-                </div>
-                <span class="materia-tempo">0h</span>
-              </div>
-              <a href="./questoes.html?materia=${m.id}" class="see-all" style="font-size:0.75rem;" title="Começar ${m.nome}">Começar →</a>
-            </div>
-          `;
-        }).join('');
-      }
-    }
-  } catch (err) {
-    console.error('Erro ao carregar matérias:', err);
-  }
-}
-
-/**
- * Carrega a contagem regressiva para a próxima prova com cache de 10 minutos.
- */
-async function carregarContagemVestibulares() {
+async function carregarContagemVestibulares(promessaObjetivo) {
   const el = document.getElementById('topbar-countdown');
   if (!el) return;
+
+  const objetivo = await promessaObjetivo;
+  if (objetivo?.data_prova) {
+    const dias = calcularDiasRestantes(objetivo.data_prova);
+    el.textContent = `${objetivo.vestibular_id?.toUpperCase() || 'Vestibular'}: ${formatarContagem(dias)}`;
+    return;
+  }
 
   try {
     let vestibulares = getCache('vestibulares-datas');
     if (!vestibulares) {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('vestibulares')
         .select('nome, data_prova')
         .order('data_prova', { ascending: true });
 
-      if (!error && data) {
+      if (data) {
         vestibulares = data;
         setCache('vestibulares-datas', vestibulares, 600);
       }
@@ -934,60 +852,46 @@ async function carregarContagemVestibulares() {
 
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-
     const proximo = (vestibulares || []).find(v => v.data_prova && new Date(v.data_prova) >= hoje);
 
     if (proximo) {
       const diffMs = new Date(proximo.data_prova) - hoje;
       const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      el.textContent = `${proximo.nome}: Faltam ${dias} dias`;
+      el.textContent = `${proximo.nome}: ${dias} dias`;
     } else {
-      const anoAtual = hoje.getFullYear();
-      let dataEnem = new Date(anoAtual, 10, 8);
-      if (dataEnem < hoje) dataEnem = new Date(anoAtual + 1, 10, 8);
-      const diffMs = dataEnem - hoje;
-      const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      el.textContent = `ENEM ${dataEnem.getFullYear()}: Faltam ${dias} dias`;
+      const dias = calcularDiasRestantes('2026-11-01');
+      el.textContent = `FUVEST 2027: ${formatarContagem(dias)}`;
     }
   } catch (_) {
-    el.textContent = 'ENEM 2026: Faltam 82 dias';
+    const dias = calcularDiasRestantes('2026-11-01');
+    el.textContent = `FUVEST 2027: ${formatarContagem(dias)}`;
   }
 }
 
-/**
- * Carrega os 5 melhores alunos no ranking com pódio estilizado e distinção do usuário logado.
- */
 async function carregarRanking(userId) {
   const elRanking = document.getElementById('ranking-list');
   if (!elRanking) return;
 
   try {
-    const { data: ranking, error } = await supabase
+    const { data: ranking } = await supabase
       .from('profiles')
       .select('id, nome, nome_usuario, xp')
       .order('xp', { ascending: false })
       .limit(5);
 
-    if (error || !ranking || !ranking.length) return;
+    if (!ranking || !ranking.length) return;
 
     const medalhas = ['🥇 1º', '🥈 2º', '🥉 3º', '4º', '5º'];
-    const classesPodio = ['pos-ouro', 'pos-prata', 'pos-bronze', 'pos-padrao', 'pos-padrao'];
 
     elRanking.innerHTML = ranking.map((p, i) => {
       const nome = p.nome_usuario || p.nome || 'Aluno(a)';
       const ehVoce = p.id === userId;
-      const labelPos = medalhas[i] || `${i + 1}º`;
-      const classePos = classesPodio[i] || 'pos-padrao';
 
       return `
-        <div class="ranking-item ${ehVoce ? 'ranking-item-voce' : ''}">
-          <span class="ranking-pos-badge ${classePos}">${labelPos}</span>
-          <span class="ranking-avatar-mini">${nome[0]?.toUpperCase() || 'A'}</span>
-          <div class="ranking-info">
-            <span class="ranking-nome">${nome}</span>
-            ${ehVoce ? '<span class="tag-voce">você</span>' : ''}
-          </div>
-          <span class="ranking-xp"><strong>${(p.xp || 0).toLocaleString('pt-BR')}</strong> XP</span>
+        <div class="materia-prog-row" style="padding:8px 0;">
+          <span style="font-weight:800; font-size:0.8rem; width:36px;">${medalhas[i] || `${i + 1}º`}</span>
+          <span class="materia-prog-nome" style="flex:1;">${nome} ${ehVoce ? '<span style="font-size:0.68rem; background:rgba(124,58,237,0.2); color:var(--color-primary-400); padding:1px 6px; border-radius:999px;">você</span>' : ''}</span>
+          <span style="font-size:0.82rem; font-weight:700;">${(p.xp || 0).toLocaleString('pt-BR')} XP</span>
         </div>
       `;
     }).join('');
@@ -996,9 +900,6 @@ async function carregarRanking(userId) {
   }
 }
 
-/**
- * Sincronização Realtime otimizada e limpeza correta da subscription.
- */
 function iniciarSincronizacaoRealtime(userId) {
   const verificarFoco = () => {
     if (document.visibilityState === 'visible' && Date.now() - ultimoFetchCotas > 30000) {
@@ -1027,14 +928,9 @@ function iniciarSincronizacaoRealtime(userId) {
         supabase.removeChannel(canalCotasRealtime);
       }
     });
-  } catch (e) {
-    console.warn('Realtime channel warning:', e);
-  }
+  } catch (_) {}
 }
 
-/**
- * Conta os dias seguidos no fuso horário local correto.
- */
 function calcularSequencia(datasCriadoEm) {
   if (!datasCriadoEm || !datasCriadoEm.length) return 0;
 
