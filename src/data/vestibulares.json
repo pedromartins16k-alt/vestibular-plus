@@ -182,6 +182,64 @@
       },
       "fonte": "https://enem.inep.gov.br/",
       "fonte_atualizada_em": "2026-09-29"
+    },
+    {
+      "id": "ita",
+      "nome": "ITA",
+      "nome_completo": "Instituto Tecnológico de Aeronáutica",
+      "instituicao": "ITA / DCTA",
+      "sigla": "ITA",
+      "edicao": "2027",
+      "website_oficial": "http://www.vestibular.ita.br/",
+      "cor": "#002244",
+      "icone": "✈️",
+      "descricao": "Vestibular do Instituto Tecnológico de Aeronáutica. Um dos processos seletivos mais exigentes do país nas áreas de Engenharia e Ciências Exatas.",
+      "status": "aguardando",
+      "primeira_fase": {
+        "data": null,
+        "data_formatada": "A confirmar",
+        "total_questoes": 48,
+        "duracao_horas": 4
+      },
+      "segunda_fase": {
+        "datas": [],
+        "inclui_redacao": true
+      },
+      "inscricoes": {
+        "inicio": null,
+        "fim": null
+      },
+      "fonte": "http://www.vestibular.ita.br/",
+      "fonte_atualizada_em": "2026-09-29"
+    },
+    {
+      "id": "ime",
+      "nome": "IME",
+      "nome_completo": "Instituto Militar de Engenharia",
+      "instituicao": "IME / Exército Brasileiro",
+      "sigla": "IME",
+      "edicao": "2027",
+      "website_oficial": "https://www.ime.eb.mil.br/",
+      "cor": "#1b4d3e",
+      "icone": "⚔️",
+      "descricao": "Concurso de Admissão aos Cursos de Formação e Graduação de Oficiais do Exército Brasileiro no Instituto Militar de Engenharia.",
+      "status": "aguardando",
+      "primeira_fase": {
+        "data": null,
+        "data_formatada": "A confirmar",
+        "total_questoes": 40,
+        "duracao_horas": 4
+      },
+      "segunda_fase": {
+        "datas": [],
+        "inclui_redacao": true
+      },
+      "inscricoes": {
+        "inicio": null,
+        "fim": null
+      },
+      "fonte": "https://www.ime.eb.mil.br/",
+      "fonte_atualizada_em": "2026-09-29"
     }
   ]
 }

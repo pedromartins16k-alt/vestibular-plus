@@ -13,6 +13,7 @@
  */
 
 import { supabase } from '../lib/supabaseClient.js';
+import vestibularesData from '../data/vestibulares.json';
 
 const LS_KEY_PREFIX = 'vestibular_objetivo_';
 
@@ -21,21 +22,14 @@ function getStorageKey(userId) {
 }
 
 // ----------------------------------------------------------------
-// Dados de vestibulares (importados do JSON configurável)
+// Dados de vestibulares (importados estaticamente do JSON oficial)
 // ----------------------------------------------------------------
-let _vestibularesData = null;
+export function obterVestibulares() {
+  return vestibularesData?.vestibulares || [];
+}
 
 async function carregarVestibulares() {
-  if (_vestibularesData) return _vestibularesData;
-  try {
-    const resp = await fetch('../data/vestibulares.json');
-    const json = await resp.json();
-    _vestibularesData = json.vestibulares || [];
-  } catch (err) {
-    console.warn('[objetivo] Não foi possível carregar vestibulares.json:', err);
-    _vestibularesData = [];
-  }
-  return _vestibularesData;
+  return obterVestibulares();
 }
 
 // ----------------------------------------------------------------
@@ -194,8 +188,7 @@ export async function abrirModalObjetivo(onSalvar) {
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
 
-  // Handler de salvar
-  const form = modal.querySelector('#form-objetivo');
+  // Handler de fechar e salvar
   const btnSalvar = modal.querySelector('#btn-salvar-objetivo');
   const btnFechar = modal.querySelector('#btn-fechar-objetivo');
 
@@ -204,24 +197,26 @@ export async function abrirModalObjetivo(onSalvar) {
     document.body.style.overflow = '';
   };
 
-  btnFechar?.addEventListener('click', fechar, { once: true });
-  modal.addEventListener('click', (e) => {
+  if (btnFechar) btnFechar.onclick = fechar;
+  modal.onclick = (e) => {
     if (e.target === modal) fechar();
-  }, { once: true });
+  };
 
-  btnSalvar?.addEventListener('click', async () => {
-    const dados = coletarDadosFormulario(modal, vestibulares);
-    if (!dados) return;
-    btnSalvar.disabled = true;
-    btnSalvar.textContent = 'Salvando...';
-    const resultado = await salvarObjetivo(dados);
-    btnSalvar.disabled = false;
-    btnSalvar.textContent = '✅ Salvo!';
-    setTimeout(() => {
-      fechar();
-      if (typeof onSalvar === 'function') onSalvar(resultado);
-    }, 600);
-  }, { once: true });
+  if (btnSalvar) {
+    btnSalvar.onclick = async () => {
+      const dados = coletarDadosFormulario(modal, vestibulares);
+      if (!dados) return;
+      btnSalvar.disabled = true;
+      btnSalvar.textContent = 'Salvando...';
+      const resultado = await salvarObjetivo(dados);
+      btnSalvar.disabled = false;
+      btnSalvar.textContent = '✅ Salvo!';
+      setTimeout(() => {
+        fechar();
+        if (typeof onSalvar === 'function') onSalvar(resultado);
+      }, 500);
+    };
+  }
 }
 
 function criarModalObjetivo() {
@@ -279,8 +274,8 @@ function criarModalObjetivo() {
           <label style="display: block; font-size: 0.84rem; font-weight: 700; margin-bottom: 8px; color: var(--text-secondary);">
             🎓 Vestibular
           </label>
-          <select id="sel-vestibular" class="input-field" style="width: 100%;" required>
-            <option value="">— Selecione o vestibular —</option>
+          <select id="sel-vestibular" class="input-field" style="width: 100%; cursor: pointer; color: var(--text-primary); background-color: var(--bg-elevated);" required>
+            <option value="" style="background-color: var(--bg-elevated); color: var(--text-secondary);">— Selecione o vestibular —</option>
           </select>
         </div>
 
@@ -363,11 +358,13 @@ function criarModalObjetivo() {
 function preencherSelectVestibulares(modal, vestibulares, objetivo) {
   const sel = modal.querySelector('#sel-vestibular');
   if (!sel) return;
-  sel.innerHTML = '<option value="">— Selecione o vestibular —</option>';
+  sel.innerHTML = '<option value="" style="background-color: var(--bg-elevated); color: var(--text-secondary);">— Selecione o vestibular —</option>';
   vestibulares.forEach(v => {
     const opt = document.createElement('option');
     opt.value = v.id;
     opt.textContent = `${v.icone || '🎓'} ${v.nome} ${v.edicao}`;
+    opt.style.backgroundColor = 'var(--bg-elevated)';
+    opt.style.color = 'var(--text-primary)';
     if (objetivo?.vestibular_id === v.id) opt.selected = true;
     sel.appendChild(opt);
   });

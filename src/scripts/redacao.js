@@ -1,4 +1,4 @@
-﻿/**
+/**
  * redacao.js — Laboratório Oficial de Redação do Vestibular+
  *
  * Características e Diretrizes:
@@ -20,10 +20,11 @@
 
 import { supabase } from '../lib/supabaseClient.js';
 import { lerObjetivo } from './objetivo.js';
+import propostasDataImported from '../data/propostas-redacao.json';
 
-let propostasData = null;
-let propostasLista = [];
-let criteriosBancas = {};
+let propostasData = propostasDataImported;
+let propostasLista = propostasDataImported?.propostas || [];
+let criteriosBancas = propostasDataImported?.criterios_bancas || {};
 let propostaAtiva = null;
 let sessionUserId = null;
 let objetivoAluno = null;
@@ -69,12 +70,6 @@ async function iniciar() {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     sessionUserId = session?.user?.id || null;
-
-    // Carrega dados das propostas e critérios
-    const resp = await fetch('../data/propostas-redacao.json');
-    propostasData = await resp.json();
-    propostasLista = propostasData.propostas || [];
-    criteriosBancas = propostasData.criterios_bancas || {};
 
     // Carrega objetivo do aluno
     objetivoAluno = await lerObjetivo();

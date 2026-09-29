@@ -3,6 +3,7 @@ import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { obterPlanoUsuario, hasFeature, hasPlanAccess, isUltimate } from '../lib/permissions.js';
+import vestibularesOficiaisData from '../data/vestibulares.json';
 
 const vestibularesListaEl = document.getElementById('vestibulares-lista');
 const filtroTreineiroEl = document.getElementById('filtro-materias-treineiro');
@@ -249,9 +250,7 @@ async function carregarVestibulares() {
 
   // Se o banco não tiver todos os vestibulares ou estiver vazio, enriquece com dados oficiais do JSON
   try {
-    const resp = await fetch('../data/vestibulares.json');
-    const json = await resp.json();
-    const dadosOficiais = json.vestibulares || [];
+    const dadosOficiais = vestibularesOficiaisData?.vestibulares || [];
 
     // Mapeia para o formato esperado pelo renderer se não houver dados no banco
     if (!dataFinal.length) {
@@ -272,7 +271,7 @@ async function carregarVestibulares() {
       }));
     }
   } catch (err) {
-    console.warn('[vestibulares] Erro ao carregar vestibulares.json:', err);
+    console.warn('[vestibulares] Erro ao processar dados de vestibulares:', err);
   }
 
   if (!dataFinal.length) {
