@@ -1,167 +1,597 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Cronograma · Vestibular+</title>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Cronograma Adaptativo · Vestibular+</title>
+<meta name="description" content="Cronograma adaptativo inteligente de estudos que reorganiza suas prioridades com base no seu desempenho real." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles/base.css" />
+<link rel="stylesheet" href="../styles/tokens.css" />
 <style>
-  .page-wrap { padding: 32px 5%; max-width: 1100px; margin: 0 auto; }
-  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-  .back-link { color: var(--text-secondary); font-size: .9rem; }
-  .back-link:hover { color: var(--text-primary); }
-  .page-title { font-size: 1.8rem; margin-top: 6px; }
-  .header-actions { display: flex; align-items: center; gap: 10px; }
-  .btn-add {
-    padding: 10px 18px; border-radius: var(--radius-full); border: none;
-    background: var(--gradient-primary); color: #fff; font-weight: 700; font-size: .85rem;
-    cursor: pointer; box-shadow: var(--shadow-glow);
+  .cronograma-wrap {
+    padding: 28px 4% 64px;
+    max-width: 1120px;
+    margin: 0 auto;
+    width: 100%;
   }
-  .filtro-materias { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px; }
-  .chip {
-    padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
-    background: var(--bg-elevated); font-size: .85rem; font-weight: 600; cursor: pointer;
-    transition: all var(--transition-fast); display: flex; align-items: center; gap: 6px;
+
+  /* Cabeçalho da página */
+  .crono-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
   }
-  .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
-  .dia-grupo { margin-bottom: 28px; }
-  .dia-titulo {
-    font-family: 'Sora', sans-serif; font-size: 1rem; font-weight: 700;
-    color: var(--text-secondary); margin-bottom: 12px; text-transform: capitalize;
+  .crono-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
-  .dia-titulo.hoje { color: var(--accent-color, #7c3aed); }
-  .item-lista { display: flex; flex-direction: column; gap: 10px; }
-  .item-card {
-    display: flex; align-items: center; gap: 14px; padding: 14px 18px;
-    cursor: default;
+  .crono-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color var(--transition-fast);
   }
-  .item-card.concluido { opacity: .55; }
-  .item-card.concluido .item-titulo { text-decoration: line-through; }
-  .item-check {
-    width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border-color);
-    background: var(--bg-elevated); cursor: pointer; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; font-size: .75rem;
+  .crono-back:hover { color: var(--text-primary); }
+  .crono-titulo h1 {
+    font-size: 1.85rem;
+    font-weight: 800;
+    margin: 0;
+    font-family: var(--font-display);
+    color: var(--text-primary);
+  }
+  .crono-titulo p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 2px 0 0;
+  }
+
+  /* Hero Contextual: Aluno, Objetivo e Prova */
+  .crono-hero-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero-contexto-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    min-width: 280px;
+  }
+  .hero-tag-objetivo {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-primary-400);
+    background: rgba(124,58,237,0.12);
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(124,58,237,0.25);
+    width: fit-content;
+  }
+  .hero-titulo-vestibular {
+    font-size: 1.45rem;
+    font-weight: 800;
+    font-family: var(--font-display);
+    color: var(--text-primary);
+    margin: 0;
+  }
+  .hero-sub-detalhes {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    margin: 0;
+  }
+  .hero-countdown-box {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 16px 22px;
+    text-align: center;
+    min-width: 170px;
+  }
+  .countdown-num {
+    font-size: 2.1rem;
+    font-weight: 900;
+    font-family: var(--font-display);
+    color: #38bdf8;
+    line-height: 1;
+  }
+  .countdown-lbl {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  /* Grid de Métricas de Estudo */
+  .crono-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .crono-stat-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+    box-shadow: var(--shadow-soft);
+  }
+  .crono-stat-lbl {
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .crono-stat-val {
+    font-size: 1.55rem;
+    font-weight: 800;
+    font-family: var(--font-display);
+    color: var(--text-primary);
+    line-height: 1.1;
+  }
+  .crono-stat-sub {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+
+  /* Container Principal com 2 colunas no desktop */
+  .crono-main-layout {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 24px;
+    margin-bottom: 32px;
+  }
+
+  /* Painel: Plano de Hoje (Atividades Adaptativas) */
+  .plano-hoje-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 24px;
+    box-shadow: var(--shadow-soft);
+  }
+  .panel-topo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .panel-topo h2 {
+    font-size: 1.25rem;
+    font-family: var(--font-display);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Lista de Tarefas do Dia */
+  .tarefas-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .tarefa-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
     transition: all var(--transition-fast);
   }
-  .item-check.checked { background: var(--gradient-primary); border-color: transparent; color: #fff; }
-  .item-info { flex: 1; min-width: 0; }
-  .item-titulo { font-weight: 600; font-size: .95rem; }
-  .item-meta { font-size: .78rem; color: var(--text-secondary); margin-top: 3px; }
-  .item-tag { font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-full); flex-shrink: 0; }
-  .item-del { color: var(--text-secondary); cursor: pointer; font-size: 1rem; flex-shrink: 0; padding: 4px; }
-  .item-del:hover { color: #ef4444; }
-  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
+  .tarefa-card:hover {
+    border-color: rgba(124,58,237,0.3);
+  }
+  .tarefa-card.concluida {
+    opacity: 0.6;
+    background: rgba(34,197,94,0.04);
+    border-color: rgba(34,197,94,0.25);
+  }
+  .tarefa-card.concluida .tarefa-titulo {
+    text-decoration: line-through;
+  }
+  .tarefa-check {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid var(--border-color);
+    background: var(--bg-card);
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #fff;
+    margin-top: 2px;
+    transition: all var(--transition-fast);
+  }
+  .tarefa-card.concluida .tarefa-check {
+    background: #22c55e;
+    border-color: #22c55e;
+  }
+  .tarefa-corpo {
+    flex: 1;
+    min-width: 0;
+  }
+  .tarefa-meta-topo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .tarefa-etiqueta {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+  }
+  .tarefa-etiqueta.revisao { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+  .tarefa-etiqueta.urgente { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+  .tarefa-etiqueta.pratica { background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+  .tarefa-etiqueta.simulado { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); }
+  .tarefa-etiqueta.manual { background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border-color); }
+
+  .tarefa-titulo {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 4px;
+  }
+  .tarefa-motivo {
+    font-size: 0.83rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    margin: 0 0 10px;
+  }
+  .tarefa-rodape {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .tarefa-duracao {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .tarefa-acoes {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Coluna Lateral: Semana & Compromissos */
+  .crono-sidebar-col {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Painel Calendário Semanal */
+  .semana-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 22px;
+    box-shadow: var(--shadow-soft);
+  }
+  .semana-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    margin-top: 14px;
+  }
+  .semana-dia-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 4px;
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+  .semana-dia-col:hover {
+    border-color: var(--color-primary-400);
+  }
+  .semana-dia-col.hoje {
+    background: rgba(124,58,237,0.14);
+    border-color: var(--color-primary-500);
+  }
+  .semana-dia-col.selecionado {
+    border-color: #38bdf8;
+    box-shadow: 0 0 10px rgba(56,189,248,0.25);
+  }
+  .dia-sigla {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+  .dia-numero {
+    font-size: 1.1rem;
+    font-weight: 800;
+    font-family: var(--font-display);
+    margin: 4px 0 6px;
+  }
+  .dia-dot-atividade {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-primary-500);
+  }
+
+  /* Painel de Prioridades do Mapa de Domínio */
+  .prioridades-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 22px;
+    box-shadow: var(--shadow-soft);
+  }
+  .prioridade-mini-item {
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+  }
+
+  /* Estado de Onboarding para Aluno Sem Dados */
+  .crono-onboarding {
+    text-align: center;
+    padding: 60px 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    max-width: 620px;
+    margin: 40px auto;
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* Skeleton Loading */
+  .skeleton-box {
+    background: linear-gradient(90deg, var(--bg-elevated) 25%, var(--border-color) 50%, var(--bg-elevated) 75%);
+    background-size: 200% 100%;
+    animation: skeletonGlow 1.5s infinite;
+    border-radius: var(--radius-md);
+  }
+  @keyframes skeletonGlow {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Modal de Adicionar Compromisso */
   .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
-    align-items: center; justify-content: center; z-index: 50; padding: 20px;
+    position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none;
+    align-items: center; justify-content: center; z-index: 2000; padding: 20px;
+    backdrop-filter: blur(8px);
   }
   .modal-overlay.open { display: flex; }
-  .modal-content { max-width: 440px; width: 100%; padding: 32px; }
-  .modal-close { float: right; cursor: pointer; font-size: 1.2rem; color: var(--text-secondary); }
-  .form-group { margin-bottom: 16px; }
-  .form-group label { display: block; font-size: .82rem; font-weight: 600; margin-bottom: 6px; color: var(--text-secondary); }
-  .form-group input, .form-group select {
-    width: 100%; padding: 10px 12px; border-radius: var(--radius-md, 10px);
-    border: 1px solid var(--border-color); background: var(--bg-elevated);
-    color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: .9rem;
+  .modal-content {
+    max-width: 460px; width: 100%; padding: 28px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgba(0,0,0,0.6);
   }
-.form-row { display: flex; gap: 12px; }
-  .form-row .form-group { flex: 1; }
-  .date-input-wrapper { position: relative; }
-  .date-input-wrapper input[type="text"] { cursor: pointer; }
-  .calendario-popup {
-    display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
-    width: 280px; padding: 16px; border-radius: var(--radius-md, 10px);
-    border: 1px solid var(--border-color); background: var(--bg-elevated);
-    box-shadow: 0 12px 30px rgba(0,0,0,.4);
+
+  @media (max-width: 900px) {
+    .crono-main-layout { grid-template-columns: 1fr; }
+    .semana-grid { gap: 4px; }
   }
-  .calendario-popup.open { display: block; }
-  .calendario-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-weight: 700; font-size: .9rem; text-transform: capitalize; }
-  .cal-nav { cursor: pointer; padding: 4px 10px; border-radius: var(--radius-full); user-select: none; }
-  .cal-nav:hover { background: var(--glass-bg); }
-  .calendario-dias-semana { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: .72rem; color: var(--text-secondary); margin-bottom: 6px; }
-  .calendario-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-  .cal-dia {
-    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-    border-radius: 50%; font-size: .82rem; cursor: pointer; transition: all var(--transition-fast);
-  }
-  .cal-dia:hover { background: var(--glass-bg); }
-  .cal-dia.outro-mes { color: var(--text-secondary); opacity: .35; }
-  .cal-dia.hoje { border: 1px solid var(--color-primary-500, #7c3aed); }
-  .cal-dia.selecionado { background: var(--gradient-primary); color: #fff; font-weight: 700; }
-  .btn-salvar {
-    width: 100%; padding: 12px; border-radius: var(--radius-full); border: none;
-    background: var(--gradient-primary); color: #fff; font-weight: 700; font-size: .9rem;
-    cursor: pointer; margin-top: 8px;
+  @media (max-width: 640px) {
+    .cronograma-wrap { padding: 20px 4% 48px; }
+    .crono-hero-card { padding: 18px 20px; }
+    .hero-countdown-box { width: 100%; min-width: auto; }
   }
 </style>
 </head>
 <body>
-  <div class="page-wrap">
-    <div class="page-header">
-      <div>
-        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
-        <h1 class="page-title">🗓️ Cronograma</h1>
-      </div>
-      <div class="header-actions">
-        <button id="theme-toggle" class="icon-btn" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;">🌙</button>
-        <button class="btn-add" id="btn-add">+ Novo compromisso</button>
+<div class="cronograma-wrap">
+
+  <!-- Header Geral -->
+  <header class="crono-header">
+    <div class="crono-header-left">
+      <a class="crono-back" href="./dashboard.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Voltar ao Dashboard
+      </a>
+      <div class="crono-titulo">
+        <h1>🗓️ Cronograma Adaptativo</h1>
+        <p>Planejamento que se ajusta automaticamente ao seu ritmo e ao seu desempenho real.</p>
       </div>
     </div>
-    <div class="filtro-materias" id="filtro-materias">
-      <div class="chip active" data-materia="todas">Todas</div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button class="btn btn-secondary" id="btn-alterar-meta-crono" style="font-size:0.86rem; padding:8px 16px;">
+        🎯 Ajustar Objetivo
+      </button>
+      <button class="btn btn-primary" id="btn-add-compromisso" style="font-size:0.86rem; padding:8px 16px;">
+        + Adicionar Item
+      </button>
+      <button id="theme-toggle" class="icon-btn" style="width:38px;height:38px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;" title="Alternar tema">🌙</button>
     </div>
-    <div id="cronograma-lista">
-      <p class="empty-state">Carregando cronograma...</p>
+  </header>
+
+  <!-- Container de Erro -->
+  <div id="crono-erro-container" style="display:none; margin-bottom:24px;"></div>
+
+  <!-- SKELETON LOADING -->
+  <div id="crono-loading-skeleton">
+    <div class="skeleton-box" style="height:120px; margin-bottom:20px;"></div>
+    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:24px;">
+      <div class="skeleton-box" style="height:76px;"></div>
+      <div class="skeleton-box" style="height:76px;"></div>
+      <div class="skeleton-box" style="height:76px;"></div>
+      <div class="skeleton-box" style="height:76px;"></div>
+    </div>
+    <div style="display:grid; grid-template-columns:1.6fr 1fr; gap:24px;">
+      <div class="skeleton-box" style="height:360px;"></div>
+      <div class="skeleton-box" style="height:360px;"></div>
     </div>
   </div>
 
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal-content card">
-      <span class="modal-close" id="modal-close">✕</span>
-      <h2 id="modal-titulo-form">Novo compromisso</h2>
-      <div class="form-group">
-        <label>Título</label>
-        <input type="text" id="input-titulo" placeholder="Ex: Revisar Matemática" />
-      </div>
-      <div class="form-group">
-        <label>Matéria</label>
-        <select id="input-materia"></select>
-      </div>
-   <div class="form-group">
-        <label>Data</label>
-        <div class="date-input-wrapper">
-          <input type="text" id="input-data-display" placeholder="Selecione uma data" readonly />
-          <input type="hidden" id="input-data" />
-          <div class="calendario-popup" id="calendario-popup">
-            <div class="calendario-header">
-              <span class="cal-nav" id="cal-prev">‹</span>
-              <span id="cal-mes-ano"></span>
-              <span class="cal-nav" id="cal-next">›</span>
-            </div>
-            <div class="calendario-dias-semana">
-              <span>D</span><span>S</span><span>T</span><span>Q</span><span>Q</span><span>S</span><span>S</span>
-            </div>
-            <div class="calendario-grid" id="calendario-grid"></div>
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main id="crono-conteudo-principal" style="display:none;">
+
+    <!-- 1. HERO DO OBJETIVO & PROVA -->
+    <section class="crono-hero-card" id="crono-hero-card"></section>
+
+    <!-- 2. RESUMO DE PREPARAÇÃO & CONSTÂNCIA -->
+    <section class="crono-stats-grid" id="crono-stats-grid"></section>
+
+    <!-- 3. LAYOUT DUPLO: PLANO DIÁRIO + SIDEBAR SEMANAL -->
+    <div class="crono-main-layout">
+      
+      <!-- Coluna Esquerda: Tarefas de Hoje -->
+      <section class="plano-hoje-panel">
+        <div class="panel-topo">
+          <h2>
+            <span>⚡</span>
+            <span id="plano-data-titulo">Plano de Estudos de Hoje</span>
+          </h2>
+          <span style="font-size:0.8rem; color:var(--text-secondary);" id="plano-tempo-total-estimado">
+            ⏱️ Carga sugerida
+          </span>
+        </div>
+
+        <div class="tarefas-lista" id="tarefas-hoje-lista"></div>
+      </section>
+
+      <!-- Coluna Direita: Calendário Semanal & Prioridades do Domínio -->
+      <div class="crono-sidebar-col">
+
+        <!-- Calendário Semanal -->
+        <section class="semana-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="font-size:1.05rem; font-family:var(--font-display); margin:0;">
+              📅 Semana Atual
+            </h3>
+            <span style="font-size:0.75rem; color:var(--text-secondary);" id="semana-rotulo-mes"></span>
           </div>
-        </div>
+          <div class="semana-grid" id="semana-dias-grid"></div>
+        </section>
+
+        <!-- Matérias Prioritárias do Mapa de Domínio -->
+        <section class="prioridades-box">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <h3 style="font-size:1.05rem; font-family:var(--font-display); margin:0;">
+              🧬 Foco do Mapa de Domínio
+            </h3>
+            <a href="./mapa-dominio.html" style="font-size:0.76rem; color:var(--color-primary-400); font-weight:700;">
+              Ver Mapa →
+            </a>
+          </div>
+          <div id="crono-prioridades-lista"></div>
+        </section>
+
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Início</label>
-          <input type="time" id="input-hora-inicio" />
-        </div>
-        <div class="form-group">
-          <label>Fim</label>
-          <input type="time" id="input-hora-fim" />
-        </div>
-      </div>
-      <button class="btn-salvar" id="btn-salvar">Salvar</button>
+
+    </div>
+
+  </main>
+
+  <!-- ONBOARDING NOVO ALUNO -->
+  <div id="crono-onboarding" class="crono-onboarding" style="display:none;">
+    <span style="font-size:3.2rem; display:block; margin-bottom:14px;">🎯</span>
+    <h2 style="font-size:1.4rem; font-family:var(--font-display); margin-bottom:8px;">
+      Vamos montar seu cronograma personalizado
+    </h2>
+    <p style="color:var(--text-secondary); font-size:0.92rem; line-height:1.6; margin-bottom:24px;">
+      Para que o cronograma consiga adaptar automaticamente sua rotina, precisamos entender qual vestibular você vai prestar e identificar seu nível inicial.
+    </p>
+    <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+      <button class="btn btn-primary" id="btn-onboarding-definir-obj">🎯 Configurar Meu Objetivo</button>
+      <a href="./diagnostico.html" class="btn btn-secondary">🧠 Fazer Diagnóstico Inicial</a>
     </div>
   </div>
 
-  <script type="module" src="../scripts/theme.js"></script>
-  <script type="module" src="../scripts/cronograma.js"></script>
+</div>
+
+<!-- MODAL DE ADICIONAR COMPROMISSO MANUAL -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+      <h3 style="font-family:var(--font-display); font-size:1.2rem; margin:0;" id="modal-titulo-form">Novo Compromisso</h3>
+      <span class="modal-close" id="modal-close" style="cursor:pointer; font-size:1.2rem; color:var(--text-secondary);">✕</span>
+    </div>
+
+    <form id="form-novo-item" style="display:flex; flex-direction:column; gap:14px;">
+      <div>
+        <label style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;">Título da atividade</label>
+        <input class="input-field" type="text" id="input-titulo" placeholder="Ex: Resolver 20 questões de Física" required />
+      </div>
+
+      <div>
+        <label style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;">Disciplina</label>
+        <select class="input-field" id="input-materia">
+          <option value="">Geral / Sem disciplina específica</option>
+        </select>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div>
+          <label style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;">Data</label>
+          <input class="input-field" type="date" id="input-data" required />
+        </div>
+        <div>
+          <label style="display:block; font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-bottom:6px;">Horário início</label>
+          <input class="input-field" type="time" id="input-hora-inicio" />
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="btn-salvar" style="width:100%; margin-top:8px;">
+        Salvar no Cronograma
+      </button>
+    </form>
+  </div>
+</div>
+
+<script type="module" src="../scripts/cronograma.js"></script>
+<script type="module" src="../scripts/theme.js"></script>
 </body>
 </html>
