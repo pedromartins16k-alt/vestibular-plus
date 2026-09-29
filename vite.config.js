@@ -36,6 +36,7 @@ export default defineConfig({
         diagnostico: resolve(__dirname, 'src/pages/diagnostico.html'),
         mapaDominio: resolve(__dirname, 'src/pages/mapa-dominio.html'),
         leituras: resolve(__dirname, 'src/pages/leituras.html'),
+        redacao: resolve(__dirname, 'src/pages/redacao.html'),
       }
     }
   },

@@ -1,0 +1,532 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Laboratório de Redação · Vestibular+</title>
+<meta name="description" content="Laboratório oficial de redação para vestibulares: propostas com textos motivadores, editor com autosave e cronômetro, e critérios por banca." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<link rel="stylesheet" href="../styles/tokens.css" />
+<style>
+  .redacao-wrap {
+    padding: 28px 4% 64px;
+    max-width: 1140px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  /* Cabeçalho */
+  .redacao-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .redacao-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .redacao-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.86rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+  .redacao-back:hover { color: var(--text-primary); }
+  .redacao-titulo h1 {
+    font-size: 1.85rem;
+    font-weight: 800;
+    margin: 0;
+    font-family: var(--font-display);
+    color: var(--text-primary);
+  }
+  .redacao-titulo p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 2px 0 0;
+  }
+
+  /* Hero Contextual */
+  .redacao-hero-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .hero-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-primary-400);
+    background: rgba(124,58,237,0.12);
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(124,58,237,0.25);
+    width: fit-content;
+  }
+
+  /* Abas Principais */
+  .redacao-tabs-nav {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    padding: 8px 18px;
+    border-radius: var(--radius-full);
+    font-size: 0.88rem;
+    font-weight: 700;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--text-primary); }
+  .tab-btn.active {
+    background: var(--gradient-primary);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(124,58,237,0.3);
+  }
+
+  /* Barra de Filtros e Busca */
+  .filtros-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .filtros-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .chip-banca {
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+  }
+  .chip-banca.active {
+    background: rgba(124,58,237,0.15);
+    border-color: var(--color-primary-500);
+    color: var(--color-primary-400);
+  }
+  .busca-input-wrap {
+    flex: 1;
+    min-width: 240px;
+    max-width: 380px;
+  }
+
+  /* Grid de Propostas */
+  .propostas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+  .proposta-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 22px;
+    box-shadow: var(--shadow-soft);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all var(--transition-base);
+  }
+  .proposta-card:hover {
+    border-color: rgba(124,58,237,0.35);
+    transform: translateY(-3px);
+  }
+  .proposta-topo {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .banca-tag {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    background: rgba(56,189,248,0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(56,189,248,0.25);
+  }
+  .proposta-titulo {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--text-primary);
+    margin: 0 0 10px;
+  }
+  .proposta-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  /* Área do Editor / Modo de Escrita */
+  .editor-view {
+    display: none;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .editor-header-painel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 20px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .cronometro-box {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: var(--radius-full);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+  .cronometro-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
+  }
+  .cronometro-btn:hover { color: var(--text-primary); }
+
+  /* Layout do Editor: Coletânea e Textarea */
+  .editor-duo-layout {
+    display: grid;
+    grid-template-columns: 1.1fr 1.5fr;
+    gap: 22px;
+  }
+  .coletanea-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 22px;
+    max-height: 700px;
+    overflow-y: auto;
+  }
+  .texto-mot-item {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 14px;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+  }
+  .texto-mot-fonte {
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    font-style: italic;
+  }
+
+  .editor-canvas-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .redacao-textarea {
+    width: 100%;
+    min-height: 480px;
+    background: var(--bg-elevated);
+    border: 1.5px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 1.02rem;
+    line-height: 1.75;
+    color: var(--text-primary);
+    resize: vertical;
+    outline: none;
+    transition: border-color var(--transition-fast);
+  }
+  .redacao-textarea:focus {
+    border-color: var(--color-primary-500);
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+  }
+
+  /* Barra de Status e Contadores do Editor */
+  .editor-statusbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+  .contadores-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-weight: 600;
+  }
+  .autosave-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.76rem;
+    color: #22c55e;
+  }
+
+  /* Painel de Histórico e Avaliação */
+  .historico-view {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .redacao-historico-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  /* Modal de Detalhes da Proposta */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none;
+    align-items: center; justify-content: center; z-index: 2000; padding: 20px;
+    backdrop-filter: blur(8px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-content {
+    max-width: 620px; width: 100%; padding: 28px;
+    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    max-height: 85vh; overflow-y: auto;
+  }
+
+  @media (max-width: 960px) {
+    .editor-duo-layout { grid-template-columns: 1fr; }
+    .coletanea-box { max-height: 380px; }
+  }
+  @media (max-width: 640px) {
+    .redacao-wrap { padding: 20px 4% 48px; }
+    .propostas-grid { grid-template-columns: 1fr; }
+    .editor-statusbar { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="redacao-wrap">
+
+  <!-- Header Geral -->
+  <header class="redacao-header">
+    <div class="redacao-header-left">
+      <a class="redacao-back" href="./dashboard.html">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Voltar ao Dashboard
+      </a>
+      <div class="redacao-titulo">
+        <h1>✍️ Laboratório de Redação</h1>
+        <p>Pratique produção textual com propostas orientadas por banca, editor com contagem real e critérios oficiais.</p>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button id="theme-toggle" class="icon-btn" style="width:38px;height:38px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;" title="Alternar tema">🌙</button>
+    </div>
+  </header>
+
+  <!-- Hero Contextual -->
+  <section class="redacao-hero-card" id="redacao-hero-card"></section>
+
+  <!-- Abas de Navegação -->
+  <nav class="redacao-tabs-nav">
+    <button class="tab-btn active" id="tab-btn-propostas">📚 Propostas & Temas</button>
+    <button class="tab-btn" id="tab-btn-editor" style="display:none;">📝 Editor em Andamento</button>
+    <button class="tab-btn" id="tab-btn-historico">📑 Minhas Redações (<span id="count-historico">0</span>)</button>
+  </nav>
+
+  <!-- ABA 1: PROPOSTAS E TEMAS -->
+  <div id="aba-propostas">
+    <!-- Barra de Filtros e Busca -->
+    <div class="filtros-bar">
+      <div class="filtros-chips" id="filtros-bancas">
+        <button class="chip-banca active" data-banca="todas">Todas as Bancas</button>
+        <button class="chip-banca" data-banca="enem">ENEM</button>
+        <button class="chip-banca" data-banca="fuvest">FUVEST</button>
+        <button class="chip-banca" data-banca="unicamp">UNICAMP</button>
+        <button class="chip-banca" data-banca="unesp">UNESP</button>
+      </div>
+
+      <div class="busca-input-wrap">
+        <input class="input-field" type="text" id="busca-proposta-input" placeholder="Pesquisar por tema, palavra-chave..." />
+      </div>
+    </div>
+
+    <!-- Grid de Propostas -->
+    <div class="propostas-grid" id="propostas-grid"></div>
+  </div>
+
+  <!-- ABA 2: EDITOR DE REDAÇÃO -->
+  <div id="aba-editor" class="editor-view">
+    <div class="editor-header-painel">
+      <div>
+        <span class="banca-tag" id="editor-banca-tag">ENEM</span>
+        <h3 style="font-size:1.15rem; margin:6px 0 2px; font-family:var(--font-display);" id="editor-tema-titulo">Título da Proposta</h3>
+        <span style="font-size:0.78rem; color:var(--text-secondary);" id="editor-tipo-genero">Dissertativo-argumentativo</span>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div class="cronometro-box">
+          <span>⏱️</span>
+          <span id="cronometro-display">00:00:00</span>
+          <button class="cronometro-btn" id="btn-toggle-cronometro" title="Pausar / Iniciar">⏸️</button>
+        </div>
+
+        <button class="btn btn-secondary" id="btn-salvar-rascunho">💾 Salvar Rascunho</button>
+        <button class="btn btn-primary" id="btn-finalizar-redacao">Finalizar Redação ✓</button>
+      </div>
+    </div>
+
+    <div class="editor-duo-layout">
+      <!-- Coletânea e Textos Motivadores -->
+      <div class="coletanea-box">
+        <h4 style="font-size:0.95rem; font-family:var(--font-display); margin-bottom:12px;">📑 Coletânea de Textos Motivadores</h4>
+        <div id="coletanea-textos-lista"></div>
+        <div style="margin-top:16px; padding:12px; border-radius:var(--radius-md); background:rgba(124,58,237,0.08); border:1px solid rgba(124,58,237,0.2); font-size:0.82rem; color:var(--text-secondary); line-height:1.5;" id="coletanea-criterios-resumo"></div>
+      </div>
+
+      <!-- Canvas do Editor -->
+      <div class="editor-canvas-box">
+        <textarea class="redacao-textarea" id="redacao-texto-input" placeholder="Comece a redigir seu texto aqui..."></textarea>
+
+        <div class="editor-statusbar">
+          <div class="contadores-group">
+            <span id="contador-palavras">0 palavras</span>
+            <span>·</span>
+            <span id="contador-caracteres">0 caracteres</span>
+            <span>·</span>
+            <span id="contador-linhas">0 linhas estimadas</span>
+          </div>
+
+          <div class="autosave-pill">
+            <span id="autosave-status">✓ Rascunho seguro</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABA 3: HISTÓRICO & AVALIAÇÃO -->
+  <div id="aba-historico" class="historico-view">
+    <div id="historico-lista"></div>
+  </div>
+
+</div>
+
+<!-- MODAL DE VISUALIZAÇÃO DA PROPOSTA -->
+<div class="modal-overlay" id="modal-proposta-overlay">
+  <div class="modal-content">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
+      <span class="banca-tag" id="modal-banca-tag">ENEM</span>
+      <span class="modal-close" id="modal-proposta-close" style="cursor:pointer; font-size:1.2rem; color:var(--text-secondary);">✕</span>
+    </div>
+    <h3 style="font-family:var(--font-display); font-size:1.25rem; margin-bottom:8px;" id="modal-proposta-titulo"></h3>
+    <div style="font-size:0.84rem; color:var(--text-secondary); margin-bottom:16px;" id="modal-proposta-meta"></div>
+
+    <div style="margin-bottom:18px;">
+      <h4 style="font-size:0.9rem; margin-bottom:6px;">Instruções da Banca:</h4>
+      <p style="font-size:0.85rem; line-height:1.55; color:var(--text-secondary);" id="modal-proposta-instrucoes"></p>
+    </div>
+
+    <div style="margin-bottom:20px;">
+      <h4 style="font-size:0.9rem; margin-bottom:8px;">Textos Motivadores:</h4>
+      <div id="modal-textos-motivadores" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:10px;">
+      <button class="btn btn-ghost" id="modal-btn-cancelar">Fechar</button>
+      <button class="btn btn-primary" id="modal-btn-iniciar-escrita">Escrever Redação Agora ✍️</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE CORREÇÃO / DETALHES -->
+<div class="modal-overlay" id="modal-correcao-overlay">
+  <div class="modal-content" style="max-width:680px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h3 style="font-family:var(--font-display); font-size:1.2rem; margin:0;">📊 Avaliação da Redação</h3>
+      <span class="modal-close" id="modal-correcao-close" style="cursor:pointer; font-size:1.2rem; color:var(--text-secondary);">✕</span>
+    </div>
+
+    <div id="modal-correcao-conteudo"></div>
+  </div>
+</div>
+
+<script type="module" src="../scripts/redacao.js"></script>
+<script type="module" src="../scripts/theme.js"></script>
+</body>
+</html>

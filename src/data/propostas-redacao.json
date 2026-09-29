@@ -1,0 +1,267 @@
+{
+  "meta": {
+    "versao": "1.0.0",
+    "atualizado_em": "2026-09-29",
+    "descricao": "Acervo oficial de propostas de redação com temas reais de edições anteriores e propostas inéditas de treino com textos motivadores e critérios por banca."
+  },
+  "criterios_bancas": {
+    "enem": {
+      "nome": "ENEM — Exame Nacional do Ensino Médio",
+      "tipo_genero": "Dissertativo-argumentativo em prosa",
+      "pontuacao_maxima": 1000,
+      "limite_linhas": "Mínimo de 7 linhas e máximo de 30 linhas",
+      "competencias": [
+        {
+          "numero": 1,
+          "nome": "Domínio da norma culta escrita",
+          "peso": 200,
+          "descricao": "Demonstrar domínio da modalidade escrita formal da língua portuguesa."
+        },
+        {
+          "numero": 2,
+          "nome": "Compreensão da proposta e aplicação de repertório",
+          "peso": 200,
+          "descricao": "Compreender a proposta de redação e aplicar conceitos das várias áreas de conhecimento para desenvolver o tema, dentro dos limites estruturais do texto dissertativo-argumentativo em prosa."
+        },
+        {
+          "numero": 3,
+          "nome": "Seleção, organização e interpretação de argumentos",
+          "peso": 200,
+          "descricao": "Selecionar, relacionar, organizar e interpretar informações, fatos, opiniões e argumentos em defesa de um ponto de vista."
+        },
+        {
+          "numero": 4,
+          "nome": "Demonstração de recursos coesivos",
+          "peso": 200,
+          "descricao": "Demonstrar conhecimento dos mecanismos linguísticos necessários para a construção da argumentação (coesão interparágrafo e intraparágrafo)."
+        },
+        {
+          "numero": 5,
+          "nome": "Proposta de intervenção social",
+          "peso": 200,
+          "descricao": "Elaborar proposta de intervenção para o problema abordado que respeite os direitos humanos (contendo agente, ação, meio/modo, efeito e detalhamento)."
+        }
+      ]
+    },
+    "fuvest": {
+      "nome": "FUVEST — Universidade de São Paulo (USP)",
+      "tipo_genero": "Dissertativo-argumentativo em prosa",
+      "pontuacao_maxima": 50,
+      "limite_linhas": "Entre 20 e 30 linhas",
+      "competencias": [
+        {
+          "numero": 1,
+          "nome": "Abordagem do tema e capacidade de reflexão crítica",
+          "peso": 20,
+          "descricao": "Compreensão da tese filosófica/sociológica em debate, densidade reflexiva e autonomia intelectual sem clichês."
+        },
+        {
+          "numero": 2,
+          "nome": "Estrutura argumentativa e coesão textual",
+          "peso": 15,
+          "descricao": "Progressão lógica do raciocínio, articulação coerente entre premissas e conclusões."
+        },
+        {
+          "numero": 3,
+          "nome": "Domínio da expressão escrita e precisão vocabular",
+          "peso": 15,
+          "descricao": "Correção gramatical, concisão, clareza, variedade lexical e adequação do registro culto."
+        }
+      ]
+    },
+    "unicamp": {
+      "nome": "UNICAMP — Universidade Estadual de Campinas",
+      "tipo_genero": "Gêneros discursivos situados (Artigo de Opinião, Carta Aberta, Discurso, Resenha)",
+      "pontuacao_maxima": 48,
+      "limite_linhas": "Conforme o gênero solicitado (geralmente até 24 ou 30 linhas)",
+      "competencias": [
+        {
+          "numero": 1,
+          "nome": "Cumprimento da proposta e interlocução do gênero",
+          "peso": 16,
+          "descricao": "Construção da voz autoral, interlocutor específico e adequação integral à máscara discursiva."
+        },
+        {
+          "numero": 2,
+          "nome": "Articulação de argumentos e uso da coletânea",
+          "peso": 16,
+          "descricao": "Leitura crítica dos textos motivadores sem cópia mecânica, com posicionamento substantivo."
+        },
+        {
+          "numero": 3,
+          "nome": "Coesão, coerência e convenções da escrita",
+          "peso": 16,
+          "descricao": "Fluidez dos elos sintáticos e sintaxe conforme a norma padrão."
+        }
+      ]
+    },
+    "unesp": {
+      "nome": "UNESP — Universidade Estadual Paulista",
+      "tipo_genero": "Dissertativo-argumentativo em prosa",
+      "pontuacao_maxima": 28,
+      "limite_linhas": "Mínimo de 15 e máximo de 30 linhas",
+      "competencias": [
+        {
+          "numero": 1,
+          "nome": "Tema e tese central",
+          "peso": 10,
+          "descricao": "Compreensão do tema formulado na forma de pergunta-problema e resposta clara com posicionamento."
+        },
+        {
+          "numero": 2,
+          "nome": "Estrutura dissertativa e argumentação",
+          "peso": 10,
+          "descricao": "Fundamentação dos argumentos e consistência analítica."
+        },
+        {
+          "numero": 3,
+          "nome": "Norma culta e coesão",
+          "peso": 8,
+          "descricao": "Domínio gramatical e articulação expressiva."
+        }
+      ]
+    }
+  },
+  "propostas": [
+    {
+      "id": "prop-enem-2024",
+      "titulo": "Desafios para a valorização da herança africana no Brasil",
+      "vestibular_id": "enem",
+      "vestibular_nome": "ENEM",
+      "ano": 2024,
+      "edicao_oficial": true,
+      "categoria": "Cultura e Sociedade",
+      "tipo_genero": "Dissertativo-argumentativo",
+      "dificuldade": "medio",
+      "palavras_recomendadas": "Entre 350 e 600 palavras (25 a 30 linhas)",
+      "instrucoes": "A partir da leitura dos textos motivadores e com base nos conhecimentos construídos ao longo de sua formação, redija um texto dissertativo-argumentativo em modalidade escrita formal da língua portuguesa sobre o tema, apresentando proposta de intervenção que respeite os direitos humanos. Selecione, organize e relacione, de forma coerente e coesa, argumentos e fatos para defesa de seu ponto de vista.",
+      "textos_motivadores": [
+        {
+          "titulo": "Texto I — O resgate histórico e a Lei 10.639",
+          "conteudo": "A sanção da Lei nº 10.639/03 tornou obrigatório o ensino sobre História e Cultura Afro-Brasileira nas escolas de ensino fundamental e médio. Duas décadas depois, especialistas apontam que, embora tenha havido avanços em materiais didáticos, a implementação curricular ainda enfrenta resistências e escassez de formação continuada para docentes.",
+          "fonte": "Ministério da Educação / IBGE"
+        },
+        {
+          "titulo": "Texto II — Dados de representatividade",
+          "conteudo": "Mais de 56% da população brasileira se autodeclara preta ou parda, de acordo com o Censo Demográfico. Contudo, bens materiais e imateriais ligados às matrizes africanas ainda sofrem com desvalorização simbólica e casos reiterados de intolerância patrimonial e religiosa.",
+          "fonte": "IPEA / Censo Demográfico"
+        }
+      ]
+    },
+    {
+      "id": "prop-enem-2023",
+      "titulo": "Desafios para o enfrentamento da invisibilidade do trabalho de cuidado realizado pela mulher no Brasil",
+      "vestibular_id": "enem",
+      "vestibular_nome": "ENEM",
+      "ano": 2023,
+      "edicao_oficial": true,
+      "categoria": "Sociedade e Trabalho",
+      "tipo_genero": "Dissertativo-argumentativo",
+      "dificuldade": "medio",
+      "palavras_recomendadas": "Entre 350 e 600 palavras (25 a 30 linhas)",
+      "instrucoes": "Redija um texto dissertativo-argumentativo na modalidade escrita formal da língua portuguesa. Selecione, organize e relacione fatos e argumentos para defender uma tese, elaborando proposta de intervenção social completa.",
+      "textos_motivadores": [
+        {
+          "titulo": "Texto I — A economia do cuidado",
+          "conteudo": "O trabalho de cuidado não remunerado sustenta o funcionamento diário de famílias e da economia: cuidar de crianças, idosos, doentes e dos afazeres domésticos. No Brasil, as mulheres dedicam, em média, quase o dobro de horas semanais a essas tarefas em comparação aos homens.",
+          "fonte": "IBGE / Pesquisa Nacional por Amostra de Domicílios Contínua"
+        },
+        {
+          "titulo": "Texto II — Impactos profissionais",
+          "conteudo": "A sobrecarga do trabalho de cuidado invisível afasta mulheres do mercado formal, restringe o acesso ao ensino superior e acentua a disparidade de renda e aposentadoria ao longo do ciclo de vida.",
+          "fonte": "OIT — Organização Internacional do Trabalho"
+        }
+      ]
+    },
+    {
+      "id": "prop-fuvest-2024",
+      "titulo": "Educação básica e formação profissional: entre a técnica e a emancipação cidadã",
+      "vestibular_id": "fuvest",
+      "vestibular_nome": "FUVEST",
+      "ano": 2024,
+      "edicao_oficial": true,
+      "categoria": "Educação e Filosofia",
+      "tipo_genero": "Dissertativo-argumentativo",
+      "dificuldade": "dificil",
+      "palavras_recomendadas": "Entre 300 e 500 palavras (20 a 30 linhas)",
+      "instrucoes": "Elabore uma dissertação em prosa, com argumentação consistente e reflexão crítica aprofundada, discutindo se o papel primário da escola contemporânea deve ser a imediata capacitação para o mercado técnico ou o cultivo humanístico emancipatório.",
+      "textos_motivadores": [
+        {
+          "titulo": "Texto I — A visão utilitarista",
+          "conteudo": "Defensores do ensino técnico precoce sustentam que a juventude necessita de empregabilidade imediata num cenário de rápidas transformações tecnológicas, reduzindo índices de evasão escolar pelo atrativo financeiro de curto prazo.",
+          "fonte": "Coletânea FUVEST"
+        },
+        {
+          "titulo": "Texto II — O valor da formação humanista",
+          "conteudo": "Pensadores da pedagogia crítica advertem que reduzir a escola à mera reprodutora de mão de obra aliena o estudante de sua condição cidadã, tolhendo o pensamento reflexivo e a imaginação política.",
+          "fonte": "Fragmento filosófico / Coletânea oficial"
+        }
+      ]
+    },
+    {
+      "id": "prop-unicamp-2024",
+      "titulo": "Artigo de opinião: A urgência da justiça climática nos centros urbanos periféricos",
+      "vestibular_id": "unicamp",
+      "vestibular_nome": "UNICAMP",
+      "ano": 2024,
+      "edicao_oficial": true,
+      "categoria": "Meio Ambiente e Cidadania",
+      "tipo_genero": "Artigo de Opinião",
+      "dificuldade": "dificil",
+      "palavras_recomendadas": "Entre 280 e 450 palavras (20 a 24 linhas)",
+      "instrucoes": "Você é um jovem ativista comunitário e foi convidado a publicar um artigo de opinião em um portal jornalístico regional. Analise os impactos desiguais de enchentes e ondas de calor nas periferias urbanas, reivindicando medidas de adaptação climática estrutural.",
+      "textos_motivadores": [
+        {
+          "titulo": "Texto I — Racismo ambiental e periferias",
+          "conteudo": "As populações que menos emitem gases estufa e menos consomem recursos são as primeiras a perder residências e vidas durante eventos climáticos extremos, habitando encostas desprovidas de saneamento e áreas de mananciais sem infraestrutura.",
+          "fonte": "Relatório Painel Brasileiro de Mudanças Climáticas"
+        }
+      ]
+    },
+    {
+      "id": "prop-unesp-2024",
+      "titulo": "A inteligência artificial ameaça ou potencializa a criatividade humana?",
+      "vestibular_id": "unesp",
+      "vestibular_nome": "UNESP",
+      "ano": 2024,
+      "edicao_oficial": true,
+      "categoria": "Tecnologia e Ética",
+      "tipo_genero": "Dissertativo-argumentativo",
+      "dificuldade": "medio",
+      "palavras_recomendadas": "Entre 300 e 500 palavras (20 a 30 linhas)",
+      "instrucoes": "Com base na leitura da coletânea, responda à questão-tema formulando uma tese nítida apoiada em argumentos consistentes e repertório cultural autônomo.",
+      "textos_motivadores": [
+        {
+          "titulo": "Texto I — O algoritmo gerador",
+          "conteudo": "Modelos de linguagem sintetizam bilhões de dados em segundos, produzindo sonetos, códigos e ilustrações convincentes. Para entusiastas, trata-se de um pincel digital amplificador do engenho humano.",
+          "fonte": "Artigo de divulgação científica"
+        },
+        {
+          "titulo": "Texto II — A padronização da imaginação",
+          "conteudo": "Críticos culturais advertem que a automação da escrita e da arte conduz à reprodução mecânica de médias estatísticas, esvaziando o caráter angustiante, visceral e original que define a condição da autoria humana.",
+          "fonte": "Coletânea UNESP"
+        }
+      ]
+    },
+    {
+      "id": "prop-treino-redes",
+      "titulo": "Cultura do cancelamento e linchamento virtual: limites entre liberdade de expressão e dano moral",
+      "vestibular_id": "enem",
+      "vestibular_nome": "ENEM / Treino",
+      "ano": 2025,
+      "edicao_oficial": false,
+      "categoria": "Cidadania Digital",
+      "tipo_genero": "Dissertativo-argumentativo",
+      "dificuldade": "medio",
+      "palavras_recomendadas": "Entre 350 e 600 palavras",
+      "instrucoes": "Redija uma dissertação-argumentativa propondo mecanismos de regulação civil e conscientização digital que preservem tanto a liberdade de manifestação quanto a dignidade da pessoa humana.",
+      "textos_motivadores": [
+        {
+          "titulo": "Texto I — A viralização do julgamento",
+          "conteudo": "A velocidade algorítmica transforma acusações precipitadas em condenações sociais instantâneas, gerando impactos psicológicos e profissionais irreparáveis antes de qualquer apuração de fatos.",
+          "fonte": "Caderno de Direitos Humanos e Internet"
+        }
+      ]
+    }
+  ]
+}

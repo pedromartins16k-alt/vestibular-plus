@@ -299,3 +299,75 @@ Informe ao usuário exatamente:
 - [ ] Tabela `diagnostico_resultados` criada com RLS
 - [ ] Tabela `revisao_agendada` criada com RLS e índice
 - [ ] Verificações finais executadas e aprovadas
+
+---
+
+# ETAPA 12: LABORATÓRIO DE REDAÇÃO (PERSISTÊNCIA SUPABASE)
+
+> **Contexto:** O Laboratório de Redação do Vestibular+ foi implementado no frontend (`src/pages/redacao.html`, `src/scripts/redacao.js`).  
+> O histórico e rascunhos são salvos com isolamento por usuário (`sessionUserId`) no `localStorage` e a sessão de estudo é registrada em `sessoes_estudo (tipo='redacao')`.  
+> Para garantir persistência remota definitiva de redações finalizadas e histórico de correções oficiais, execute a migration abaixo no Supabase SQL Editor.
+
+```sql
+-- ==============================================================================
+-- 1. TABELA DE REDAÇÕES ENTREGUES
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.redacoes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  proposta_id TEXT NOT NULL,
+  titulo_proposta TEXT NOT NULL,
+  banca TEXT NOT NULL,
+  ano INTEGER,
+  texto TEXT NOT NULL,
+  palavras INTEGER NOT NULL DEFAULT 0,
+  caracteres INTEGER NOT NULL DEFAULT 0,
+  linhas INTEGER NOT NULL DEFAULT 0,
+  tempo_segundos INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'aguardando_correcao', -- 'rascunho', 'aguardando_correcao', 'corrigida'
+  criado_em TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
+  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- Ativar RLS
+ALTER TABLE public.redacoes ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de RLS: Isolamento estrito por usuário
+CREATE POLICY "Usuário acessa apenas suas próprias redações"
+  ON public.redacoes FOR ALL
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- Índices para consultas otimizadas
+CREATE INDEX IF NOT EXISTS idx_redacoes_user_data ON public.redacoes(user_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_redacoes_banca ON public.redacoes(user_id, banca);
+
+-- ==============================================================================
+-- 2. TABELA DE AVALIAÇÕES / CRITÉRIOS DE CORREÇÃO POR BANCA
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.redacao_avaliacoes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  redacao_id UUID NOT NULL REFERENCES public.redacoes(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  tipo_avaliacao TEXT NOT NULL DEFAULT 'autoavaliacao', -- 'autoavaliacao', 'monitor', 'ia', 'banca_oficial'
+  nota_total NUMERIC(6, 2),
+  nota_maxima NUMERIC(6, 2) NOT NULL DEFAULT 1000,
+  criterios_detalhe JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{ "criterio": "C1", "nome": "...", "nota": 160, "max": 200, "comentario": "..." }]
+  pontos_fortes TEXT[] DEFAULT '{}',
+  pontos_melhoria TEXT[] DEFAULT '{}',
+  comentario_geral TEXT,
+  criado_em TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
+);
+
+-- Ativar RLS
+ALTER TABLE public.redacao_avaliacoes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Usuário acessa apenas avaliações de suas próprias redações"
+  ON public.redacao_avaliacoes FOR ALL
+  TO authenticated
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_redacao ON public.redacao_avaliacoes(redacao_id);
+```

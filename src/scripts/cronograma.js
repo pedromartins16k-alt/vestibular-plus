@@ -1,4 +1,4 @@
-﻿/**
+/**
  * cronograma.js — Cronograma Adaptativo Inteligente do Vestibular+
  *
  * Princípios e Fontes de Dados Reais:
@@ -352,7 +352,25 @@ function gerarPlanoAdaptativo(dados, dataIso) {
     });
   }
 
-  // 5. COMPROMISSOS MANUAIS DO SUPABASE PARA ESTA DATA
+  // 5. TAREFA: Laboratório de Redação Orientada pelo Vestibular
+  if (objetivoAluno?.vestibular_id) {
+    const taskId = 'auto-redacao-semanal';
+    tarefas.push({
+      id: taskId,
+      tipo: 'redacao',
+      etiqueta: 'Produção Textual',
+      classeEtiqueta: 'simulado',
+      icone: '✍️',
+      titulo: `Produção de Redação (${objetivoAluno.vestibular_nome || objetivoAluno.vestibular_id.toUpperCase()})`,
+      motivo: `Treine a escrita dissertativa com proposta oficial e textos motivadores voltados para a banca do seu objetivo.`,
+      duracao: '⏱️ 60 min',
+      ctaTexto: 'Escrever Redação →',
+      ctaUrl: './redacao.html',
+      concluida: concluidasLocais.includes(taskId)
+    });
+  }
+
+  // 6. COMPROMISSOS MANUAIS DO SUPABASE PARA ESTA DATA
   const manuaisDoDia = compromissosManuais.filter(c => c.data === dataIso);
   manuaisDoDia.forEach(c => {
     const hora = c.hora_inicio ? `${c.hora_inicio.slice(0, 5)}` : 'Horário livre';
