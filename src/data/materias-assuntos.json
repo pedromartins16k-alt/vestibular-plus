@@ -1,0 +1,261 @@
+{
+  "meta": {
+    "versao": "1.0.0",
+    "atualizado_em": "2026-09-29",
+    "descricao": "Taxonomia curricular oficial de assuntos e palavras-chave para o vestibular paulista e nacional"
+  },
+  "materias": {
+    "Matemática": {
+      "icone": "📐",
+      "cor": "#3b82f6",
+      "assuntos": [
+        {
+          "nome": "Álgebra e Equações",
+          "keywords": ["equação", "equações", "sistema linear", "polinômio", "raiz", "fatoração", "incógnita", "expressão algébrica"]
+        },
+        {
+          "nome": "Funções",
+          "keywords": ["função", "funções", "afim", "quadrática", "exponencial", "logaritmo", "logarítmica", "domínio", "imagem", "vértice da parábola"]
+        },
+        {
+          "nome": "Geometria Plana",
+          "keywords": ["triângulo", "semelhantes", "área", "perímetro", "circunferência", "círculo", "pitágoras", "retângulo", "trapézio", "polígono"]
+        },
+        {
+          "nome": "Geometria Espacial",
+          "keywords": ["prisma", "cilindro", "cone", "esfera", "pirâmide", "volume", "aresta", "cubo", "tetraedro"]
+        },
+        {
+          "nome": "Trigonometria",
+          "keywords": ["seno", "cosseno", "tangente", "círculo trigonométrico", "arcos", "triângulo retângulo"]
+        },
+        {
+          "nome": "Progressões (PA e PG)",
+          "keywords": ["pa", "pg", "progressão aritmética", "progressão geométrica", "razão", "termo geral"]
+        },
+        {
+          "nome": "Combinatória e Probabilidade",
+          "keywords": ["probabilidade", "arranjo", "combinação", "permutação", "fatorial", "espaço amostral", "chance"]
+        },
+        {
+          "nome": "Aritmética e Porcentagem",
+          "keywords": ["porcentagem", "desconto", "juros", "razão e proporção", "regra de três", "número natural", "inteiro", "divisibilidade"]
+        },
+        {
+          "nome": "Estatística",
+          "keywords": ["média", "mediana", "moda", "desvio padrão", "frequência", "gráfico estatístico"]
+        }
+      ]
+    },
+    "Português": {
+      "icone": "📖",
+      "cor": "#f59e0b",
+      "assuntos": [
+        {
+          "nome": "Interpretação de Texto",
+          "keywords": ["interpretação", "sentido do texto", "inferência", "ideia central", "ambiguidade", "ironia", "leitura", "pressuposto"]
+        },
+        {
+          "nome": "Funções da Linguagem",
+          "keywords": ["função da linguagem", "metalinguística", "referencial", "emotiva", "conativa", "fática", "poética", "comunicação"]
+        },
+        {
+          "nome": "Sintaxe e Pontuação",
+          "keywords": ["crase", "concordância", "regência", "oração", "sujeito", "predicado", "vírgula", "subordinação"]
+        },
+        {
+          "nome": "Morfologia e Classes Gramaticais",
+          "keywords": ["substantivo", "adjetivo", "verbo", "pronome", "conjunção", "preposição", "advérbio"]
+        },
+        {
+          "nome": "Figuras de Linguagem",
+          "keywords": ["metáfora", "metonímia", "antítese", "paradoxo", "eufemismo", "hipérbole"]
+        },
+        {
+          "nome": "Literatura Brasileira",
+          "keywords": ["modernismo", "romantismo", "realismo", "machado de assis", "clarice lispector", "barroco", "arcadismo"]
+        },
+        {
+          "nome": "Variação Linguística e Coesão",
+          "keywords": ["variação linguística", "coesão", "coerência", "gênero textual", "conectivo"]
+        }
+      ]
+    },
+    "Física": {
+      "icone": "⚛️",
+      "cor": "#8b5cf6",
+      "assuntos": [
+        {
+          "nome": "Cinemática",
+          "keywords": ["velocidade", "aceleração", "muv", "movimento uniforme", "torricelli", "trajetória", "queda livre"]
+        },
+        {
+          "nome": "Dinâmica e Leis de Newton",
+          "keywords": ["força", "newton", "massa", "atrito", "inércia", "ação e reação", "peso"]
+        },
+        {
+          "nome": "Trabalho e Energia",
+          "keywords": ["energia cinética", "energia potencial", "trabalho", "potência mecânica", "conservação da energia"]
+        },
+        {
+          "nome": "Eletricidade e Magnetismo",
+          "keywords": ["corrente elétrica", "tensão", "resistência", "ohm", "campo elétrico", "indução", "magnético", "gerador", "circuito"]
+        },
+        {
+          "nome": "Termologia e Calorimetria",
+          "keywords": ["calor", "temperatura", "calor específico", "dilatação", "termodinâmica", "condução", "convecção"]
+        },
+        {
+          "nome": "Ondulatória e Óptica",
+          "keywords": ["onda", "frequência", "comprimento de onda", "som", "luz", "refração", "reflexão", "espelho", "lente"]
+        },
+        {
+          "nome": "Hidrostática",
+          "keywords": ["pressão", "empuxo", "densidade", "arquimedes", "pascal", "fluido"]
+        }
+      ]
+    },
+    "Química": {
+      "icone": "🧪",
+      "cor": "#ec4899",
+      "assuntos": [
+        {
+          "nome": "Estrutura Atômica e Tabela Periódica",
+          "keywords": ["átomo", "elétron", "próton", "tabela periódica", "ligação iônica", "ligação covalente", "raio atômico"]
+        },
+        {
+          "nome": "Estequiometria e Cálculos Químicos",
+          "keywords": ["mol", "massa molar", "estequiometria", "rendimento", "pureza", "reação química"]
+        },
+        {
+          "nome": "Soluções e Concentrações",
+          "keywords": ["solução", "concentração", "soluto", "solvente", "diluição", "molaridade", "solubilidade"]
+        },
+        {
+          "nome": "Termoquímica e Cinética",
+          "keywords": ["entalpia", "endotérmica", "exotérmica", "velocidade da reação", "catalisador", "energia de ativação"]
+        },
+        {
+          "nome": "Equilíbrio Químico e pH",
+          "keywords": ["equilíbrio químico", "ph", "poh", "ácido", "base", "le chatelier", "constante de equilíbrio"]
+        },
+        {
+          "nome": "Eletroquímica",
+          "keywords": ["pilha", "eletrólise", "oxidação", "redução", "potencial de redução", "ânodo", "cátodo"]
+        },
+        {
+          "nome": "Química Orgânica",
+          "keywords": ["carbono", "hidrocarboneto", "função orgânica", "álcool", "ácido carboxílico", "isomeria", "cadeia carbônica"]
+        },
+        {
+          "nome": "Radioatividade",
+          "keywords": ["decaimento", "alfa", "beta", "gama", "meia-vida", "fissão", "fusão"]
+        }
+      ]
+    },
+    "Biologia": {
+      "icone": "🌱",
+      "cor": "#10b981",
+      "assuntos": [
+        {
+          "nome": "Citologia e Bioquímica Celular",
+          "keywords": ["célula", "membrana", "organela", "mitocôndria", "fotossíntese", "respiração celular", "dna", "rna", "proteína"]
+        },
+        {
+          "nome": "Genética e Biotecnologia",
+          "keywords": ["mendel", "gene", "alelo", "cromossomo", "mutação", "transgênico", "herança", "genótipo"]
+        },
+        {
+          "nome": "Ecologia e Meio Ambiente",
+          "keywords": ["cadeia alimentar", "produtor", "consumidor", "ecossistema", "bioma", "ciclo biogeoquímico", "poluição", "sustentabilidade"]
+        },
+        {
+          "nome": "Fisiologia Humana",
+          "keywords": ["sistema circulatório", "digestão", "respiração", "sistema nervoso", "imunidade", "hormônio", "coração"]
+        },
+        {
+          "nome": "Evolução Biológica",
+          "keywords": ["darwin", "seleção natural", "adaptação", "especiação", "lamarck", "fóssil"]
+        },
+        {
+          "nome": "Reinos dos Seres Vivos",
+          "keywords": ["planta", "botânica", "animal", "zoologia", "bactéria", "vírus", "fungo", "protozoário"]
+        }
+      ]
+    },
+    "História": {
+      "icone": "📜",
+      "cor": "#ef4444",
+      "assuntos": [
+        {
+          "nome": "Brasil Colônia",
+          "keywords": ["capitanias", "cana-de-açúcar", "escravidão", "jesuítas", "bandeirantes", "ciclo do ouro", "inconfidência"]
+        },
+        {
+          "nome": "Brasil Império",
+          "keywords": ["independência", "primeiro reinado", "segundo reinado", "dom pedro", "abolição", "guerra do paraguai"]
+        },
+        {
+          "nome": "Brasil República",
+          "keywords": ["república velha", "café com leite", "era vargas", "ditadura militar", "redemocratização", "constituição de 1988", "golpe"]
+        },
+        {
+          "nome": "História Antiga e Medieval",
+          "keywords": ["grécia", "roma", "feudalismo", "cidadania ateniense", "igreja medieval", "cruzadas"]
+        },
+        {
+          "nome": "História Moderna",
+          "keywords": ["renascimento", "reforma protestante", "absolutismo", "iluminismo", "grandes navegações"]
+        },
+        {
+          "nome": "História Contemporânea",
+          "keywords": ["revolução francesa", "revolução industrial", "primeira guerra", "segunda guerra", "guerra fria", "nazismo", "imperialismo"]
+        }
+      ]
+    },
+    "Geografia": {
+      "icone": "🗺️",
+      "cor": "#06b6d4",
+      "assuntos": [
+        {
+          "nome": "Geografia Física e Climatologia",
+          "keywords": ["relevo", "clima", "vegetação", "hidrografia", "placas tectônicas", "bacia hidrográfica", "erosão"]
+        },
+        {
+          "nome": "Geografia Agrária e Uso da Terra",
+          "keywords": ["agropecuária", "agronegócio", "reforma agrária", "conflito fundiário", "monocultura", "fronteira agrícola"]
+        },
+        {
+          "nome": "Urbanização e População",
+          "keywords": ["urbanização", "metrópole", "migração", "demografia", "transição demográfica", "favelização", "gentrificação"]
+        },
+        {
+          "nome": "Geopolítica e Globalização",
+          "keywords": ["globalização", "guerra", "brics", "comércio internacional", "fronteira", "conflito geopolítico", "potência"]
+        },
+        {
+          "nome": "Questões Ambientais",
+          "keywords": ["desmatamento", "efeito estufa", "aquecimento global", "lixo", "recursos hídricos", "energia renovável"]
+        },
+        {
+          "nome": "Geografia Regional do Brasil",
+          "keywords": ["sudeste", "nordeste", "amazônia", "centro-oeste", "sul", "caatinga", "cerrado", "pantanal"]
+        }
+      ]
+    },
+    "Redação": {
+      "icone": "✍️",
+      "cor": "#8b5cf6",
+      "assuntos": [
+        {
+          "nome": "Estrutura Dissertativo-Argumentativa",
+          "keywords": ["tese", "introdução", "desenvolvimento", "conclusão", "proposta de intervenção", "dissertação"]
+        },
+        {
+          "nome": "Coesão e Repertório Sociocultural",
+          "keywords": ["repertório", "conectivo", "argumento de autoridade", "alusão histórica", "filosofia", "legitimação"]
+        }
+      ]
+    }
+  }
+}

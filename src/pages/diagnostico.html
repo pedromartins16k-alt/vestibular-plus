@@ -4,10 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Diagnóstico Inicial · Vestibular+</title>
-<meta name="description" content="Descubra seu nível atual em cada matéria com o diagnóstico personalizado do Vestibular+." />
+<meta name="description" content="Descubra seu nível de partida em cada matéria com a avaliação inicial do Vestibular+." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles/base.css" />
 <link rel="stylesheet" href="../styles/tokens.css" />
 <style>
@@ -22,31 +22,32 @@
 
   /* Tela de introdução */
   .diag-intro {
-    max-width: 580px;
+    max-width: 640px;
     width: 100%;
     text-align: center;
   }
   .diag-intro-icon {
-    width: 80px; height: 80px;
-    border-radius: 24px;
+    width: 72px; height: 72px;
+    border-radius: 20px;
     background: var(--gradient-primary);
     display: flex; align-items: center; justify-content: center;
     font-size: 2rem;
-    margin: 0 auto 24px;
-    box-shadow: 0 8px 28px rgba(124,58,237,0.4);
+    margin: 0 auto 20px;
+    box-shadow: 0 8px 24px rgba(124,58,237,0.35);
   }
   .diag-intro h1 {
-    font-size: 2rem; font-weight: 800;
+    font-size: 1.9rem; font-weight: 800;
     margin-bottom: 12px; letter-spacing: -0.02em;
+    font-family: var(--font-display);
   }
   .diag-intro p {
-    color: var(--text-secondary); font-size: 1rem;
+    color: var(--text-secondary); font-size: 0.98rem;
     line-height: 1.6; margin-bottom: 24px;
-    max-width: 460px; margin-left: auto; margin-right: auto;
+    max-width: 520px; margin-left: auto; margin-right: auto;
   }
   .diag-materias-preview {
     display: flex; flex-wrap: wrap; gap: 8px;
-    justify-content: center; margin-bottom: 32px;
+    justify-content: center; margin-bottom: 28px;
   }
   .diag-materia-chip {
     display: inline-flex; align-items: center; gap: 6px;
@@ -59,28 +60,40 @@
   }
   .diag-info-grid {
     display: grid; grid-template-columns: repeat(3, 1fr);
-    gap: 12px; margin-bottom: 32px;
+    gap: 12px; margin-bottom: 24px;
   }
   .diag-info-item {
-    padding: 16px 12px;
+    padding: 14px 10px;
     border-radius: var(--radius-md);
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
     text-align: center;
   }
   .diag-info-num {
-    font-size: 1.6rem; font-weight: 800;
+    font-size: 1.5rem; font-weight: 800;
     font-family: var(--font-display);
     color: var(--color-primary-500);
     display: block; line-height: 1.1; margin-bottom: 4px;
   }
   .diag-info-label {
-    font-size: 0.78rem; color: var(--text-secondary); font-weight: 600;
+    font-size: 0.76rem; color: var(--text-secondary); font-weight: 600;
+  }
+
+  .diag-aviso-pedagogico {
+    background: rgba(124,58,237,0.08);
+    border: 1px solid rgba(124,58,237,0.2);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    margin-bottom: 28px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    text-align: left;
   }
 
   /* Tela de questão */
   .diag-questao {
-    max-width: 680px;
+    max-width: 720px;
     width: 100%;
     display: none;
   }
@@ -88,7 +101,7 @@
 
   .diag-header {
     display: flex; align-items: center; gap: 12px;
-    margin-bottom: 24px; flex-wrap: wrap;
+    margin-bottom: 20px; flex-wrap: wrap;
   }
   .diag-back-btn {
     display: inline-flex; align-items: center; gap: 6px;
@@ -116,31 +129,37 @@
   .diag-prog-fill {
     height: 100%; border-radius: var(--radius-full);
     background: var(--gradient-primary);
-    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+    transition: width 0.4s ease;
   }
 
   .diag-questao-card {
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: 28px 32px;
+    padding: 28px 30px;
     box-shadow: var(--shadow-soft);
-    margin-bottom: 16px;
+    margin-bottom: 20px;
   }
   .diag-questao-meta {
     display: flex; align-items: center; gap: 10px;
     margin-bottom: 16px; flex-wrap: wrap;
   }
   .diag-materia-tag {
-    font-size: 0.74rem; font-weight: 700;
+    font-size: 0.76rem; font-weight: 700;
     padding: 4px 12px; border-radius: var(--radius-full);
     background: var(--gradient-primary); color: #fff;
   }
   .diag-dif-badge {
     font-size: 0.74rem; font-weight: 700;
     padding: 4px 10px; border-radius: var(--radius-full);
-    background: var(--bg-elevated); border: 1px solid var(--border-color);
+    background: var(--bg-card); border: 1px solid var(--border-color);
     color: var(--text-secondary);
+  }
+  .diag-assunto-badge {
+    font-size: 0.74rem; font-weight: 600;
+    padding: 4px 10px; border-radius: var(--radius-full);
+    background: rgba(56,189,248,0.12); color: #38bdf8;
+    border: 1px solid rgba(56,189,248,0.25);
   }
   .diag-questao-num {
     font-size: 0.8rem; color: var(--text-secondary); margin-left: auto;
@@ -149,6 +168,7 @@
   .diag-enunciado {
     font-size: 1.05rem; line-height: 1.65;
     color: var(--text-primary); margin-bottom: 24px;
+    white-space: pre-line;
   }
 
   .diag-alternativas {
@@ -159,92 +179,130 @@
     padding: 14px 18px;
     border-radius: var(--radius-md);
     border: 1.5px solid var(--border-color);
-    background: var(--bg-elevated);
+    background: var(--bg-card);
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
     text-align: left;
     width: 100%;
   }
-  .diag-alt:hover:not(:disabled) {
-    border-color: var(--color-primary-500);
-    background: rgba(124,58,237,0.06);
+  .diag-alt:hover {
+    border-color: var(--color-primary-400);
+    background: rgba(124,58,237,0.05);
     transform: translateX(3px);
   }
-  .diag-alt.correta {
-    border-color: #22c55e !important;
-    background: rgba(34,197,94,0.1) !important;
-  }
-  .diag-alt.errada {
-    border-color: #ef4444 !important;
-    background: rgba(239,68,68,0.08) !important;
-    opacity: 0.7;
+  .diag-alt.selecionada {
+    border-color: var(--color-primary-500) !important;
+    background: rgba(124,58,237,0.14) !important;
+    box-shadow: 0 0 12px rgba(124,58,237,0.2);
   }
   .diag-alt-letra {
-    width: 28px; height: 28px;
+    width: 30px; height: 30px;
     border-radius: 50%;
-    background: var(--border-color);
+    border: 1px solid var(--border-color);
+    background: var(--bg-elevated);
     display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 0.82rem;
+    font-weight: 800; font-size: 0.84rem;
     flex-shrink: 0;
     transition: all 0.2s;
   }
-  .diag-alt.correta .diag-alt-letra { background: #22c55e; color: #fff; }
-  .diag-alt.errada .diag-alt-letra { background: #ef4444; color: #fff; }
+  .diag-alt.selecionada .diag-alt-letra {
+    background: var(--color-primary-500);
+    border-color: var(--color-primary-500);
+    color: #fff;
+  }
   .diag-alt-texto {
     font-size: 0.92rem; line-height: 1.5;
     color: var(--text-primary);
+    padding-top: 3px;
   }
-
-  .diag-feedback {
-    padding: 16px 20px;
-    border-radius: var(--radius-md);
-    margin-top: 12px;
-    display: none;
-    font-size: 0.9rem;
-    line-height: 1.5;
-  }
-  .diag-feedback.acertou {
-    background: rgba(34,197,94,0.1);
-    border: 1px solid rgba(34,197,94,0.3);
-    color: #16a34a;
-    display: block;
-  }
-  .diag-feedback.errou {
-    background: rgba(239,68,68,0.08);
-    border: 1px solid rgba(239,68,68,0.2);
-    color: #dc2626;
-    display: block;
-  }
-  [data-theme='dark'] .diag-feedback.acertou { color: #4ade80; }
-  [data-theme='dark'] .diag-feedback.errou { color: #f87171; }
 
   .diag-actions {
-    display: flex; justify-content: flex-end; margin-top: 12px;
+    display: flex; justify-content: space-between; align-items: center; margin-top: 16px;
+    gap: 12px; flex-wrap: wrap;
+  }
+
+  /* Modal de Resumo Pré-Finalização */
+  .diag-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 20px;
+    backdrop-filter: blur(6px);
+  }
+  .diag-modal-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    max-width: 480px; width: 100%;
+    padding: 28px 24px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
   }
 
   /* Tela de resultado */
   .diag-resultado {
-    max-width: 680px; width: 100%;
+    max-width: 760px; width: 100%;
     display: none;
   }
   .diag-resultado.active { display: block; }
 
   .resultado-header {
-    text-align: center; margin-bottom: 32px;
+    text-align: center; margin-bottom: 28px;
   }
   .resultado-icon {
-    font-size: 3rem; margin-bottom: 12px;
+    font-size: 3rem; margin-bottom: 10px;
     display: block;
   }
   .resultado-header h2 {
     font-size: 1.8rem; font-weight: 800;
-    margin-bottom: 8px;
+    margin-bottom: 8px; font-family: var(--font-display);
   }
   .resultado-header p {
     color: var(--text-secondary); font-size: 0.95rem;
     line-height: 1.5;
   }
 
+  .resultado-cards-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px; margin-bottom: 24px;
+  }
+  .resultado-metric-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 16px 12px;
+    text-align: center;
+  }
+  .resultado-metric-val {
+    font-size: 1.5rem; font-weight: 800; font-family: var(--font-display);
+    color: var(--text-primary);
+  }
+  .resultado-metric-lbl {
+    font-size: 0.74rem; color: var(--text-secondary); text-transform: uppercase;
+    letter-spacing: 0.04em; margin-top: 4px;
+  }
+
+  /* Destaques: Pontos Fortes e Lacunas */
+  .destaques-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px; margin-bottom: 24px;
+  }
+  .destaque-box {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+  }
+  .destaque-box h4 {
+    font-size: 0.9rem; font-weight: 800; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .destaque-item {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.85rem; padding: 6px 0; border-bottom: 1px solid var(--border-color);
+  }
+  .destaque-item:last-child { border-bottom: none; }
+
+  /* Desempenho por matéria */
   .resultado-materias {
     display: flex; flex-direction: column; gap: 12px;
     margin-bottom: 28px;
@@ -273,14 +331,14 @@
     transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
   }
   .resultado-pct {
-    font-weight: 800; font-size: 0.9rem; min-width: 40px; text-align: right;
+    font-weight: 800; font-size: 0.9rem; min-width: 44px; text-align: right;
   }
   .resultado-status {
-    font-size: 0.8rem; min-width: 28px; text-align: center;
+    font-size: 0.78rem; font-weight: 700; min-width: 110px; text-align: right;
   }
 
   .resultado-actions {
-    display: flex; gap: 12px; flex-wrap: wrap;
+    display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px;
   }
   .resultado-actions .btn { flex: 1; min-width: 160px; }
 
@@ -291,7 +349,7 @@
   }
   .diag-loading.active { display: block; }
   .diag-spinner {
-    width: 48px; height: 48px;
+    width: 44px; height: 44px;
     border: 3px solid var(--border-color);
     border-top-color: var(--color-primary-500);
     border-radius: 50%;
@@ -300,16 +358,17 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  @media (max-width: 600px) {
+  @media (max-width: 640px) {
     .diag-questao-card { padding: 20px 16px; }
     .diag-info-grid { grid-template-columns: repeat(3, 1fr); }
+    .destaques-grid { grid-template-columns: 1fr; }
     .resultado-materia-nome { flex: 0 0 120px; }
   }
-  @media (max-width: 400px) {
-    .diag-info-grid { grid-template-columns: 1fr 1fr; }
-    .resultado-materia-item { flex-wrap: wrap; }
+  @media (max-width: 480px) {
+    .resultado-materia-item { flex-wrap: wrap; gap: 8px; }
     .resultado-materia-nome { flex: 1 1 100%; }
     .resultado-prog-wrap { width: 100%; }
+    .resultado-status { text-align: left; min-width: auto; }
   }
 </style>
 </head>
@@ -319,57 +378,47 @@
   <!-- TELA 0: LOADING -->
   <div class="diag-loading" id="tela-loading">
     <div class="diag-spinner"></div>
-    <p style="color: var(--text-secondary); font-size: 0.95rem;">Carregando questões...</p>
+    <p style="color: var(--text-secondary); font-size: 0.95rem;">Carregando questões oficiais do acervo...</p>
   </div>
 
   <!-- TELA 1: INTRODUÇÃO -->
-  <div class="diag-intro glass card" id="tela-intro" style="padding: 40px 36px;">
+  <div class="diag-intro glass card" id="tela-intro" style="padding: 40px 32px;">
     <div class="diag-intro-icon">🧠</div>
-    <h1>Diagnóstico Inicial</h1>
+    <h1>Descubra Seu Nível Inicial</h1>
     <p>
-      Vamos avaliar seu conhecimento atual em cada matéria do vestibular.
-      O resultado vai personalizar seu plano de estudos.
+      Uma avaliação inicial diagnóstica para mapear seu ponto de partida em cada disciplina e calibrar suas prioridades de estudo.
     </p>
 
-    <div class="diag-materias-preview" id="preview-materias">
-      <!-- Preenchido via JS -->
-      <div class="diag-materia-chip">📐 Matemática</div>
-      <div class="diag-materia-chip">⚛️ Física</div>
-      <div class="diag-materia-chip">🧪 Química</div>
-      <div class="diag-materia-chip">🌱 Biologia</div>
-      <div class="diag-materia-chip">📖 Português</div>
-      <div class="diag-materia-chip">🗺️ Geografia</div>
-      <div class="diag-materia-chip">📜 História</div>
-    </div>
+    <div class="diag-materias-preview" id="preview-materias"></div>
 
     <div class="diag-info-grid">
       <div class="diag-info-item">
-        <span class="diag-info-num" id="num-questoes-diag">~20</span>
-        <span class="diag-info-label">Questões</span>
+        <span class="diag-info-num" id="num-questoes-diag">—</span>
+        <span class="diag-info-label">Questões Reais</span>
       </div>
       <div class="diag-info-item">
-        <span class="diag-info-num">~15</span>
-        <span class="diag-info-label">Minutos</span>
+        <span class="diag-info-num" id="tempo-estimado-diag">~15</span>
+        <span class="diag-info-label">Minutos Sugeridos</span>
       </div>
       <div class="diag-info-item">
-        <span class="diag-info-num">7</span>
-        <span class="diag-info-label">Matérias</span>
+        <span class="diag-info-num" id="num-materias-diag">7</span>
+        <span class="diag-info-label">Disciplinas</span>
       </div>
     </div>
 
-    <div style="background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.2); border-radius: var(--radius-md); padding: 14px 16px; margin-bottom: 28px; font-size: 0.86rem; color: var(--text-secondary); line-height: 1.5; text-align: left;">
-      💡 <strong>Como funciona:</strong> As questões se adaptam ao seu desempenho — se você acerta, fica mais difícil. Se erra, ficam mais fáceis. No final, você recebe um mapa detalhado do seu conhecimento.
+    <div class="diag-aviso-pedagogico">
+      💡 <strong>Como os resultados são utilizados:</strong> O diagnóstico não é uma prova oficial classificatória. Ele identifica o seu desempenho de partida para destacar tópicos consolidados, lacunas observadas e alimentar seu Mapa de Domínio. O gabarito com resolução comentada é liberado após a finalização.
     </div>
 
-    <button class="btn btn-primary" id="btn-iniciar-diag" style="width: 100%; height: 52px; font-size: 1rem; font-weight: 700; border-radius: var(--radius-md);">
-      🚀 Iniciar Diagnóstico
+    <button class="btn btn-primary" id="btn-iniciar-diag" style="width: 100%; height: 50px; font-size: 1rem; font-weight: 700; border-radius: var(--radius-md);">
+      🚀 Começar Diagnóstico
     </button>
     <a href="./dashboard.html" style="display: block; text-align: center; margin-top: 14px; font-size: 0.85rem; color: var(--text-secondary);">
-      Fazer depois
+      Voltar ao Dashboard
     </a>
   </div>
 
-  <!-- TELA 2: QUESTÃO -->
+  <!-- TELA 2: SALA DE TESTE -->
   <div class="diag-questao" id="tela-questao">
     <div class="diag-header">
       <button class="diag-back-btn" id="btn-voltar-diag">
@@ -377,8 +426,8 @@
       </button>
       <div class="diag-progresso">
         <div class="diag-prog-label">
-          <span id="prog-label">Questão 1 de 20</span>
-          <span id="prog-pct">0%</span>
+          <span id="prog-label">Questão 1 de 21</span>
+          <span id="prog-pct">0% respondido</span>
         </div>
         <div class="diag-prog-track">
           <div class="diag-prog-fill" id="prog-fill" style="width:0%"></div>
@@ -389,55 +438,111 @@
     <div class="diag-questao-card">
       <div class="diag-questao-meta">
         <span class="diag-materia-tag" id="q-materia">Matemática</span>
-        <span class="diag-dif-badge" id="q-dificuldade">Média</span>
-        <span class="diag-questao-num" id="q-num">1/20</span>
+        <span class="diag-dif-badge" id="q-dificuldade">Médio</span>
+        <span class="diag-assunto-badge" id="q-assunto" style="display:none;"></span>
+        <span class="diag-questao-num" id="q-num">1/21</span>
       </div>
       <p class="diag-enunciado" id="q-enunciado"></p>
       <div class="diag-alternativas" id="q-alternativas"></div>
     </div>
 
-    <div class="diag-feedback" id="q-feedback"></div>
-
     <div class="diag-actions">
-      <button class="btn btn-primary" id="btn-proxima" style="display:none; padding: 12px 28px; border-radius: var(--radius-md);">
+      <button class="btn btn-ghost" id="btn-anterior" style="display:inline-flex;">
+        ← Anterior
+      </button>
+
+      <button class="btn btn-secondary" id="btn-revisar-fim">
+        📋 Resumo / Concluir
+      </button>
+
+      <button class="btn btn-primary" id="btn-proxima" style="display:inline-flex;">
         Próxima →
       </button>
     </div>
   </div>
 
-  <!-- TELA 3: RESULTADO -->
+  <!-- TELA 3: RESULTADOS E DIAGNÓSTICO -->
   <div class="diag-resultado" id="tela-resultado">
     <div class="resultado-header">
-      <span class="resultado-icon" id="res-icon">🎉</span>
-      <h2 id="res-titulo">Diagnóstico Concluído!</h2>
-      <p id="res-subtitulo">Aqui está seu mapa de conhecimento atual.</p>
+      <span class="resultado-icon" id="res-icon">🎯</span>
+      <h2 id="res-titulo">Seu Diagnóstico</h2>
+      <p id="res-subtitulo">Aqui está o mapeamento do seu desempenho inicial por disciplina e assunto.</p>
     </div>
 
-    <div class="glass card" style="padding: 20px 24px; margin-bottom: 24px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-        <span style="font-weight: 700; font-size: 0.9rem;">📊 Resultado Geral</span>
-        <span style="font-size: 1.4rem; font-weight: 800; font-family: var(--font-display); color: var(--color-primary-500);" id="res-geral">—</span>
+    <!-- CARDS DE MÉTRICAS -->
+    <div class="resultado-cards-grid">
+      <div class="resultado-metric-card">
+        <div class="resultado-metric-val" style="color:var(--color-primary-400);" id="res-pct-geral">0%</div>
+        <div class="resultado-metric-lbl">Aproveitamento</div>
       </div>
-      <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0; line-height: 1.4;" id="res-descricao">
-        —
-      </p>
+      <div class="resultado-metric-card">
+        <div class="resultado-metric-val" style="color:#22c55e;" id="res-acertos">0</div>
+        <div class="resultado-metric-lbl">Acertos</div>
+      </div>
+      <div class="resultado-metric-card">
+        <div class="resultado-metric-val" style="color:#ef4444;" id="res-erros">0</div>
+        <div class="resultado-metric-lbl">Erros</div>
+      </div>
+      <div class="resultado-metric-card">
+        <div class="resultado-metric-val" id="res-total">0</div>
+        <div class="resultado-metric-lbl">Questões</div>
+      </div>
     </div>
 
-    <div class="resultado-materias" id="resultado-materias">
-      <!-- Preenchido via JS -->
+    <!-- PONTOS FORTES E LACUNAS -->
+    <div class="destaques-grid">
+      <div class="destaque-box">
+        <h4 style="color:#22c55e;">
+          <span>🌟</span> Melhores Desempenhos Observados
+        </h4>
+        <div id="destaque-fortes">
+          <p style="font-size:0.84rem; color:var(--text-secondary); margin:0;">Nenhum ponto consolidado ainda.</p>
+        </div>
+      </div>
+      <div class="destaque-box">
+        <h4 style="color:#f59e0b;">
+          <span>🎯</span> Prioridades de Estudo / Lacunas
+        </h4>
+        <div id="destaque-fracos">
+          <p style="font-size:0.84rem; color:var(--text-secondary); margin:0;">Nenhuma lacuna crítica detectada.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESEMPENHO POR DISCIPLINA -->
+    <div class="card" style="padding:22px 24px; margin-bottom:24px;">
+      <h3 style="font-size:1.05rem; font-family:var(--font-display); margin-bottom:16px;">
+        📊 Desempenho por Disciplina
+      </h3>
+      <div class="resultado-materias" id="resultado-materias"></div>
+    </div>
+
+    <!-- DESEMPENHO POR ASSUNTO -->
+    <div class="card" style="padding:22px 24px; margin-bottom:24px;" id="box-assuntos">
+      <h3 style="font-size:1.05rem; font-family:var(--font-display); margin-bottom:14px;">
+        📑 Desempenho por Assunto Identificado
+      </h3>
+      <div id="resultado-assuntos" style="display:flex; flex-direction:column; gap:10px;"></div>
     </div>
 
     <div class="resultado-actions">
-      <a href="./dashboard.html" class="btn btn-secondary">
-        🏠 Ir para o Dashboard
-      </a>
+      <button class="btn btn-secondary" id="btn-refazer-diag">
+        🔄 Refazer Diagnóstico
+      </button>
       <a href="./mapa-dominio.html" class="btn btn-primary">
-        🧬 Ver Mapa de Domínio →
+        🧬 Ver Mapa de Domínio Completo →
+      </a>
+      <a href="./dashboard.html" class="btn btn-ghost">
+        🏠 Dashboard
       </a>
     </div>
   </div>
 
 </div>
+
+<!-- CONTAINER DE MODAL PARA PRÉ-SUBMISSÃO -->
+<div id="diag-modal-container"></div>
+
 <script type="module" src="../scripts/diagnostico.js"></script>
 <script type="module" src="../scripts/theme.js"></script>
 </body>
