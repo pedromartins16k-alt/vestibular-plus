@@ -3,180 +3,484 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Questões · Vestibular+</title>
+<title>Laboratório de Questões · Vestibular+</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../styles/base.css" />
 <style>
-  .page-wrap { padding: 32px 5%; max-width: 800px; margin: 0 auto; }
-  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-  .back-link { color: var(--text-secondary); font-size: .9rem; cursor: pointer; }
+  /* ==========================================================================
+     LABORATÓRIO DE QUESTÕES — ESTILOS
+     ========================================================================== */
+  .page-wrap {
+    padding: 24px 4% 64px;
+    max-width: 960px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .lab-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .lab-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .back-link {
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color var(--transition-fast);
+  }
   .back-link:hover { color: var(--text-primary); }
-  .page-title { font-size: 1.8rem; margin-top: 6px; }
-
-  .filtro-materias { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
-  .chip {
-    padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid var(--border-color);
-    background: var(--bg-elevated); font-size: .85rem; font-weight: 600; cursor: pointer;
-    transition: all var(--transition-fast);
+  .lab-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin: 0;
+    color: var(--text-primary);
   }
-  .chip.active { background: var(--gradient-primary); color: #fff; border-color: transparent; box-shadow: var(--shadow-glow); }
 
-  .progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: .85rem; color: var(--text-secondary); }
-  .questao-card { padding: 28px; position: relative; }
-  .questao-topo { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
-  .questao-tag { display: inline-block; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); }
-  .questao-enunciado { font-size: 1.05rem; line-height: 1.6; margin-bottom: 22px; }
-
-  /* Questão Bloqueada */
-  .questao-card.bloqueada .questao-enunciado {
-    filter: blur(4px);
-    user-select: none;
-    pointer-events: none;
-  }
-  .questao-card.bloqueada .alternativas-container {
-    filter: blur(4px);
-    user-select: none;
-    pointer-events: none;
-    opacity: .6;
-  }
-  .bloqueio-overlay-card {
+  /* BARRA DE SESSÃO ATIVA */
+  .sessao-barra {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     background: var(--bg-elevated);
     border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
     box-shadow: var(--shadow-soft);
+  }
+  .sessao-stats {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 0.86rem;
+    font-weight: 600;
+    flex-wrap: wrap;
+  }
+  .sessao-badge-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* PAINEL DE FILTROS & BUSCA */
+  .filtros-container {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: 24px;
-    text-align: center;
-    margin-top: 16px;
-    backdrop-filter: blur(8px);
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-soft);
+  }
+  .filtros-top-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .busca-input-wrap {
+    position: relative;
+  }
+  .busca-input-wrap input {
+    padding-left: 38px;
+    height: 42px;
+    font-size: 0.9rem;
+  }
+  .busca-input-wrap::before {
+    content: '🔍';
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.85rem;
+    z-index: 1;
   }
 
-  .favorito-btn {
-    background: none; border: none; font-size: 1.3rem; cursor: pointer;
-    color: var(--text-secondary); line-height: 1; transition: transform var(--transition-fast), color var(--transition-fast);
+  .filtro-select {
+    height: 42px;
+    padding: 0 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    transition: border-color var(--transition-fast);
   }
-  .favorito-btn:hover { transform: scale(1.15); }
-  .favorito-btn.ativo { color: #ef4444; }
+  .filtro-select:focus {
+    border-color: var(--color-primary-500);
+  }
 
-  .alternativa {
-    display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: var(--radius-md);
-    border: 1px solid var(--border-color); margin-bottom: 10px; cursor: pointer;
+  /* CHIPS DE MODOS RÁPIDOS */
+  .modos-chips-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .chip-modo {
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border-color);
+    background: var(--glass-bg);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
     transition: all var(--transition-fast);
+    user-select: none;
   }
-  .alternativa:hover { border-color: var(--color-primary-500); }
-  .alternativa.selecionada { border-color: var(--color-primary-500); background: rgba(124,58,237,.08); }
-  .alternativa.correta { border-color: var(--color-success); background: rgba(34,197,94,.1); }
-  .alternativa.errada { border-color: var(--color-danger); background: rgba(239,68,68,.1); }
-  .alt-letra {
-    width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-color);
-    display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; flex-shrink: 0;
+  .chip-modo:hover {
+    color: var(--text-primary);
+    border-color: var(--color-primary-500);
   }
-  .alternativa.correta .alt-letra { background: var(--color-success); border-color: var(--color-success); color: #fff; }
-  .alternativa.errada .alt-letra { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
-
-  .feedback-box { margin-top: 18px; padding: 16px; border-radius: var(--radius-md); font-size: .9rem; line-height: 1.6; display: none; }
-  .feedback-box.acerto { background: rgba(34,197,94,.1); border: 1px solid var(--color-success); display: block; }
-  .feedback-box.erro { background: rgba(239,68,68,.1); border: 1px solid var(--color-danger); display: block; }
-  .feedback-box strong { display: block; margin-bottom: 6px; }
-
-  .actions-row { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; flex-wrap: wrap; gap: 10px; }
-  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-secondary); }
-
-  /* Tela de seleção de temas */
-  .temas-header { margin-bottom: 18px; }
-  .temas-titulo { font-size: 1.2rem; font-weight: 700; margin-top: 8px; }
-  .tema-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-  .tema-card {
-    padding: 16px 18px; border-radius: var(--radius-md); border: 1px solid var(--border-color);
-    background: var(--bg-elevated); cursor: pointer; transition: all var(--transition-fast);
+  .chip-modo.active {
+    background: var(--gradient-primary);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
   }
-  .tema-card:hover { border-color: var(--color-primary-500); transform: translateY(-1px); }
-  .tema-card.todos { border-color: var(--color-primary-500); background: rgba(124,58,237,.08); }
-  .tema-card-titulo { font-weight: 600; font-size: .92rem; margin-bottom: 6px; line-height: 1.35; }
-  .tema-card-count { font-size: .78rem; color: var(--text-secondary); }
 
-  /* Banner de Contexto de Projeto de Estudo */
-  .contexto-projeto-banner {
-    display: none;
+  /* TAGS DE FILTROS ATIVOS */
+  .filtros-ativos-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.8rem;
+  }
+  .badge-filtro-ativo {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    background: rgba(124, 58, 237, 0.15);
+    border: 1px solid rgba(124, 58, 237, 0.35);
+    border-radius: var(--radius-full);
+    color: var(--color-primary-400);
+    font-weight: 600;
+  }
+  .badge-filtro-fechar {
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    opacity: 0.7;
+  }
+  .badge-filtro-fechar:hover { opacity: 1; }
+
+  /* CARD DA QUESTÃO */
+  .questao-card-moderno {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 32px 36px;
+    box-shadow: var(--shadow-soft);
+    position: relative;
+    transition: all var(--transition-base);
+  }
+  .questao-topo-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .meta-tags-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .tag-pill {
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .favorito-toggle-btn {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    line-height: 1;
+    transition: transform 0.2s, color 0.2s;
+  }
+  .favorito-toggle-btn:hover { transform: scale(1.2); }
+  .favorito-toggle-btn.ativo { color: #ef4444; }
+
+  .questao-enunciado-texto {
+    font-size: 1.12rem;
+    line-height: 1.7;
+    color: var(--text-primary);
+    margin-bottom: 28px;
+    font-weight: 450;
+  }
+
+  /* ALTERNATIVAS */
+  .alternativas-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .alt-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 20px;
+    border-radius: var(--radius-md);
+    background: var(--glass-bg);
+    border: 1.5px solid var(--border-color);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    min-height: 52px;
+  }
+  .alt-item:hover {
+    border-color: var(--color-primary-500);
+    background: rgba(124, 58, 237, 0.05);
+  }
+  .alt-item.selecionada {
+    border-color: var(--color-primary-500);
+    background: rgba(124, 58, 237, 0.12);
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25);
+  }
+  .alt-item.correta {
+    border-color: var(--color-success) !important;
+    background: rgba(34, 197, 94, 0.12) !important;
+  }
+  .alt-item.errada {
+    border-color: var(--color-danger) !important;
+    background: rgba(239, 68, 68, 0.12) !important;
+  }
+  .alt-letra-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.86rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .alt-item.selecionada .alt-letra-circle {
+    background: var(--gradient-primary);
+    border-color: transparent;
+    color: #fff;
+  }
+  .alt-item.correta .alt-letra-circle {
+    background: var(--color-success);
+    border-color: transparent;
+    color: #fff;
+  }
+  .alt-item.errada .alt-letra-circle {
+    background: var(--color-danger);
+    border-color: transparent;
+    color: #fff;
+  }
+  .alt-texto-conteudo {
+    font-size: 0.98rem;
+    line-height: 1.55;
+    color: var(--text-primary);
+    flex: 1;
+    padding-top: 3px;
+  }
+
+  /* BARRA DE AÇÕES DA QUESTÃO */
+  .questao-actions-bar {
+    display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 12px 16px;
-    margin-bottom: 16px;
+    flex-wrap: wrap;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  /* FEEDBACK & EXPLICAÇÃO COMENTADA */
+  .feedback-box-laboratorio {
+    margin-top: 24px;
+    padding: 22px 26px;
     border-radius: var(--radius-md);
-    background: rgba(124, 58, 237, 0.08);
-    border: 1px solid rgba(124, 58, 237, 0.25);
-    font-size: 0.88rem;
-    line-height: 1.4;
+    line-height: 1.6;
+    animation: fadeIn 0.3s ease;
+    display: none;
   }
-  .contexto-projeto-banner.ativo {
+  .feedback-box-laboratorio.acerto {
+    background: rgba(34, 197, 94, 0.08);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    display: block;
+  }
+  .feedback-box-laboratorio.erro {
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    display: block;
+  }
+  .feedback-topo-titulo {
+    font-size: 1.05rem;
+    font-weight: 800;
+    margin-bottom: 8px;
     display: flex;
+    align-items: center;
+    gap: 8px;
   }
-  .contexto-projeto-banner.alerta {
-    background: rgba(245, 158, 11, 0.08);
-    border-color: rgba(245, 158, 11, 0.28);
-  }
-  .contexto-banner-texto {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .contexto-banner-tag {
-    font-weight: 700;
-    font-size: 0.76rem;
-    color: var(--color-primary-400, #818cf8);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .contexto-projeto-banner.alerta .contexto-banner-tag {
-    color: #f59e0b;
-  }
-  .contexto-banner-fechar {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 1.1rem;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
-    line-height: 1;
-    transition: color 0.15s, background 0.15s;
-  }
-  .contexto-banner-fechar:hover {
+  .feedback-comentario-texto {
+    font-size: 0.92rem;
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.08);
+    line-height: 1.65;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* CARD DE RESUMO DA SESSÃO */
+  .resumo-sessao-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 40px 32px;
+    text-align: center;
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* SKELETON LOADING */
+  .skeleton-loader-wrap {
+    padding: 32px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+  }
+  .skeleton-line {
+    height: 16px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+  @media (max-width: 768px) {
+    .filtros-top-row { grid-template-columns: 1fr; }
+    .questao-card-moderno { padding: 22px 18px; }
+    .questao-enunciado-texto { font-size: 1.02rem; }
+    .alt-item { padding: 12px 14px; }
   }
 </style>
 </head>
 <body>
   <div class="page-wrap">
-    <div class="page-header">
-      <div>
-        <a class="back-link" href="./dashboard.html">← Voltar ao dashboard</a>
-        <h1 class="page-title">✅ Questões comentadas</h1>
+    <!-- CABEÇALHO -->
+    <header class="lab-header">
+      <div class="lab-title-wrap">
+        <a class="back-link" href="./dashboard.html">← Voltar ao Centro de Comando</a>
+        <h1 class="lab-title">🧪 Laboratório de Questões</h1>
       </div>
-      <button id="theme-toggle" class="icon-btn" style="width:40px;height:40px;border-radius:999px;border:1px solid var(--border-color);background:var(--bg-elevated);cursor:pointer;">🌙</button>
-    </div>
-
-    <!-- Banner de contexto de projeto -->
-    <div id="contexto-projeto-banner" class="contexto-projeto-banner" role="status">
-      <div class="contexto-banner-texto">
-        <span class="contexto-banner-tag" id="contexto-banner-tag">🎯 Projeto de Estudo</span>
-        <span id="contexto-banner-desc">Carregando questões relacionadas...</span>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button id="theme-toggle" class="icon-btn" title="Alternar tema">🌙</button>
       </div>
-      <button type="button" class="contexto-banner-fechar" id="contexto-banner-fechar" title="Fechar aviso e explorar todos os temas">✕</button>
-    </div>
+    </header>
 
-    <div class="filtro-materias" id="filtro-materias">
-      <div class="chip active" data-materia="todas">Todas</div>
-    </div>
+    <!-- BARRA DA SESSÃO ATIVA -->
+    <section class="sessao-barra" id="sessao-barra" aria-label="Progresso da Sessão">
+      <div class="sessao-stats">
+        <span class="sessao-badge-item" id="sessao-indice-texto">
+          <span>📝</span> <strong id="sessao-num-atual">Questão 1 de 1</strong>
+        </span>
+        <span class="sessao-badge-item" style="color:var(--color-success);">
+          <span>✅</span> <strong id="sessao-acertos-num">0 acertos</strong>
+        </span>
+        <span class="sessao-badge-item" style="color:var(--color-danger);">
+          <span>❌</span> <strong id="sessao-erros-num">0 erros</strong>
+        </span>
+        <span class="sessao-badge-item" style="color:var(--color-primary-400);">
+          <span>📊</span> <strong id="sessao-aproveitamento-num">0%</strong>
+        </span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn btn-ghost" id="btn-finalizar-sessao" style="padding:6px 14px; font-size:0.78rem;">
+          Finalizar Sessão
+        </button>
+      </div>
+    </section>
 
-    <div class="progress-info" id="progress-info"></div>
+    <!-- PAINEL DE FILTROS & BUSCA RÁPIDA -->
+    <section class="filtros-container" aria-label="Filtros de Questões">
+      <div class="filtros-top-row">
+        <div class="busca-input-wrap">
+          <input class="input-field" type="text" id="filtro-busca-input" placeholder="Pesquisar termo, assunto ou enunciado..." autocomplete="off" />
+        </div>
+        <select class="filtro-select" id="filtro-materia-select" aria-label="Filtrar por Matéria">
+          <option value="todas">Todas as Matérias</option>
+        </select>
+        <select class="filtro-select" id="filtro-dificuldade-select" aria-label="Filtrar por Dificuldade">
+          <option value="todas">Qualquer Dificuldade</option>
+          <option value="facil">Fácil ●</option>
+          <option value="medio">Médio ●●</option>
+          <option value="dificil">Difícil ●●●</option>
+          <option value="genio">Gênio ●●●●</option>
+        </select>
+      </div>
 
-    <div id="questao-container">
-      <p class="empty-state">Carregando questões...</p>
-    </div>
+      <!-- MODOS RÁPIDOS (Pílulas de Seleção) -->
+      <div class="modos-chips-row" id="modos-chips-row">
+        <button type="button" class="chip-modo active" data-modo="todas">Todas as Questões</button>
+        <button type="button" class="chip-modo" data-modo="revisao">🧠 Para Revisar Hoje</button>
+        <button type="button" class="chip-modo" data-modo="erradas">❌ Minhas Erradas</button>
+        <button type="button" class="chip-modo" data-modo="favoritas">⭐ Favoritas</button>
+      </div>
+
+      <!-- FILTROS ATIVOS BAR -->
+      <div class="filtros-ativos-bar" id="filtros-ativos-bar" style="display:none;">
+        <span style="color:var(--text-secondary); font-weight:600;">Filtros:</span>
+        <div id="badges-filtros-container" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+        <button type="button" id="btn-limpar-todos-filtros" style="background:none; border:none; color:var(--color-primary-400); font-weight:700; cursor:pointer; font-size:0.78rem; margin-left:auto;">
+          Limpar Filtros ✕
+        </button>
+      </div>
+    </section>
+
+    <!-- CONTAINER DA QUESTÃO (Injetado via questoes.js) -->
+    <main id="questao-container" role="region" aria-live="polite">
+      <!-- Skeleton de Carregamento Inicial -->
+      <div class="skeleton-loader-wrap">
+        <div class="skeleton-line" style="width:30%;"></div>
+        <div class="skeleton-line" style="width:90%; height:24px; margin:20px 0;"></div>
+        <div class="skeleton-line" style="width:85%; height:20px;"></div>
+        <div class="skeleton-line" style="width:100%; height:48px; margin-top:24px;"></div>
+        <div class="skeleton-line" style="width:100%; height:48px;"></div>
+        <div class="skeleton-line" style="width:100%; height:48px;"></div>
+      </div>
+    </main>
   </div>
 
   <script type="module" src="../scripts/theme.js"></script>
