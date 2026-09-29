@@ -43,7 +43,7 @@ async function carregarVestibulares() {
 // ----------------------------------------------------------------
 
 /**
- * Salva o objetivo no localStorage (sempre) e tenta salvar no Supabase.
+ * Salva o objetivo no localStorage (sempre) e no Supabase na tabela `objetivos_usuario`.
  */
 export async function salvarObjetivo(objetivo) {
   if (!objetivo) return;
@@ -64,17 +64,22 @@ export async function salvarObjetivo(objetivo) {
     localStorage.setItem(getStorageKey(currentUid), JSON.stringify(payload));
   } catch (_) {}
 
-  // Tenta salvar no Supabase (requer migration executada)
+  // Salva no Supabase na tabela objetivos_usuario (UPSERT por user_id)
   try {
     if (currentUid !== 'guest') {
       const { error } = await supabase
-        .from('profiles')
-        .update({ objetivo_json: payload })
-        .eq('id', currentUid);
+        .from('objetivos_usuario')
+        .upsert(
+          {
+            user_id: currentUid,
+            objetivo_json: payload,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'user_id' }
+        );
 
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 = coluna não existe ainda (migration pendente)
-        console.warn('[objetivo] Erro ao salvar no Supabase (migration pendente?):', error.message);
+      if (error) {
+        console.warn('[objetivo] Erro ao salvar em objetivos_usuario no Supabase:', error.message);
       }
     }
   } catch (err) {
@@ -85,21 +90,21 @@ export async function salvarObjetivo(objetivo) {
 }
 
 /**
- * Lê o objetivo: tenta Supabase, fallback localStorage isolado por usuário.
+ * Lê o objetivo: consulta Supabase `objetivos_usuario`, fallback localStorage isolado por usuário.
  */
 export async function lerObjetivo() {
   let currentUid = 'guest';
 
-  // Tenta ler do Supabase
+  // Tenta ler do Supabase (tabela objetivos_usuario)
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (user?.id) {
       currentUid = user.id;
       const { data, error } = await supabase
-        .from('profiles')
+        .from('objetivos_usuario')
         .select('objetivo_json')
-        .eq('id', user.id)
-        .single();
+        .eq('user_id', user.id)
+        .maybeSingle();
 
       if (!error && data?.objetivo_json) {
         // Sincroniza com localStorage isolado
@@ -119,7 +124,7 @@ export async function lerObjetivo() {
 }
 
 /**
- * Remove o objetivo do usuário.
+ * Remove o objetivo do usuário em `objetivos_usuario`.
  */
 export async function limparObjetivo() {
   let currentUid = 'guest';
@@ -128,9 +133,9 @@ export async function limparObjetivo() {
     if (user?.id) {
       currentUid = user.id;
       await supabase
-        .from('profiles')
-        .update({ objetivo_json: null })
-        .eq('id', user.id);
+        .from('objetivos_usuario')
+        .delete()
+        .eq('user_id', user.id);
     }
   } catch (_) {}
 

@@ -854,7 +854,10 @@ async function selecionarResposta(el, questao) {
 
   // Ciclo de aprendizado: agenda revisão espaçada com base no acerto ou erro
   if (sessionUserId && questao?.id) {
-    registrarRevisaoEspacada(sessionUserId, questao.id, acertou ? 'acerto' : 'erro').catch(err => {
+    registrarRevisaoEspacada(sessionUserId, questao.id, acertou ? 'acerto' : 'erro', {
+      tipoItem: 'questao',
+      dificuldade: questao.dificuldade || 'medio'
+    }).catch(err => {
       console.warn('[questões] Falha ao registrar revisão espaçada:', err);
     });
   }

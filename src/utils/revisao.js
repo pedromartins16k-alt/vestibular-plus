@@ -99,43 +99,92 @@ function salvarRevisoesLocal(userId, revisoes) {
 }
 
 /**
- * Registra ou atualiza o resultado de uma questão no sistema de revisão.
+ * Registra ou atualiza o resultado de um item no sistema de revisão espaçada.
  * @param {string} userId
- * @param {string} questaoId
- * @param {string} resultado — 'erro' | 'dificuldade' | 'acerto' | 'acerto_facil'
+ * @param {string|object} itemOrId — itemId/questaoId (string) ou objeto { itemId, tipoItem, resultado, dificuldade }
+ * @param {string} [resultadoParam] — 'erro' | 'dificuldade' | 'acerto' | 'acerto_facil'
+ * @param {object} [opcoes] — { tipoItem, dificuldade }
  */
-export async function registrarResultado(userId, questaoId, resultado) {
-  if (!questaoId || !resultado) return;
+export async function registrarResultado(userId, itemOrId, resultadoParam, opcoes = {}) {
+  let itemId = '';
+  let tipoItem = 'questao';
+  let resultado = resultadoParam;
+  let dificuldade = opcoes.dificuldade || 'medio';
 
-  // Ler revisão existente para calcular novo intervalo
+  if (typeof itemOrId === 'object' && itemOrId !== null) {
+    itemId = itemOrId.itemId || itemOrId.item_id || itemOrId.questaoId || itemOrId.questao_id || '';
+    tipoItem = itemOrId.tipoItem || itemOrId.tipo_item || 'questao';
+    resultado = itemOrId.resultado || resultadoParam;
+    dificuldade = itemOrId.dificuldade || opcoes.dificuldade || 'medio';
+  } else {
+    itemId = String(itemOrId || '');
+    tipoItem = opcoes.tipoItem || opcoes.tipo_item || 'questao';
+  }
+
+  if (!itemId || !resultado) return;
+
+  // Ler revisão existente para calcular novo intervalo e nível
   let intervaloDias = 1;
-  let revisaoExistente = null;
+  let nivelAtual = 0;
+  let totalAcertos = 0;
+  let totalErros = 0;
+  let totalRevisoesAnteriores = 0;
+  let historicoAnterior = [];
 
   // Tenta ler do Supabase
   try {
     const { data } = await supabase
       .from('revisao_agendada')
-      .select('intervalo_dias, total_revisoes')
+      .select('nivel, intervalo_dias, total_revisoes, acertos, erros, historico')
       .eq('user_id', userId)
-      .eq('questao_id', questaoId)
-      .single();
+      .eq('tipo_item', tipoItem)
+      .eq('item_id', itemId)
+      .maybeSingle();
+
     if (data) {
       intervaloDias = data.intervalo_dias || 1;
-      revisaoExistente = data;
+      nivelAtual = data.nivel || 0;
+      totalAcertos = data.acertos || 0;
+      totalErros = data.erros || 0;
+      totalRevisoesAnteriores = data.total_revisoes || 0;
+      historicoAnterior = Array.isArray(data.historico) ? data.historico : [];
     }
   } catch (_) {}
 
+  const acertou = resultado === 'acerto' || resultado === 'acerto_facil';
+  const novoNivel = acertou ? nivelAtual + 1 : Math.max(0, nivelAtual - 1);
   const { proximaRevisao, novoIntervalo } = calcularProximaRevisao(resultado, intervaloDias);
-  const totalRevisoes = (revisaoExistente?.total_revisoes || 0) + 1;
+  
+  const novoTotalRevisoes = totalRevisoesAnteriores + 1;
+  const novoTotalAcertos = acertou ? totalAcertos + 1 : totalAcertos;
+  const novoTotalErros = !acertou ? totalErros + 1 : totalErros;
+  const agoraIso = new Date().toISOString();
+
+  const novoHistorico = [
+    ...historicoAnterior.slice(-19), // Mantém últimos 20 registros
+    {
+      data: agoraIso,
+      resultado,
+      intervalo_dias: novoIntervalo,
+      nivel: novoNivel
+    }
+  ];
 
   const payload = {
     user_id: userId,
-    questao_id: questaoId,
-    proxima_revisao: proximaRevisao,
+    tipo_item: tipoItem,
+    item_id: itemId,
+    nivel: novoNivel,
     intervalo_dias: novoIntervalo,
+    dificuldade: dificuldade,
+    total_revisoes: novoTotalRevisoes,
+    acertos: novoTotalAcertos,
+    erros: novoTotalErros,
     ultimo_resultado: resultado,
-    total_revisoes: totalRevisoes,
-    atualizado_em: new Date().toISOString()
+    ultima_revisao: agoraIso,
+    proxima_revisao: proximaRevisao,
+    historico: novoHistorico,
+    updated_at: agoraIso
   };
 
   // Tenta salvar no Supabase (upsert)
@@ -143,14 +192,14 @@ export async function registrarResultado(userId, questaoId, resultado) {
   try {
     const { error } = await supabase
       .from('revisao_agendada')
-      .upsert(payload, { onConflict: 'user_id,questao_id' });
+      .upsert(payload, { onConflict: 'user_id,tipo_item,item_id' });
     if (!error) salvoNoSupabase = true;
   } catch (_) {}
 
-  // Fallback: localStorage
+  // Fallback: localStorage isolado por usuário
   if (!salvoNoSupabase) {
     const revisoes = lerRevisoesLocal(userId);
-    const idx = revisoes.findIndex(r => r.questao_id === questaoId);
+    const idx = revisoes.findIndex(r => r.item_id === itemId && r.tipo_item === tipoItem);
     if (idx >= 0) {
       revisoes[idx] = payload;
     } else {

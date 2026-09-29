@@ -420,9 +420,12 @@ async function finalizarSimulado() {
     const acertou = respostasDadas[q.id] === q.resposta_correta;
     if (acertou) acertos++;
 
-    // Ciclo de aprendizado: se errou no simulado, agenda para revisão espaçada
+    // Ciclo de aprendizado: se respondeu no simulado, agenda para revisão espaçada
     if (sessionUserId && q.id) {
-      registrarRevisaoEspacada(sessionUserId, q.id, acertou ? 'acerto' : 'erro').catch(err => {
+      registrarRevisaoEspacada(sessionUserId, q.id, acertou ? 'acerto' : 'erro', {
+        tipoItem: 'questao',
+        dificuldade: q.dificuldade || simuladoAtual?.dificuldade || 'medio'
+      }).catch(err => {
         console.warn('[simulados] Falha ao registrar revisão de questão do simulado:', err);
       });
     }

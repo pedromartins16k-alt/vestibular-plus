@@ -328,11 +328,15 @@ async function finalizarDiagnostico() {
 }
 
 async function salvarResultado({ totalQuestoes, totalAcertos, resultadosPorMateria }) {
+  const pctGeral = totalQuestoes > 0
+    ? Math.round((totalAcertos / totalQuestoes) * 100)
+    : 0;
+
   const payload = {
     total_questoes: totalQuestoes,
-    total_acertos: totalAcertos,
-    resultados_por_materia: resultadosPorMateria,
-    concluido: true,
+    acertos: totalAcertos,
+    percentual: pctGeral,
+    resultado: resultadosPorMateria,
     realizado_em: new Date().toISOString()
   };
 
@@ -341,10 +345,16 @@ async function salvarResultado({ totalQuestoes, totalAcertos, resultadosPorMater
     try {
       const { error } = await supabase
         .from('diagnostico_resultados')
-        .insert({ ...payload, user_id: estado.userId });
+        .insert({
+          user_id: estado.userId,
+          resultado: resultadosPorMateria,
+          acertos: totalAcertos,
+          total_questoes: totalQuestoes,
+          percentual: pctGeral,
+          realizado_em: payload.realizado_em
+        });
 
       if (!error) return;
-      // Se tabela não existe (migration pendente), usa localStorage
     } catch (_) {}
   }
 

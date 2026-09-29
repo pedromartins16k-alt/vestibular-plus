@@ -124,12 +124,12 @@ async function calcularDominio(userId) {
     try {
       const { data } = await supabase
         .from('diagnostico_resultados')
-        .select('resultados_por_materia')
+        .select('resultado, acertos, total_questoes, percentual, realizado_em')
         .eq('user_id', userId)
         .order('realizado_em', { ascending: false })
         .limit(1)
-        .single();
-      if (data) diagnostico = data.resultados_por_materia;
+        .maybeSingle();
+      if (data) diagnostico = data.resultado;
     } catch (_) {}
   }
 
@@ -139,7 +139,7 @@ async function calcularDominio(userId) {
       const raw = localStorage.getItem(`vestibular_diagnostico_${userId || 'guest'}`);
       if (raw) {
         const parsed = JSON.parse(raw);
-        diagnostico = parsed.resultados_por_materia || parsed;
+        diagnostico = parsed.resultado || parsed.resultados_por_materia || parsed;
       }
     } catch (_) {}
   }
