@@ -69,7 +69,37 @@
         Deixe em branco para continuar usando seu nome completo.
       </p>
 
-      <button class="btn-salvar" id="btn-salvar">Salvar</button>
+      <div style="height:1px; background:var(--border-color); margin:20px 0;"></div>
+
+      <h3 style="font-size:1.1rem; margin-bottom:14px; font-weight:700;">🎯 Seu Objetivo de Vestibular</h3>
+      
+      <div class="form-group">
+        <label>Vestibular Principal</label>
+        <select id="sel-perfil-vestibular" style="width:100%; padding:10px 12px; border-radius:var(--radius-md,10px); border:1px solid var(--border-color); background:var(--bg-elevated); color:var(--text-primary); font-size:.9rem;">
+          <option value="fuvest">🎓 FUVEST 2027 (USP)</option>
+          <option value="unicamp">🔬 COMVEST / UNICAMP 2027</option>
+          <option value="vunesp_unesp">🌿 VUNESP / UNESP 2027</option>
+          <option value="enem">🇧🇷 ENEM 2026</option>
+          <option value="unifesp">💊 UNIFESP 2027</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-top:12px;">
+        <label>Universidade / Instituição Alvo</label>
+        <input type="text" id="input-perfil-universidade" placeholder="Ex: USP, UNICAMP, UNESP..." />
+      </div>
+
+      <div class="form-group" style="margin-top:12px;">
+        <label>Curso Desejado</label>
+        <input type="text" id="input-perfil-curso" placeholder="Ex: Engenharia de Computação, Medicina..." />
+      </div>
+
+      <div class="form-group" style="margin-top:12px; margin-bottom:24px;">
+        <label>Data Prevista da 1ª Fase</label>
+        <input type="date" id="input-perfil-data" />
+      </div>
+
+      <button class="btn-salvar" id="btn-salvar">Salvar Alterações</button>
       <p class="mensagem-perfil" id="mensagem-perfil"></p>
     </div>
   </div>

@@ -2,11 +2,16 @@ import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
+import { lerObjetivo, salvarObjetivo } from './objetivo.js';
 
 const avatarEl = document.getElementById('perfil-avatar');
 const nomeRealEl = document.getElementById('perfil-nome-real');
 const emailEl = document.getElementById('perfil-email');
 const inputEl = document.getElementById('input-nome-usuario');
+const selVestibular = document.getElementById('sel-perfil-vestibular');
+const inputUniv = document.getElementById('input-perfil-universidade');
+const inputCurso = document.getElementById('input-perfil-curso');
+const inputData = document.getElementById('input-perfil-data');
 const btnSalvar = document.getElementById('btn-salvar');
 const mensagemEl = document.getElementById('mensagem-perfil');
 
@@ -17,11 +22,10 @@ async function iniciarPerfil() {
   if (!session) return;
   userId = session.user.id;
 
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('nome, nome_usuario')
-    .eq('id', userId)
-    .single();
+  const [{ data: profile, error }, objetivo] = await Promise.all([
+    supabase.from('profiles').select('nome, nome_usuario').eq('id', userId).single(),
+    lerObjetivo()
+  ]);
 
   if (error || !profile) {
     mostrarMensagem('Não foi possível carregar seu perfil. Tente recarregar a página.', 'erro');
@@ -34,28 +38,53 @@ async function iniciarPerfil() {
   emailEl.textContent = session.user.email || '';
   inputEl.value = profile.nome_usuario || '';
 
-  btnSalvar.addEventListener('click', salvarNomeUsuario);
+  if (objetivo) {
+    if (selVestibular && objetivo.vestibular_id) selVestibular.value = objetivo.vestibular_id;
+    if (inputUniv && objetivo.universidade) inputUniv.value = objetivo.universidade;
+    if (inputCurso && objetivo.curso) inputCurso.value = objetivo.curso;
+    if (inputData && objetivo.data_prova) inputData.value = objetivo.data_prova;
+  } else {
+    if (inputData) inputData.value = '2026-11-01';
+    if (inputUniv) inputUniv.value = 'USP';
+    if (inputCurso) inputCurso.value = 'Engenharia de Computação';
+  }
+
+  btnSalvar.addEventListener('click', salvarPerfilCompleto);
 }
 
-async function salvarNomeUsuario() {
-  const valor = inputEl.value.trim();
+async function salvarPerfilCompleto() {
+  const valorApelido = inputEl.value.trim();
+  const vestId = selVestibular?.value || 'fuvest';
+  const vestNome = selVestibular?.options[selVestibular.selectedIndex]?.text || 'FUVEST 2027';
+  const univ = inputUniv?.value.trim() || 'USP';
+  const curso = inputCurso?.value.trim() || '';
+  const dataProva = inputData?.value || '2026-11-01';
 
   btnSalvar.disabled = true;
-  mostrarMensagem('Salvando...', '');
+  mostrarMensagem('Salvando alterações...', '');
 
-  const { error } = await supabase
-    .from('profiles')
-    .update({ nome_usuario: valor === '' ? null : valor })
-    .eq('id', userId);
+  const [resProfile, resObj] = await Promise.allSettled([
+    supabase
+      .from('profiles')
+      .update({ nome_usuario: valorApelido === '' ? null : valorApelido })
+      .eq('id', userId),
+    salvarObjetivo({
+      vestibular_id: vestId,
+      vestibular_nome: vestNome,
+      universidade: univ,
+      curso: curso,
+      data_prova: dataProva
+    })
+  ]);
 
   btnSalvar.disabled = false;
 
-  if (error) {
-    mostrarMensagem('Erro ao salvar. Tente novamente.', 'erro');
+  if (resProfile.status === 'rejected' || resProfile.value?.error) {
+    mostrarMensagem('Erro ao salvar nome de usuário. Tente novamente.', 'erro');
     return;
   }
 
-  mostrarMensagem('Salvo com sucesso! ✅', 'sucesso');
+  mostrarMensagem('Perfil e objetivo salvos com sucesso! ✅', 'sucesso');
 }
 
 function mostrarMensagem(texto, tipo) {
@@ -66,3 +95,4 @@ function mostrarMensagem(texto, tipo) {
 iniciarPerfil();
 iniciarBusca();
 iniciarNotificacoes();
+

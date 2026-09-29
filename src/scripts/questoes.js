@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
 import { verificarConquistas } from './conquistas.js';
 import { buscarFavoritos, alternarFavorito } from './favoritos-global.js';
+import { registrarResultado as registrarRevisaoEspacada } from '../utils/revisao.js';
 import {
   obterOrdemPlano,
   canAccessDifficulty,
@@ -850,6 +851,13 @@ async function selecionarResposta(el, questao) {
   `;
 
   document.getElementById('proxima-btn').style.display = 'inline-flex';
+
+  // Ciclo de aprendizado: agenda revisão espaçada com base no acerto ou erro
+  if (sessionUserId && questao?.id) {
+    registrarRevisaoEspacada(sessionUserId, questao.id, acertou ? 'acerto' : 'erro').catch(err => {
+      console.warn('[questões] Falha ao registrar revisão espaçada:', err);
+    });
+  }
 
   await registrarResposta(questao.materia_id, acertou);
 }

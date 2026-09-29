@@ -2,6 +2,7 @@ import { iniciarNotificacoes } from './notificacoes-global.js';
 import { iniciarBusca } from './busca-global.js';
 import { supabase } from '../lib/supabaseClient.js';
 import { exigirAutenticacao } from '../lib/authGuard.js';
+import { registrarResultado as registrarRevisaoEspacada } from '../utils/revisao.js';
 import {
   obterOrdemPlano,
   canAccessDifficulty,
@@ -416,9 +417,17 @@ async function finalizarSimulado() {
 
   let acertos = 0;
   questoesDoSimulado.forEach(q => {
-    if (respostasDadas[q.id] === q.resposta_correta) acertos++;
+    const acertou = respostasDadas[q.id] === q.resposta_correta;
+    if (acertou) acertos++;
+
+    // Ciclo de aprendizado: se errou no simulado, agenda para revisão espaçada
+    if (sessionUserId && q.id) {
+      registrarRevisaoEspacada(sessionUserId, q.id, acertou ? 'acerto' : 'erro').catch(err => {
+        console.warn('[simulados] Falha ao registrar revisão de questão do simulado:', err);
+      });
+    }
   });
-  const nota = Math.round((acertos / questoesDoSimulado.length) * 100);
+  const nota = questoesDoSimulado.length > 0 ? Math.round((acertos / questoesDoSimulado.length) * 100) : 0;
 
   await supabase.from('simulado_respostas').insert({
     user_id: sessionUserId,
@@ -447,7 +456,10 @@ async function finalizarSimulado() {
       <div class="resultado-nota">${nota}%</div>
       <p style="color:var(--text-secondary); margin-top:6px;">${acertos} de ${questoesDoSimulado.length} questões corretas</p>
       <p style="margin-top:12px; color:var(--color-success); font-weight:600;">${xpGanhoTexto}</p>
-      <a class="btn btn-primary" href="./simulados.html" style="margin-top:20px; display:inline-flex;">Voltar aos simulados</a>
+      <div style="display:flex; gap:12px; justify-content:center; margin-top:20px; flex-wrap:wrap;">
+        <a class="btn btn-primary" href="./simulados.html" style="display:inline-flex;">Voltar aos simulados</a>
+        <a class="btn btn-secondary" href="./mapa-dominio.html" style="display:inline-flex;">🧬 Ver Mapa de Domínio</a>
+      </div>
     </div>
   `;
 }
