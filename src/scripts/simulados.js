@@ -222,7 +222,7 @@ async function carregarSimulados() {
   try {
     const { data: simulados, error } = await supabase
       .from('simulados')
-      .select('id, titulo, descricao, tempo_limite_minutos, dificuldade, vestibulares(nome), simulado_questoes(id)')
+      .select('id, titulo, descricao, tempo_limite_minutos, dificuldade, vestibulares(nome)')
       .order('criado_em', { ascending: false });
 
     if (error) throw error;
