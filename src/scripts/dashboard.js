@@ -187,8 +187,8 @@ function atualizarVisualObjetivo(obj) {
       : 'Plano intensivo de estudos para o vestibular.';
   }
 
-  // Calcula contagem regressiva
-  const dataProva = obj.data_prova || '2026-11-01';
+  // Calcula contagem regressiva — usa somente a data salva no objetivo do aluno
+  const dataProva = obj.data_prova || null;
   const diasRestantes = calcularDiasRestantes(dataProva);
 
   if (elDiasVal) {
@@ -859,12 +859,10 @@ async function carregarContagemVestibulares(promessaObjetivo) {
       const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
       el.textContent = `${proximo.nome}: ${dias} dias`;
     } else {
-      const dias = calcularDiasRestantes('2026-11-01');
-      el.textContent = `FUVEST 2027: ${formatarContagem(dias)}`;
+      el.textContent = 'Nenhum vestibular próximo cadastrado';
     }
   } catch (_) {
-    const dias = calcularDiasRestantes('2026-11-01');
-    el.textContent = `FUVEST 2027: ${formatarContagem(dias)}`;
+    el.textContent = 'Nenhum vestibular próximo cadastrado';
   }
 }
 

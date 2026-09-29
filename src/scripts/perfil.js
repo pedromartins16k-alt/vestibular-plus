@@ -43,22 +43,19 @@ async function iniciarPerfil() {
     if (inputUniv && objetivo.universidade) inputUniv.value = objetivo.universidade;
     if (inputCurso && objetivo.curso) inputCurso.value = objetivo.curso;
     if (inputData && objetivo.data_prova) inputData.value = objetivo.data_prova;
-  } else {
-    if (inputData) inputData.value = '2026-11-01';
-    if (inputUniv) inputUniv.value = 'USP';
-    if (inputCurso) inputCurso.value = 'Engenharia de Computação';
   }
+  // Se não houver objetivo salvo, mantém os campos vazios
 
   btnSalvar.addEventListener('click', salvarPerfilCompleto);
 }
 
 async function salvarPerfilCompleto() {
   const valorApelido = inputEl.value.trim();
-  const vestId = selVestibular?.value || 'fuvest';
-  const vestNome = selVestibular?.options[selVestibular.selectedIndex]?.text || 'FUVEST 2027';
-  const univ = inputUniv?.value.trim() || 'USP';
+  const vestId = selVestibular?.value || '';
+  const vestNome = selVestibular?.options[selVestibular.selectedIndex]?.text || '';
+  const univ = inputUniv?.value.trim() || '';
   const curso = inputCurso?.value.trim() || '';
-  const dataProva = inputData?.value || '2026-11-01';
+  const dataProva = inputData?.value || null;
 
   btnSalvar.disabled = true;
   mostrarMensagem('Salvando alterações...', '');

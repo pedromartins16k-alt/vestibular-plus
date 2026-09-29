@@ -1,6 +1,6 @@
 {
   "meta": {
-    "versao": "1.0.0",
+    "versao": "1.1.0",
     "atualizado_em": "2026-09-29",
     "nota": "Dados baseados em comunicados oficiais das bancas. Campos nulos indicam informações ainda não divulgadas para a edição."
   },
@@ -35,9 +35,9 @@
         "nota": "A 2ª fase tem conteúdo diferenciado por carreira. Consulte o site oficial."
       },
       "inscricoes": {
-        "inicio": null,
-        "fim": null,
-        "nota": "Datas de inscrição a confirmar. Acompanhe o site oficial."
+        "inicio": "2026-08-17",
+        "fim": "2026-10-09",
+        "nota": "Período de inscrições: 17 de agosto a 9 de outubro de 2026."
       },
       "materias_primeira_fase": [
         "Língua Portuguesa e Literatura Brasileira",
@@ -60,7 +60,7 @@
         "nota": "Consultar lista oficial no site da FUVEST para o Vestibular 2027.",
         "fonte": "https://www.fuvest.br/"
       },
-      "fonte": "https://www.fuvest.br/",
+      "fonte": "https://www.fuvest.br/fuvest-2027-fuvest-divulga-cronograma-completo-do-vestibular-2027/",
       "fonte_atualizada_em": "2026-09-29"
     },
     {
@@ -74,24 +74,25 @@
       "cor": "#1565C0",
       "icone": "🔬",
       "descricao": "Vestibular da Universidade Estadual de Campinas. Conhecido pela abordagem interdisciplinar e questões dissertativas.",
-      "status": "aguardando",
+      "status": "confirmado",
       "primeira_fase": {
-        "data": null,
-        "data_formatada": "A confirmar",
-        "dia_semana": null,
+        "data": "2026-10-18",
+        "data_formatada": "18 de outubro de 2026",
+        "dia_semana": "domingo",
         "total_questoes": null,
         "duracao_horas": null
       },
       "segunda_fase": {
-        "datas": [],
+        "datas": ["2026-11-29", "2026-11-30"],
+        "datas_formatadas": ["29 de novembro de 2026", "30 de novembro de 2026"],
         "inclui_redacao": true
       },
       "inscricoes": {
-        "inicio": null,
-        "fim": null,
-        "nota": "Acompanhe o site oficial."
+        "inicio": "2026-08-03",
+        "fim": "2026-08-31",
+        "nota": "Inscrições de 3 a 31 de agosto de 2026."
       },
-      "fonte": "https://www.comvest.unicamp.br/",
+      "fonte": "https://www.unicamp.br/noticias/2026/03/30/unicamp-divulga-datas-do-vestibular-2027-inscricoes-serao-realizadas-de-3-a-31-de-agosto/",
       "fonte_atualizada_em": "2026-09-29"
     },
     {
@@ -105,22 +106,25 @@
       "cor": "#2E7D32",
       "icone": "🌿",
       "descricao": "Vestibular da Universidade Estadual Paulista Júlio de Mesquita Filho, com campi em diversas cidades do estado.",
-      "status": "aguardando",
+      "status": "confirmado",
       "primeira_fase": {
-        "data": null,
-        "data_formatada": "A confirmar",
+        "data": "2026-11-22",
+        "data_formatada": "22 de novembro de 2026",
+        "dia_semana": "domingo",
         "total_questoes": null,
         "duracao_horas": null
       },
       "segunda_fase": {
-        "datas": [],
+        "datas": ["2026-12-13", "2026-12-14"],
+        "datas_formatadas": ["13 de dezembro de 2026", "14 de dezembro de 2026"],
         "inclui_redacao": true
       },
       "inscricoes": {
-        "inicio": null,
-        "fim": null
+        "inicio": "2026-09-04",
+        "fim": "2026-10-20",
+        "nota": "Inscrições de 4 de setembro a 20 de outubro de 2026."
       },
-      "fonte": "https://www.vunesp.com.br/",
+      "fonte": "https://vestibular.unesp.br/",
       "fonte_atualizada_em": "2026-09-29"
     },
     {
@@ -133,8 +137,9 @@
       "website_oficial": "https://www.unifesp.br/",
       "cor": "#6A1B9A",
       "icone": "💊",
-      "descricao": "Universidade Federal de São Paulo. Destaque para cursos da área de saúde.",
+      "descricao": "Universidade Federal de São Paulo. Destaque para cursos da área de saúde. Utiliza sistema misto com ENEM na primeira fase.",
       "status": "aguardando",
+      "nota_importante": "A UNIFESP utiliza sistema misto: ENEM como 1ª fase e provas específicas como 2ª fase. Acompanhe o edital oficial para as datas da 2ª fase.",
       "primeira_fase": {
         "data": null,
         "data_formatada": "A confirmar",
@@ -147,7 +152,8 @@
       },
       "inscricoes": {
         "inicio": null,
-        "fim": null
+        "fim": null,
+        "nota": "Acompanhe o edital oficial em unifesp.br e comissaovest.unifesp.br."
       },
       "fonte": "https://www.unifesp.br/",
       "fonte_atualizada_em": "2026-09-29"
@@ -165,22 +171,26 @@
       "descricao": "Exame Nacional do Ensino Médio. Usado para ingresso no SISU, ProUni e FIES. Aceito por diversas universidades públicas e privadas.",
       "status": "confirmado",
       "primeira_fase": {
-        "data": "2026-11-01",
-        "data_formatada": "01 de novembro de 2026",
+        "data": "2026-11-08",
+        "data_formatada": "08 de novembro de 2026",
+        "dia_semana": "domingo",
         "total_questoes": 180,
         "duracao_horas": 5.5,
-        "nota": "180 questões de múltipla escolha + redação em dois dias"
+        "nota": "1º dia (08/11): Linguagens, Ciências Humanas e Redação. 2º dia (15/11): Ciências da Natureza e Matemática."
       },
       "segunda_fase": {
-        "datas": [],
-        "inclui_redacao": true
+        "datas": ["2026-11-15"],
+        "datas_formatadas": ["15 de novembro de 2026"],
+        "dias_semana": ["domingo"],
+        "inclui_redacao": false,
+        "nota": "2º dia de aplicação: Ciências da Natureza e Matemática."
       },
       "inscricoes": {
-        "inicio": null,
-        "fim": null,
-        "nota": "Acompanhe o site oficial do INEP."
+        "inicio": "2026-05-25",
+        "fim": "2026-06-12",
+        "nota": "Inscrições encerradas em 12 de junho de 2026."
       },
-      "fonte": "https://enem.inep.gov.br/",
+      "fonte": "https://www.gov.br/inep/pt-br/acesso-a-informacao/perguntas-frequentes/exame-nacional-do-ensino-medio-enem",
       "fonte_atualizada_em": "2026-09-29"
     },
     {
@@ -190,26 +200,35 @@
       "instituicao": "ITA / DCTA",
       "sigla": "ITA",
       "edicao": "2027",
-      "website_oficial": "http://www.vestibular.ita.br/",
+      "website_oficial": "https://www.vestibular.ita.br/",
       "cor": "#002244",
       "icone": "✈️",
       "descricao": "Vestibular do Instituto Tecnológico de Aeronáutica. Um dos processos seletivos mais exigentes do país nas áreas de Engenharia e Ciências Exatas.",
-      "status": "aguardando",
+      "status": "confirmado",
       "primeira_fase": {
-        "data": null,
-        "data_formatada": "A confirmar",
+        "data": "2026-09-27",
+        "data_formatada": "27 de setembro de 2026",
+        "dia_semana": "domingo",
         "total_questoes": 48,
-        "duracao_horas": 4
+        "duracao_horas": 4,
+        "horario": "13h"
       },
       "segunda_fase": {
-        "datas": [],
+        "datas": ["2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23"],
+        "datas_formatadas": [
+          "20 de outubro de 2026",
+          "21 de outubro de 2026",
+          "22 de outubro de 2026",
+          "23 de outubro de 2026"
+        ],
         "inclui_redacao": true
       },
       "inscricoes": {
         "inicio": null,
-        "fim": null
+        "fim": null,
+        "nota": "Acompanhe o site oficial para informações de inscrição."
       },
-      "fonte": "http://www.vestibular.ita.br/",
+      "fonte": "https://www.vestibular.ita.br/",
       "fonte_atualizada_em": "2026-09-29"
     },
     {
@@ -218,27 +237,31 @@
       "nome_completo": "Instituto Militar de Engenharia",
       "instituicao": "IME / Exército Brasileiro",
       "sigla": "IME",
-      "edicao": "2027",
-      "website_oficial": "https://www.ime.eb.mil.br/",
+      "edicao": "2026/2027",
+      "website_oficial": "https://vestibular.ime.eb.br/cfg/",
       "cor": "#1b4d3e",
       "icone": "⚔️",
-      "descricao": "Concurso de Admissão aos Cursos de Formação e Graduação de Oficiais do Exército Brasileiro no Instituto Militar de Engenharia.",
-      "status": "aguardando",
+      "descricao": "Concurso de Admissão aos Cursos de Formação e Graduação (CFG) 2026/2027 de Oficiais do Exército Brasileiro no Instituto Militar de Engenharia.",
+      "status": "confirmado",
       "primeira_fase": {
-        "data": null,
-        "data_formatada": "A confirmar",
+        "data": "2026-09-20",
+        "data_formatada": "20 de setembro de 2026",
+        "dia_semana": "sábado",
         "total_questoes": 40,
-        "duracao_horas": 4
+        "duracao_horas": 4,
+        "nota": "40 questões objetivas: Matemática (15), Física (15) e Química (10)."
       },
       "segunda_fase": {
         "datas": [],
-        "inclui_redacao": true
+        "inclui_redacao": true,
+        "nota": "A 2ª fase (provas discursivas) ocorre em outubro/novembro. Consulte o edital oficial."
       },
       "inscricoes": {
-        "inicio": null,
-        "fim": null
+        "inicio": "2026-05-27",
+        "fim": "2026-07-08",
+        "nota": "Inscrições encerradas em 8 de julho de 2026."
       },
-      "fonte": "https://www.ime.eb.mil.br/",
+      "fonte": "https://vestibular.ime.eb.br/cfg/",
       "fonte_atualizada_em": "2026-09-29"
     }
   ]
