@@ -324,11 +324,10 @@ function criarModalObjetivo() {
   });
   observer.observe(div, { attributes: true, attributeFilter: ['class'] });
 
-  // Listener do select de vestibular para preencher data oficial
-  div.querySelector('#sel-vestibular')?.addEventListener('change', async (e) => {
+  // Listener do select de vestibular para preencher universidade e data oficial
+  div.querySelector('#sel-vestibular')?.addEventListener('change', (e) => {
     const id = e.target.value;
-    const vestibulares = await carregarVestibulares();
-    const vest = vestibulares.find(v => v.id === id);
+    const vest = obterVestibulares().find(v => v.id === id);
     const grupoData = div.querySelector('#grupo-data-prova');
     const msgData = div.querySelector('#msg-data-oficial');
     const inpData = div.querySelector('#inp-data-prova');
@@ -336,19 +335,29 @@ function criarModalObjetivo() {
 
     if (vest) {
       grupoData.style.display = 'block';
+
+      // Preenche ou limpa a data da 1ª fase
       if (vest.primeira_fase?.data) {
         inpData.value = vest.primeira_fase.data;
         msgData.style.display = 'block';
-        msgData.textContent = `📌 Data oficial: ${vest.primeira_fase.data_formatada}`;
+        msgData.textContent = `📌 Data oficial: ${vest.primeira_fase.data_formatada || vest.primeira_fase.data}`;
       } else {
         inpData.value = '';
-        msgData.style.display = 'none';
+        msgData.style.display = 'block';
+        msgData.textContent = 'ℹ️ Data oficial ainda não divulgada pela banca. Preencha manualmente se desejar.';
       }
-      if (vest.instituicao && !inpUniv.value) {
+
+      // Preenche universidade se disponível no vestibular
+      if (vest.instituicao) {
         inpUniv.value = vest.instituicao.split('—')[0].trim();
       }
     } else {
+      // Limpar seleção: volta para o estado inicial
       grupoData.style.display = 'none';
+      inpData.value = '';
+      msgData.style.display = 'none';
+      msgData.textContent = '';
+      inpUniv.value = '';
     }
   });
 
@@ -381,6 +390,21 @@ function preencherFormulario(modal, objetivo) {
   if (sel && objetivo.vestibular_id) {
     sel.value = objetivo.vestibular_id;
     grupoData.style.display = 'block';
+
+    const vest = obterVestibulares().find(v => v.id === objetivo.vestibular_id);
+    const msgData = modal.querySelector('#msg-data-oficial');
+    if (msgData) {
+      if (vest?.primeira_fase?.data) {
+        msgData.style.display = 'block';
+        msgData.textContent = `📌 Data oficial: ${vest.primeira_fase.data_formatada || vest.primeira_fase.data}`;
+      } else if (objetivo.data_prova) {
+        msgData.style.display = 'block';
+        msgData.textContent = 'ℹ️ Data personalizada pelo estudante.';
+      } else {
+        msgData.style.display = 'block';
+        msgData.textContent = 'ℹ️ Data oficial ainda não divulgada pela banca. Preencha manualmente se desejar.';
+      }
+    }
   }
   if (inpUniv && objetivo.universidade) inpUniv.value = objetivo.universidade;
   if (inpCurso && objetivo.curso) inpCurso.value = objetivo.curso;

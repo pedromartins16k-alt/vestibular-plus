@@ -163,10 +163,10 @@
       "cor": "#1A237E",
       "icone": "🇧🇷",
       "descricao": "Exame Nacional do Ensino Médio. Usado para ingresso no SISU, ProUni e FIES. Aceito por diversas universidades públicas e privadas.",
-      "status": "aguardando",
+      "status": "confirmado",
       "primeira_fase": {
-        "data": null,
-        "data_formatada": "A confirmar",
+        "data": "2026-11-01",
+        "data_formatada": "01 de novembro de 2026",
         "total_questoes": 180,
         "duracao_horas": 5.5,
         "nota": "180 questões de múltipla escolha + redação em dois dias"
