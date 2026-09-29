@@ -282,7 +282,7 @@ function renderizarPrioridades(dados) {
       titulo: `${pendentes.length} ${pendentes.length === 1 ? 'questão pendente' : 'questões pendentes'} para revisão`,
       motivo: 'O algoritmo SM-2 identificou que você está no momento ideal de repetição para não esquecer os conceitos.',
       cta: 'Revisar agora →',
-      url: './questoes.html'
+      url: './questoes.html?modo=revisao'
     });
   }
 
@@ -385,10 +385,9 @@ function renderizarGridDisciplinas(dados) {
       const aPct = a.percentual;
       const temAssPct = aPct !== null;
       const aEscala = temAssPct ? classificarDominio(aPct) : { cor: 'var(--border-color)', emoji: '⚪' };
-
       return `
-        <div class="assunto-item">
-          <span class="assunto-nome" title="${a.nome}">${a.nome}</span>
+        <a href="./questoes.html?materia=${encodeURIComponent(d.id)}&busca=${encodeURIComponent(a.nome)}" class="assunto-item" style="text-decoration:none; color:inherit; cursor:pointer;" title="Praticar questões de ${a.nome}">
+          <span class="assunto-nome">${a.nome}</span>
           <div class="assunto-prog-wrap">
             ${temAssPct ? `
               <div class="assunto-track">
@@ -399,7 +398,7 @@ function renderizarGridDisciplinas(dados) {
               <span style="font-size:0.75rem; color:var(--text-secondary);">Sem dados</span>
             `}
           </div>
-        </div>
+        </a>
       `;
     }).join('');
 
