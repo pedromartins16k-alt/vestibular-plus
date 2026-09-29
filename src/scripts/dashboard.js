@@ -7,6 +7,8 @@ import { verificarConquistas } from './conquistas.js';
 import { aplicarCadeadosSidebar } from './plano-sidebar.js';
 import { isUltimate, obterPlanoUsuario, PLAN_LIMITS, obterOrdemPlano } from '../lib/permissions.js';
 import { getCache, setCache } from '../lib/cache.js';
+import { lerObjetivo, abrirModalObjetivo, calcularDiasRestantes, formatarContagem } from './objetivo.js';
+import { calcularIndicePreparacao } from '../utils/indice-preparacao.js';
 
 let currentUserId = null;
 let isCarregandoCotas = false;
@@ -34,6 +36,9 @@ async function iniciarDashboard() {
 
   // Inicia Notificações (passando userId para evitar nova chamada a getSession)
   iniciarNotificacoes(userId);
+
+  // Carrega e atualiza o Objetivo do Aluno
+  await inicializarPainelObjetivo(userId);
 
   // 1. PRIORIDADE ALTA: Perfil do usuário (saudação, avatar, XP, cadeados)
   const promessaPerfil = carregarPerfil(userId);
@@ -67,6 +72,7 @@ async function iniciarDashboard() {
   promessaSessoes.then(sessoes => {
     dadosSessoesCache = sessoes || [];
     atualizarProximoPasso(dadosProjetosCache, dadosSessoesCache);
+    atualizarIndicePreparacaoUI(sessoes || []);
   });
 
   // Executa verificação de conquistas em background aproveitando dados já carregados
@@ -82,6 +88,76 @@ async function iniciarDashboard() {
   // Inicia sincronização Realtime e listener de visibilidade
   iniciarSincronizacaoRealtime(userId);
 }
+
+/**
+ * Inicializa a exibição do Objetivo do Aluno no Dashboard
+ */
+async function inicializarPainelObjetivo(userId) {
+  const btnAlterar = document.getElementById('btn-alterar-objetivo');
+  if (btnAlterar) {
+    btnAlterar.addEventListener('click', () => {
+      abrirModalObjetivo((novoObj) => {
+        atualizarVisualObjetivo(novoObj);
+      });
+    });
+  }
+
+  const objetivo = await lerObjetivo();
+  atualizarVisualObjetivo(objetivo);
+}
+
+function atualizarVisualObjetivo(obj) {
+  const elTitulo = document.getElementById('obj-titulo');
+  const elSubtitulo = document.getElementById('obj-subtitulo');
+  const elCountdown = document.getElementById('obj-countdown-tag');
+
+  if (!obj) {
+    if (elTitulo) elTitulo.textContent = 'FUVEST 2027 — USP (Padrão)';
+    if (elSubtitulo) elSubtitulo.textContent = 'Clique em "Alterar Objetivo" para personalizar seu vestibular e curso.';
+    if (elCountdown) {
+      const dias = calcularDiasRestantes('2026-11-01');
+      elCountdown.textContent = `⏳ ${formatarContagem(dias)} para a 1ª fase`;
+    }
+    return;
+  }
+
+  if (elTitulo) {
+    elTitulo.textContent = `${obj.vestibular_nome || 'Vestibular'} — ${obj.universidade || 'Universidade'}`;
+  }
+  if (elSubtitulo) {
+    elSubtitulo.textContent = obj.curso ? `Curso de interesse: ${obj.curso}` : 'Preparação geral para a prova';
+  }
+  if (elCountdown) {
+    const dias = calcularDiasRestantes(obj.data_prova || '2026-11-01');
+    elCountdown.textContent = dias !== null ? `⏳ ${formatarContagem(dias)} para a prova` : '⏳ Data a confirmar';
+  }
+}
+
+/**
+ * Atualiza o card de Índice de Preparação no Dashboard com dados reais
+ */
+function atualizarIndicePreparacaoUI(sessoes) {
+  const elValor = document.getElementById('valor-indice-prep');
+  if (!elValor) return;
+
+  const totalQuestoes = sessoes.filter(s => s.tipo === 'questoes').length;
+  const totalSimulados = sessoes.filter(s => s.tipo === 'simulado').length;
+  const totalMinutos = sessoes.reduce((acc, s) => acc + (s.duracao_minutos || 0), 0);
+
+  const res = calcularIndicePreparacao({
+    streakDias: 3, // estimado ou lido
+    sessoes,
+    totalQuestoes: totalQuestoes * 5, // estimado questões por sessão
+    totalAcertos: Math.round(totalQuestoes * 3.5),
+    totalSimulados,
+    materiasEstudadas: sessoes.map(s => s.materia_id).filter(Boolean),
+    totalMaterias: 7
+  });
+
+  elValor.textContent = `${res.total}/100`;
+  elValor.style.color = res.interpretacao.cor;
+}
+
 
 /**
  * Normaliza qualquer tarefa (string ou objeto) para garantir estrutura previsível

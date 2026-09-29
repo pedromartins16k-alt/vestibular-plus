@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mapa de Domínio · Vestibular+</title>
+<meta name="description" content="Visualize seu domínio por matéria e assunto. Identifique onde focar seus estudos." />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles/base.css" />
+<link rel="stylesheet" href="../styles/tokens.css" />
+<style>
+  .mapa-wrap { padding: 32px 5%; max-width: 1100px; margin: 0 auto; }
+
+  .mapa-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px; flex-wrap: wrap; gap: 12px;
+  }
+  .mapa-header-left { display: flex; align-items: center; gap: 14px; }
+  .mapa-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.85rem; color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    background: var(--bg-elevated);
+    padding: 8px 14px; border-radius: var(--radius-sm);
+    text-decoration: none; transition: all var(--transition-fast);
+  }
+  .mapa-back:hover { color: var(--color-primary-500); border-color: var(--color-primary-500); }
+
+  .mapa-titulo h1 { font-size: 1.6rem; font-weight: 800; margin: 0; }
+  .mapa-titulo p { font-size: 0.86rem; color: var(--text-secondary); margin: 4px 0 0; }
+
+  /* Legenda de cores */
+  .mapa-legenda {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 12px 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin-bottom: 24px;
+  }
+  .legenda-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+  }
+  .legenda-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+
+  /* Grid de matérias */
+  .materias-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+  }
+
+  .materia-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 20px 22px;
+    box-shadow: var(--shadow-soft);
+    transition: all var(--transition-base);
+  }
+  .materia-card:hover {
+    border-color: rgba(124,58,237,0.3);
+    box-shadow: 0 8px 24px rgba(124,58,237,0.1);
+  }
+
+  .materia-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .materia-nome-wrap { display: flex; align-items: center; gap: 10px; }
+  .materia-icone {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(124,58,237,0.12);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+  }
+  .materia-nome { font-weight: 800; font-size: 1rem; }
+  .materia-pct-geral {
+    font-size: 1.3rem; font-weight: 800;
+    font-family: var(--font-display);
+  }
+
+  /* Barra de progresso geral */
+  .materia-prog-geral {
+    margin-bottom: 16px;
+  }
+  .materia-prog-track {
+    height: 6px; border-radius: var(--radius-full);
+    background: var(--border-color); overflow: hidden;
+    margin-top: 6px;
+  }
+  .materia-prog-fill {
+    height: 100%; border-radius: var(--radius-full);
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* Assuntos */
+  .assuntos-lista { display: flex; flex-direction: column; gap: 8px; }
+  .assunto-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(124,58,237,0.02);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+    cursor: default;
+  }
+  .assunto-item:hover { background: rgba(124,58,237,0.06); }
+  .assunto-status { font-size: 0.85rem; flex-shrink: 0; }
+  .assunto-nome {
+    flex: 1; font-size: 0.87rem; font-weight: 600;
+    color: var(--text-primary);
+  }
+  .assunto-prog-wrap {
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .assunto-track {
+    width: 80px; height: 5px; border-radius: var(--radius-full);
+    background: var(--border-color); overflow: hidden;
+  }
+  .assunto-fill {
+    height: 100%; border-radius: var(--radius-full);
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+  .assunto-pct {
+    font-size: 0.78rem; font-weight: 700;
+    min-width: 36px; text-align: right;
+  }
+
+  /* Estado vazio */
+  .mapa-empty {
+    text-align: center; padding: 60px 20px;
+    color: var(--text-secondary);
+  }
+  .mapa-empty-icon { font-size: 3rem; margin-bottom: 16px; display: block; }
+  .mapa-empty h3 { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+  .mapa-empty p { font-size: 0.88rem; line-height: 1.5; max-width: 360px; margin: 0 auto 20px; }
+
+  @media (max-width: 600px) {
+    .materias-grid { grid-template-columns: 1fr; }
+    .mapa-header { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="mapa-wrap">
+  <!-- Header -->
+  <div class="mapa-header">
+    <div class="mapa-header-left">
+      <a class="mapa-back" href="./dashboard.html">← Dashboard</a>
+      <div class="mapa-titulo">
+        <h1>🧬 Mapa de Domínio</h1>
+        <p>Seu conhecimento por matéria e assunto</p>
+      </div>
+    </div>
+    <a href="./diagnostico.html" class="btn btn-primary" style="font-size: 0.86rem; padding: 10px 18px; border-radius: var(--radius-full);">
+      + Novo Diagnóstico
+    </a>
+  </div>
+
+  <!-- Legenda -->
+  <div class="mapa-legenda">
+    <span style="font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em;">Domínio:</span>
+    <div class="legenda-item">
+      <div class="legenda-dot" style="background:#22c55e;box-shadow:0 0 6px #22c55e;"></div>
+      Alto (≥75%)
+    </div>
+    <div class="legenda-item">
+      <div class="legenda-dot" style="background:#84cc16;"></div>
+      Bom (≥50%)
+    </div>
+    <div class="legenda-item">
+      <div class="legenda-dot" style="background:#f59e0b;"></div>
+      Atenção (≥30%)
+    </div>
+    <div class="legenda-item">
+      <div class="legenda-dot" style="background:#ef4444;box-shadow:0 0 6px #ef4444;"></div>
+      Prioridade (&lt;30%)
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="mapa-loading" style="text-align:center;padding:60px 20px;display:none;">
+    <div style="width:40px;height:40px;border:3px solid var(--border-color);border-top-color:var(--color-primary-500);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;"></div>
+    <p style="color:var(--text-secondary);">Carregando seu mapa...</p>
+  </div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+  <!-- Estado vazio -->
+  <div id="mapa-empty" class="glass card" style="display:none;">
+    <div class="mapa-empty">
+      <span class="mapa-empty-icon">🗺️</span>
+      <h3>Mapa ainda vazio</h3>
+      <p>Faça o diagnóstico inicial ou responda questões para preencher seu mapa de domínio.</p>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <a href="./diagnostico.html" class="btn btn-primary">🧠 Fazer Diagnóstico</a>
+        <a href="./questoes.html" class="btn btn-secondary">📝 Praticar Questões</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grid de matérias -->
+  <div class="materias-grid" id="materias-grid">
+    <!-- Preenchido via JS -->
+  </div>
+</div>
+
+<script type="module" src="../scripts/mapa-dominio.js"></script>
+<script type="module" src="../scripts/theme.js"></script>
+</body>
+</html>

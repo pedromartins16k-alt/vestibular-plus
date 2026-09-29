@@ -32,6 +32,10 @@ export default defineConfig({
         estatisticas: resolve(__dirname, 'src/pages/estatisticas.html'),
         chat: resolve(__dirname, 'src/pages/chat.html'),
         precos: resolve(__dirname, 'src/pages/precos.html'),
+        // Novas páginas — Fase 1-4
+        diagnostico: resolve(__dirname, 'src/pages/diagnostico.html'),
+        mapaDominio: resolve(__dirname, 'src/pages/mapa-dominio.html'),
+        leituras: resolve(__dirname, 'src/pages/leituras.html'),
       }
     }
   },

@@ -1,0 +1,187 @@
+{
+  "meta": {
+    "versao": "1.0.0",
+    "atualizado_em": "2026-09-29",
+    "nota": "Dados baseados em comunicados oficiais das bancas. Campos nulos indicam informações ainda não divulgadas para a edição."
+  },
+  "vestibulares": [
+    {
+      "id": "fuvest",
+      "nome": "FUVEST",
+      "nome_completo": "Fundação Universitária para o Vestibular",
+      "instituicao": "USP — Universidade de São Paulo",
+      "sigla": "FUVEST",
+      "edicao": "2027",
+      "website_oficial": "https://www.fuvest.br/",
+      "cor": "#003087",
+      "icone": "🎓",
+      "descricao": "Vestibular da Universidade de São Paulo. Uma das provas mais concorridas do Brasil, com cursos de alta demanda como Medicina, Direito e Engenharia.",
+      "status": "confirmado",
+      "nota_importante": "A FUVEST comunicou oficialmente a redução de 90 para 80 questões na 1ª fase a partir do Vestibular 2027.",
+      "primeira_fase": {
+        "data": "2026-11-01",
+        "data_formatada": "01 de novembro de 2026",
+        "dia_semana": "domingo",
+        "total_questoes": 80,
+        "duracao_horas": 5,
+        "horario": "13h",
+        "local": "Cidades determinadas pela FUVEST"
+      },
+      "segunda_fase": {
+        "datas": ["2026-12-06", "2026-12-07"],
+        "datas_formatadas": ["06 de dezembro de 2026", "07 de dezembro de 2026"],
+        "dias_semana": ["domingo", "segunda-feira"],
+        "inclui_redacao": true,
+        "nota": "A 2ª fase tem conteúdo diferenciado por carreira. Consulte o site oficial."
+      },
+      "inscricoes": {
+        "inicio": null,
+        "fim": null,
+        "nota": "Datas de inscrição a confirmar. Acompanhe o site oficial."
+      },
+      "materias_primeira_fase": [
+        "Língua Portuguesa e Literatura Brasileira",
+        "Língua Inglesa",
+        "Matemática",
+        "Física",
+        "Química",
+        "Biologia",
+        "História",
+        "Geografia",
+        "Filosofia",
+        "Sociologia"
+      ],
+      "distribuicao_questoes": {
+        "nota": "Distribuição exata das 80 questões por área a confirmar no edital oficial.",
+        "fonte": "https://www.fuvest.br/"
+      },
+      "leituras_obrigatorias": {
+        "lista_publicada": true,
+        "nota": "Consultar lista oficial no site da FUVEST para o Vestibular 2027.",
+        "fonte": "https://www.fuvest.br/"
+      },
+      "fonte": "https://www.fuvest.br/",
+      "fonte_atualizada_em": "2026-09-29"
+    },
+    {
+      "id": "unicamp",
+      "nome": "COMVEST / UNICAMP",
+      "nome_completo": "Comissão Permanente para os Vestibulares — UNICAMP",
+      "instituicao": "UNICAMP — Universidade Estadual de Campinas",
+      "sigla": "UNICAMP",
+      "edicao": "2027",
+      "website_oficial": "https://www.comvest.unicamp.br/",
+      "cor": "#1565C0",
+      "icone": "🔬",
+      "descricao": "Vestibular da Universidade Estadual de Campinas. Conhecido pela abordagem interdisciplinar e questões dissertativas.",
+      "status": "aguardando",
+      "primeira_fase": {
+        "data": null,
+        "data_formatada": "A confirmar",
+        "dia_semana": null,
+        "total_questoes": null,
+        "duracao_horas": null
+      },
+      "segunda_fase": {
+        "datas": [],
+        "inclui_redacao": true
+      },
+      "inscricoes": {
+        "inicio": null,
+        "fim": null,
+        "nota": "Acompanhe o site oficial."
+      },
+      "fonte": "https://www.comvest.unicamp.br/",
+      "fonte_atualizada_em": "2026-09-29"
+    },
+    {
+      "id": "vunesp_unesp",
+      "nome": "VUNESP / UNESP",
+      "nome_completo": "Fundação para o Vestibular da Universidade Estadual Paulista",
+      "instituicao": "UNESP — Universidade Estadual Paulista",
+      "sigla": "UNESP",
+      "edicao": "2027",
+      "website_oficial": "https://www.vunesp.com.br/",
+      "cor": "#2E7D32",
+      "icone": "🌿",
+      "descricao": "Vestibular da Universidade Estadual Paulista Júlio de Mesquita Filho, com campi em diversas cidades do estado.",
+      "status": "aguardando",
+      "primeira_fase": {
+        "data": null,
+        "data_formatada": "A confirmar",
+        "total_questoes": null,
+        "duracao_horas": null
+      },
+      "segunda_fase": {
+        "datas": [],
+        "inclui_redacao": true
+      },
+      "inscricoes": {
+        "inicio": null,
+        "fim": null
+      },
+      "fonte": "https://www.vunesp.com.br/",
+      "fonte_atualizada_em": "2026-09-29"
+    },
+    {
+      "id": "unifesp",
+      "nome": "UNIFESP",
+      "nome_completo": "Universidade Federal de São Paulo",
+      "instituicao": "UNIFESP",
+      "sigla": "UNIFESP",
+      "edicao": "2027",
+      "website_oficial": "https://www.unifesp.br/",
+      "cor": "#6A1B9A",
+      "icone": "💊",
+      "descricao": "Universidade Federal de São Paulo. Destaque para cursos da área de saúde.",
+      "status": "aguardando",
+      "primeira_fase": {
+        "data": null,
+        "data_formatada": "A confirmar",
+        "total_questoes": null,
+        "duracao_horas": null
+      },
+      "segunda_fase": {
+        "datas": [],
+        "inclui_redacao": true
+      },
+      "inscricoes": {
+        "inicio": null,
+        "fim": null
+      },
+      "fonte": "https://www.unifesp.br/",
+      "fonte_atualizada_em": "2026-09-29"
+    },
+    {
+      "id": "enem",
+      "nome": "ENEM",
+      "nome_completo": "Exame Nacional do Ensino Médio",
+      "instituicao": "INEP / MEC",
+      "sigla": "ENEM",
+      "edicao": "2026",
+      "website_oficial": "https://enem.inep.gov.br/",
+      "cor": "#1A237E",
+      "icone": "🇧🇷",
+      "descricao": "Exame Nacional do Ensino Médio. Usado para ingresso no SISU, ProUni e FIES. Aceito por diversas universidades públicas e privadas.",
+      "status": "aguardando",
+      "primeira_fase": {
+        "data": null,
+        "data_formatada": "A confirmar",
+        "total_questoes": 180,
+        "duracao_horas": 5.5,
+        "nota": "180 questões de múltipla escolha + redação em dois dias"
+      },
+      "segunda_fase": {
+        "datas": [],
+        "inclui_redacao": true
+      },
+      "inscricoes": {
+        "inicio": null,
+        "fim": null,
+        "nota": "Acompanhe o site oficial do INEP."
+      },
+      "fonte": "https://enem.inep.gov.br/",
+      "fonte_atualizada_em": "2026-09-29"
+    }
+  ]
+}

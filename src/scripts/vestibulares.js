@@ -234,18 +234,54 @@ function renderBloqueioPlano(nomePlano) {
 /* ===== Vestibulares ===== */
 
 async function carregarVestibulares() {
-  const { data, error } = await supabase
-    .from('vestibulares')
-    .select('id, nome, instituicao, cidade, estado, tipo_prova, inscricao_inicio, inscricao_fim, data_prova, descricao, link_oficial, link_edital, aceita_treineiro')
-    .order('data_prova', { ascending: true, nullsFirst: false });
+  let dataFinal = [];
 
-  if (error || !data || !data.length) {
+  try {
+    const { data, error } = await supabase
+      .from('vestibulares')
+      .select('id, nome, instituicao, cidade, estado, tipo_prova, inscricao_inicio, inscricao_fim, data_prova, descricao, link_oficial, link_edital, aceita_treineiro')
+      .order('data_prova', { ascending: true, nullsFirst: false });
+
+    if (!error && data && data.length) {
+      dataFinal = data;
+    }
+  } catch (_) {}
+
+  // Se o banco não tiver todos os vestibulares ou estiver vazio, enriquece com dados oficiais do JSON
+  try {
+    const resp = await fetch('../data/vestibulares.json');
+    const json = await resp.json();
+    const dadosOficiais = json.vestibulares || [];
+
+    // Mapeia para o formato esperado pelo renderer se não houver dados no banco
+    if (!dataFinal.length) {
+      dataFinal = dadosOficiais.map(v => ({
+        id: v.id,
+        nome: `${v.nome} ${v.edicao}`,
+        instituicao: v.instituicao,
+        cidade: 'São Paulo',
+        estado: 'SP',
+        tipo_prova: v.primeira_fase?.total_questoes ? `${v.primeira_fase.total_questoes} questões (${v.primeira_fase.duracao_horas}h)` : 'A confirmar',
+        inscricao_inicio: v.inscricoes?.inicio,
+        inscricao_fim: v.inscricoes?.fim,
+        data_prova: v.primeira_fase?.data,
+        descricao: v.nota_importante ? `${v.descricao} ⚠️ ${v.nota_importante}` : v.descricao,
+        link_oficial: v.website_oficial,
+        link_edital: v.fonte,
+        aceita_treineiro: true
+      }));
+    }
+  } catch (err) {
+    console.warn('[vestibulares] Erro ao carregar vestibulares.json:', err);
+  }
+
+  if (!dataFinal.length) {
     vestibularesListaEl.innerHTML = `<p class="empty-state">Nenhum vestibular cadastrado ainda.</p>`;
     return;
   }
 
-  vestibularesCache = data;
-  vestibularesListaEl.innerHTML = data.map(v => renderVestibularCard(v)).join('');
+  vestibularesCache = dataFinal;
+  vestibularesListaEl.innerHTML = dataFinal.map(v => renderVestibularCard(v)).join('');
 }
 
 function renderVestibularCard(v) {
