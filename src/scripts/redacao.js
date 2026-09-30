@@ -73,16 +73,43 @@ function salvarNoHistoricoLocal(userId, redacaoObj) {
   } catch (_) {}
 }
 
+function normalizarRedacaoBanco(row) {
+  const bancaId = row.vestibular_id?.toLowerCase();
+  const matriz = criteriosBancas[bancaId] || criteriosBancas.enem;
+  const tempoSegundos = Number(row.tempo_segundos) || 0;
+  const horas = Math.floor(tempoSegundos / 3600).toString().padStart(2, '0');
+  const minutos = Math.floor((tempoSegundos % 3600) / 60).toString().padStart(2, '0');
+  const segs = (tempoSegundos % 60).toString().padStart(2, '0');
+
+  return {
+    id: row.id,
+    proposta_id: row.proposta_id,
+    proposta_titulo: row.titulo,
+    vestibular_id: row.vestibular_id,
+    vestibular_nome: row.vestibular_id ? row.vestibular_id.toUpperCase() : 'Vestibular',
+    tipo_genero: 'Dissertativo-argumentativo',
+    texto: row.conteudo,
+    palavras: row.total_palavras,
+    caracteres: row.total_caracteres,
+    linhas: row.total_linhas,
+    tempo_segundos: tempoSegundos,
+    tempo_formatado: `${horas}:${minutos}:${segs}`,
+    data_envio: row.finalizada_em || row.created_at,
+    status: row.status || 'aguardando_correcao',
+    matriz_criterios: matriz
+  };
+}
+
 async function carregarHistoricoSupabase() {
   if (!sessionUserId) return;
   try {
     const { data, error } = await supabase
       .from('redacoes')
       .select('*')
-      .order('criado_em', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('[redacao] Não foi possível buscar redações no Supabase (verifique permissões/GRANT):', error.message);
+      console.warn('[redacao] Não foi possível buscar redações no Supabase:', error.message);
       return;
     }
 
@@ -92,24 +119,7 @@ async function carregarHistoricoSupabase() {
 
       data.forEach(row => {
         if (!idsLocais.has(row.id)) {
-          const bancaId = row.banca?.toLowerCase();
-          const matriz = criteriosBancas[bancaId] || criteriosBancas.enem;
-          historicoAtual.push({
-            id: row.id,
-            proposta_id: row.proposta_id,
-            proposta_titulo: row.titulo_proposta,
-            vestibular_id: row.banca,
-            vestibular_nome: row.banca ? row.banca.toUpperCase() : 'Vestibular',
-            tipo_genero: 'Dissertativo-argumentativo',
-            texto: row.texto,
-            palavras: row.palavras,
-            caracteres: row.caracteres,
-            tempo_segundos: row.tempo_segundos,
-            tempo_formatado: `${Math.floor(row.tempo_segundos / 3600).toString().padStart(2, '0')}:${Math.floor((row.tempo_segundos % 3600) / 60).toString().padStart(2, '0')}:${(row.tempo_segundos % 60).toString().padStart(2, '0')}`,
-            data_envio: row.criado_em,
-            status: row.status || 'aguardando_correcao',
-            matriz_criterios: matriz
-          });
+          historicoAtual.push(normalizarRedacaoBanco(row));
         }
       });
 
@@ -409,68 +419,98 @@ async function finalizarRedacao() {
     btnFinalizar.textContent = 'Finalizando... ⏳';
   }
 
+  // Verifica autenticação se for salvar no Supabase
+  const { data: { session } } = await supabase.auth.getSession();
+  const currentUserId = session?.user?.id || sessionUserId;
+
+  if (!currentUserId) {
+    if (btnFinalizar) {
+      btnFinalizar.disabled = false;
+      btnFinalizar.textContent = 'Finalizar Redação ✓';
+    }
+    finalizandoEmAndamento = false;
+    alert('⚠️ É necessário entrar na sua conta para salvar e finalizar a redação.');
+    return;
+  }
+
   pararCronometro();
 
   const duracaoMinutos = Math.max(1, Math.round(timerSegundos / 60));
   const agoraIso = new Date().toISOString();
+  const totalLinhas = Math.ceil(palavras / 10);
+  const vestibularId = propostaAtiva.vestibular_id?.toLowerCase() || 'enem';
 
+  // 1. Inserção no Supabase com o schema real da tabela public.redacoes
+  let insertId = null;
+  try {
+    const { data: inserted, error: insertError } = await supabase
+      .from('redacoes')
+      .insert({
+        user_id: currentUserId,
+        proposta_id: propostaAtiva.id,
+        titulo: propostaAtiva.titulo,
+        vestibular_id: vestibularId,
+        conteudo: texto,
+        total_palavras: palavras,
+        total_caracteres: texto.length,
+        total_linhas: totalLinhas,
+        tempo_segundos: timerSegundos,
+        status: 'aguardando_correcao',
+        finalizada_em: agoraIso
+      })
+      .select('id')
+      .single();
+
+    if (insertError) {
+      throw insertError;
+    }
+    insertId = inserted?.id;
+  } catch (err) {
+    console.error('[redacao] Erro ao salvar redação em public.redacoes:', err);
+    if (btnFinalizar) {
+      btnFinalizar.disabled = false;
+      btnFinalizar.textContent = 'Finalizar Redação ✓';
+    }
+    finalizandoEmAndamento = false;
+    alert('❌ Ocorreu um erro ao salvar sua redação no servidor. Seu rascunho continua seguro no editor para você tentar novamente.');
+    return;
+  }
+
+  // 2. Registra sessão de estudo em sessoes_estudo
+  try {
+    await supabase.from('sessoes_estudo').insert({
+      user_id: currentUserId,
+      materia_id: null,
+      tipo: 'redacao',
+      duracao_minutos: duracaoMinutos
+    });
+  } catch (err) {
+    console.warn('[redacao] Falha ao registrar sessao_estudo no Supabase:', err);
+  }
+
+  // 3. Sucesso confirmado: Salva no histórico local e limpa o draft
   const bancaId = propostaAtiva.vestibular_id?.toLowerCase();
   const matriz = criteriosBancas[bancaId] || criteriosBancas.enem;
-
   const redacaoObj = {
-    id: `red-${Date.now()}`,
+    id: insertId || `red-${Date.now()}`,
     proposta_id: propostaAtiva.id,
     proposta_titulo: propostaAtiva.titulo,
-    vestibular_id: propostaAtiva.vestibular_id,
+    vestibular_id: vestibularId,
     vestibular_nome: propostaAtiva.vestibular_nome,
     tipo_genero: propostaAtiva.tipo_genero,
     texto: texto,
     palavras: palavras,
     caracteres: texto.length,
+    linhas: totalLinhas,
     tempo_segundos: timerSegundos,
     tempo_formatado: document.getElementById('cronometro-display')?.textContent || '00:00:00',
     data_envio: agoraIso,
-    status: 'aguardando_correcao', // Transparência: sem nota inventada antes de correção
+    status: 'aguardando_correcao',
     matriz_criterios: matriz
   };
 
-  // Salva no histórico do usuário
-  salvarNoHistoricoLocal(sessionUserId, redacaoObj);
-
-  // Remove rascunho temporário
-  localStorage.removeItem(getDraftKey(sessionUserId, propostaAtiva.id));
-
-  // Registra sessão de estudo no Supabase se logado
-  if (sessionUserId) {
-    try {
-      await supabase.from('sessoes_estudo').insert({
-        user_id: sessionUserId,
-        materia_id: null,
-        tipo: 'redacao',
-        duracao_minutos: duracaoMinutos
-      });
-    } catch (err) {
-      console.warn('[redacao] Falha ao registrar sessao_estudo no Supabase:', err);
-    }
-
-    try {
-      await supabase.from('redacoes').insert({
-        user_id: sessionUserId,
-        proposta_id: propostaAtiva.id,
-        titulo_proposta: propostaAtiva.titulo,
-        banca: propostaAtiva.vestibular_id,
-        ano: propostaAtiva.ano || null,
-        texto: texto,
-        palavras: palavras,
-        caracteres: texto.length,
-        linhas: Math.ceil(palavras / 10),
-        tempo_segundos: timerSegundos,
-        status: 'aguardando_correcao'
-      });
-    } catch (err) {
-      console.warn('[redacao] Falha ao salvar redação na tabela public.redacoes:', err);
-    }
-  }
+  salvarNoHistoricoLocal(currentUserId, redacaoObj);
+  localStorage.removeItem(getDraftKey(currentUserId, propostaAtiva.id));
 
   alert('🎉 Redação finalizada e salva com sucesso no seu histórico!');
 
@@ -499,6 +539,22 @@ function atualizarContadorHistorico() {
 function renderizarHistorico() {
   const container = document.getElementById('historico-lista');
   if (!container) return;
+
+  if (!sessionUserId) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:60px 20px; color:var(--text-secondary); background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl);">
+        <span style="font-size:3rem; display:block; margin-bottom:12px;">🔒</span>
+        <h3 style="font-size:1.25rem; color:var(--text-primary); margin-bottom:6px;">Acesso restrito ao seu portfólio</h3>
+        <p style="font-size:0.9rem; max-width:440px; margin:0 auto 20px;">
+          Para salvar redações com segurança, acompanhar seu histórico e visualizar correções da banca, entre na sua conta do Vestibular+.
+        </p>
+        <a class="btn btn-primary" href="./login.html">
+          Fazer Login no Vestibular+ →
+        </a>
+      </div>
+    `;
+    return;
+  }
 
   const historico = lerHistoricoLocal(sessionUserId);
 
