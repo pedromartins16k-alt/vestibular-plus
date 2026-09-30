@@ -42,6 +42,41 @@ function getDraftKey(userId, propostaId) {
   return `${STORAGE_PREFIX_DRAFT}${userId || 'guest'}_${propostaId}`;
 }
 
+function lerRascunho(userId, propostaId) {
+  try {
+    const raw = localStorage.getItem(getDraftKey(userId, propostaId));
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && typeof parsed.texto === 'string') {
+        return {
+          texto: parsed.texto,
+          tempo_segundos: Number(parsed.tempo_segundos) || 0
+        };
+      }
+    } catch (_) {
+      // Compatibilidade: rascunho salvo em versões anteriores como string simples de texto
+    }
+    return {
+      texto: String(raw),
+      tempo_segundos: 0
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function salvarRascunhoStorage(userId, propostaId, texto, tempoSegundos) {
+  try {
+    const payload = JSON.stringify({
+      texto: texto || '',
+      tempo_segundos: Number(tempoSegundos) || 0,
+      atualizado_em: new Date().toISOString()
+    });
+    localStorage.setItem(getDraftKey(userId, propostaId), payload);
+  } catch (_) {}
+}
+
 function getHistoricoKey(userId) {
   return `${STORAGE_PREFIX_HISTORICO}${userId || 'guest'}`;
 }
@@ -323,13 +358,15 @@ function iniciarEditor(proposta) {
     `;
   }
 
-  // Restaura rascunho anterior se existir
+  // Restaura rascunho anterior se existir (texto e tempo)
   const textarea = document.getElementById('redacao-texto-input');
-  const draftSalvo = localStorage.getItem(getDraftKey(sessionUserId, proposta.id));
-  if (draftSalvo) {
-    textarea.value = draftSalvo;
+  const draft = lerRascunho(sessionUserId, proposta.id);
+  if (draft) {
+    textarea.value = draft.texto || '';
+    timerSegundos = Number(draft.tempo_segundos) || 0;
   } else {
     textarea.value = '';
+    timerSegundos = 0;
   }
 
   atualizarContadores();
@@ -338,7 +375,6 @@ function iniciarEditor(proposta) {
 
 function iniciarCronometro() {
   pararCronometro();
-  timerSegundos = 0;
   timerPausado = false;
   atualizarDisplayCronometro();
 
@@ -346,6 +382,11 @@ function iniciarCronometro() {
     if (!timerPausado) {
       timerSegundos++;
       atualizarDisplayCronometro();
+      // Salva tempo decorrido no rascunho a cada 5 segundos se houver proposta ativa
+      if (timerSegundos % 5 === 0 && propostaAtiva) {
+        const textarea = document.getElementById('redacao-texto-input');
+        salvarRascunhoStorage(sessionUserId, propostaAtiva.id, textarea ? textarea.value : '', timerSegundos);
+      }
     }
   }, 1000);
 }
@@ -366,25 +407,101 @@ function atualizarDisplayCronometro() {
   el.textContent = `${h}:${m}:${s}`;
 }
 
+// Elemento espelho (mirror) invisível para calcular exatamente as linhas visuais ocupadas
+let mirrorLinhasEl = null;
+
+function obterOuCriarMirror(textarea) {
+  if (!mirrorLinhasEl) {
+    mirrorLinhasEl = document.createElement('div');
+    mirrorLinhasEl.id = 'redacao-textarea-mirror';
+    mirrorLinhasEl.setAttribute('aria-hidden', 'true');
+    // Posicionamento fora da tela visível
+    mirrorLinhasEl.style.position = 'absolute';
+    mirrorLinhasEl.style.top = '-99999px';
+    mirrorLinhasEl.style.left = '-99999px';
+    mirrorLinhasEl.style.visibility = 'hidden';
+    mirrorLinhasEl.style.pointerEvents = 'none';
+    mirrorLinhasEl.style.zIndex = '-1';
+    document.body.appendChild(mirrorLinhasEl);
+  }
+
+  const cs = window.getComputedStyle(textarea);
+  mirrorLinhasEl.style.fontFamily = cs.fontFamily;
+  mirrorLinhasEl.style.fontSize = cs.fontSize;
+  mirrorLinhasEl.style.fontWeight = cs.fontWeight;
+  mirrorLinhasEl.style.letterSpacing = cs.letterSpacing;
+  mirrorLinhasEl.style.lineHeight = cs.lineHeight;
+  mirrorLinhasEl.style.paddingLeft = cs.paddingLeft;
+  mirrorLinhasEl.style.paddingRight = cs.paddingRight;
+  mirrorLinhasEl.style.paddingTop = '0px';
+  mirrorLinhasEl.style.paddingBottom = '0px';
+  mirrorLinhasEl.style.borderLeft = cs.borderLeftWidth + ' ' + cs.borderLeftStyle + ' transparent';
+  mirrorLinhasEl.style.borderRight = cs.borderRightWidth + ' ' + cs.borderRightStyle + ' transparent';
+  mirrorLinhasEl.style.boxSizing = cs.boxSizing;
+  mirrorLinhasEl.style.whiteSpace = 'pre-wrap';
+  mirrorLinhasEl.style.wordWrap = 'break-word';
+  mirrorLinhasEl.style.overflowWrap = 'break-word';
+  mirrorLinhasEl.style.width = `${textarea.clientWidth}px`;
+
+  return { mirror: mirrorLinhasEl, computed: cs };
+}
+
+function calcularLinhasVisuais(textarea) {
+  if (!textarea) return 0;
+  const texto = textarea.value;
+  if (!texto || texto.trim().length === 0) return 0;
+
+  try {
+    const { mirror, computed } = obterOuCriarMirror(textarea);
+
+    // Mede a altura de 1 linha de referência
+    mirror.textContent = 'M';
+    const alturaUmaLinha = mirror.getBoundingClientRect().height;
+
+    // Define altura da linha com fallback computado
+    let lineHeight = parseFloat(computed.lineHeight);
+    if (!lineHeight || isNaN(lineHeight)) {
+      lineHeight = alturaUmaLinha > 0 ? alturaUmaLinha : 24;
+    }
+
+    // Alimenta com o texto completo digitado
+    // Adiciona quebra invisível no final caso termine com \n para capturar linha em branco
+    mirror.textContent = texto.endsWith('\n') ? texto + ' ' : texto;
+    const alturaTotal = mirror.getBoundingClientRect().height;
+
+    const linhas = Math.max(1, Math.round(alturaTotal / lineHeight));
+    return linhas;
+  } catch (_) {
+    // Fallback defensivo
+    const linhasQuebra = texto.split('\n').length;
+    const palavras = texto.split(/\s+/).filter(Boolean).length;
+    return Math.max(linhasQuebra, Math.ceil(palavras / 10));
+  }
+}
+
 function atualizarContadores() {
   const textarea = document.getElementById('redacao-texto-input');
-  const texto = textarea.value.trim();
+  if (!textarea) return;
+  const texto = textarea.value;
 
-  const palavras = texto.length > 0 ? texto.split(/\s+/).filter(Boolean).length : 0;
+  const palavras = texto.length > 0 ? texto.trim().split(/\s+/).filter(Boolean).length : 0;
   const caracteres = texto.length;
-  // Média padrão para vestibular: ~9 a 10 palavras por linha manuscrita
-  const linhasEstimadas = Math.ceil(palavras / 10);
+  const linhasVisuais = calcularLinhasVisuais(textarea);
 
-  document.getElementById('contador-palavras').textContent = `${palavras} palavras`;
-  document.getElementById('contador-caracteres').textContent = `${caracteres} caracteres`;
-  document.getElementById('contador-linhas').textContent = `~${linhasEstimadas} linhas`;
+  const elPalavras = document.getElementById('contador-palavras');
+  const elCaracteres = document.getElementById('contador-caracteres');
+  const elLinhas = document.getElementById('contador-linhas');
+
+  if (elPalavras) elPalavras.textContent = `${palavras} palavra${palavras === 1 ? '' : 's'}`;
+  if (elCaracteres) elCaracteres.textContent = `${caracteres} caractere${caracteres === 1 ? '' : 's'}`;
+  if (elLinhas) elLinhas.textContent = `~${linhasVisuais} linha${linhasVisuais === 1 ? '' : 's'}`;
 }
 
 function salvarRascunho() {
   if (!propostaAtiva) return;
   const textarea = document.getElementById('redacao-texto-input');
-  const texto = textarea.value;
-  localStorage.setItem(getDraftKey(sessionUserId, propostaAtiva.id), texto);
+  const texto = textarea ? textarea.value : '';
+  salvarRascunhoStorage(sessionUserId, propostaAtiva.id, texto, timerSegundos);
 
   const statusEl = document.getElementById('autosave-status');
   if (statusEl) {
@@ -437,7 +554,7 @@ async function finalizarRedacao() {
 
   const duracaoMinutos = Math.max(1, Math.round(timerSegundos / 60));
   const agoraIso = new Date().toISOString();
-  const totalLinhas = Math.ceil(palavras / 10);
+  const totalLinhas = Math.max(1, calcularLinhasVisuais(textarea));
   const vestibularId = propostaAtiva.vestibular_id?.toLowerCase() || 'enem';
 
   // 1. Inserção no Supabase com o schema real da tabela public.redacoes
@@ -826,6 +943,25 @@ function configurarEventosUI() {
 
   document.getElementById('modal-correcao-close')?.addEventListener('click', () => {
     document.getElementById('modal-correcao-overlay')?.classList.remove('open');
+  });
+
+  // Recalcula linhas visuais em resize da janela
+  let resizeTimeout = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      if (propostaAtiva) {
+        atualizarContadores();
+      }
+    }, 150);
+  });
+
+  // Salva rascunho e tempo antes de descarregar a página
+  window.addEventListener('beforeunload', () => {
+    if (propostaAtiva) {
+      const textarea = document.getElementById('redacao-texto-input');
+      salvarRascunhoStorage(sessionUserId, propostaAtiva.id, textarea ? textarea.value : '', timerSegundos);
+    }
   });
 }
 
