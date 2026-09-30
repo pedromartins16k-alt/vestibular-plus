@@ -55,12 +55,71 @@ function lerHistoricoLocal(userId) {
   }
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function salvarNoHistoricoLocal(userId, redacaoObj) {
   try {
     const historico = lerHistoricoLocal(userId);
     historico.unshift(redacaoObj);
     localStorage.setItem(getHistoricoKey(userId), JSON.stringify(historico));
   } catch (_) {}
+}
+
+async function carregarHistoricoSupabase() {
+  if (!sessionUserId) return;
+  try {
+    const { data, error } = await supabase
+      .from('redacoes')
+      .select('*')
+      .order('criado_em', { ascending: false });
+
+    if (error) {
+      console.warn('[redacao] Não foi possível buscar redações no Supabase (verifique permissões/GRANT):', error.message);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      const historicoAtual = lerHistoricoLocal(sessionUserId);
+      const idsLocais = new Set(historicoAtual.map(h => h.id));
+
+      data.forEach(row => {
+        if (!idsLocais.has(row.id)) {
+          const bancaId = row.banca?.toLowerCase();
+          const matriz = criteriosBancas[bancaId] || criteriosBancas.enem;
+          historicoAtual.push({
+            id: row.id,
+            proposta_id: row.proposta_id,
+            proposta_titulo: row.titulo_proposta,
+            vestibular_id: row.banca,
+            vestibular_nome: row.banca ? row.banca.toUpperCase() : 'Vestibular',
+            tipo_genero: 'Dissertativo-argumentativo',
+            texto: row.texto,
+            palavras: row.palavras,
+            caracteres: row.caracteres,
+            tempo_segundos: row.tempo_segundos,
+            tempo_formatado: `${Math.floor(row.tempo_segundos / 3600).toString().padStart(2, '0')}:${Math.floor((row.tempo_segundos % 3600) / 60).toString().padStart(2, '0')}:${(row.tempo_segundos % 60).toString().padStart(2, '0')}`,
+            data_envio: row.criado_em,
+            status: row.status || 'aguardando_correcao',
+            matriz_criterios: matriz
+          });
+        }
+      });
+
+      // Ordena por data decrescente
+      historicoAtual.sort((a, b) => new Date(b.data_envio) - new Date(a.data_envio));
+      localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historicoAtual));
+    }
+  } catch (err) {
+    console.warn('[redacao] Erro na sincronização Supabase -> Local:', err);
+  }
 }
 
 // ================================================================
@@ -73,6 +132,9 @@ async function iniciar() {
 
     // Carrega objetivo do aluno
     objetivoAluno = await lerObjetivo();
+
+    // Sincroniza histórico remoto se logado
+    await carregarHistoricoSupabase();
 
     renderizarHero();
     renderizarPropostas(propostasLista);
@@ -144,7 +206,7 @@ function renderizarPropostas(lista) {
         <div>
           <div class="proposta-topo">
             <span class="banca-tag">${p.vestibular_nome}</span>
-            <span style="font-size:0.75rem; color:var(--text-secondary); font-weight:700;">
+            <span class="${p.edicao_oficial ? 'tipo-tag-oficial' : 'tipo-tag-treino'}">
               ${p.edicao_oficial ? `Oficial ${p.ano}` : 'Proposta Inédita'}
             </span>
           </div>
@@ -184,6 +246,11 @@ function abrirModalProposta(propostaId) {
 
   const modal = document.getElementById('modal-proposta-overlay');
   document.getElementById('modal-banca-tag').textContent = p.vestibular_nome;
+  const tipoTag = document.getElementById('modal-tipo-tag');
+  if (tipoTag) {
+    tipoTag.textContent = p.edicao_oficial ? `Oficial ${p.ano}` : 'Proposta Inédita';
+    tipoTag.className = p.edicao_oficial ? 'tipo-tag-oficial' : 'tipo-tag-treino';
+  }
   document.getElementById('modal-proposta-titulo').textContent = p.titulo;
   document.getElementById('modal-proposta-meta').textContent = `${p.categoria} · ${p.tipo_genero} · ${p.palavras_recomendadas}`;
   document.getElementById('modal-proposta-instrucoes').textContent = p.instrucoes;
@@ -191,9 +258,9 @@ function abrirModalProposta(propostaId) {
   const containerTextos = document.getElementById('modal-textos-motivadores');
   containerTextos.innerHTML = (p.textos_motivadores || []).map(t => `
     <div class="texto-mot-item">
-      <strong>${t.titulo}</strong>
-      <p style="margin:6px 0 0;">${t.conteudo}</p>
-      ${t.fonte ? `<div class="texto-mot-fonte">Fonte: ${t.fonte}</div>` : ''}
+      <strong>${escapeHtml(t.titulo)}</strong>
+      <p style="margin:6px 0 0;">${escapeHtml(t.conteudo)}</p>
+      ${t.fonte ? `<div class="texto-mot-fonte">Fonte: ${escapeHtml(t.fonte)}</div>` : ''}
     </div>
   `).join('');
 
@@ -319,11 +386,10 @@ function salvarRascunho() {
   }
 }
 
-// ================================================================
-// FINALIZAÇÃO & PERSISTÊNCIA DA REDAÇÃO
-// ================================================================
+let finalizandoEmAndamento = false;
+
 async function finalizarRedacao() {
-  if (!propostaAtiva) return;
+  if (!propostaAtiva || finalizandoEmAndamento) return;
   const textarea = document.getElementById('redacao-texto-input');
   const texto = textarea.value.trim();
 
@@ -335,6 +401,13 @@ async function finalizarRedacao() {
 
   const confirmou = confirm(`Deseja concluir a redação "${propostaAtiva.titulo}" (${palavras} palavras)?`);
   if (!confirmou) return;
+
+  finalizandoEmAndamento = true;
+  const btnFinalizar = document.getElementById('btn-finalizar-redacao');
+  if (btnFinalizar) {
+    btnFinalizar.disabled = true;
+    btnFinalizar.textContent = 'Finalizando... ⏳';
+  }
 
   pararCronometro();
 
@@ -379,12 +452,35 @@ async function finalizarRedacao() {
     } catch (err) {
       console.warn('[redacao] Falha ao registrar sessao_estudo no Supabase:', err);
     }
+
+    try {
+      await supabase.from('redacoes').insert({
+        user_id: sessionUserId,
+        proposta_id: propostaAtiva.id,
+        titulo_proposta: propostaAtiva.titulo,
+        banca: propostaAtiva.vestibular_id,
+        ano: propostaAtiva.ano || null,
+        texto: texto,
+        palavras: palavras,
+        caracteres: texto.length,
+        linhas: Math.ceil(palavras / 10),
+        tempo_segundos: timerSegundos,
+        status: 'aguardando_correcao'
+      });
+    } catch (err) {
+      console.warn('[redacao] Falha ao salvar redação na tabela public.redacoes:', err);
+    }
   }
 
   alert('🎉 Redação finalizada e salva com sucesso no seu histórico!');
 
   // Oculta aba do editor e navega para o histórico
   document.getElementById('tab-btn-editor').style.display = 'none';
+  if (btnFinalizar) {
+    btnFinalizar.disabled = false;
+    btnFinalizar.textContent = 'Finalizar Redação ✓';
+  }
+  finalizandoEmAndamento = false;
   propostaAtiva = null;
   renderizarHero();
   atualizarContadorHistorico();
@@ -429,14 +525,14 @@ function renderizarHistorico() {
       <div class="redacao-historico-card">
         <div>
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-            <span class="banca-tag">${r.vestibular_nome}</span>
-            <span style="font-size:0.78rem; color:var(--text-secondary);">Enviada em ${dataFmt}</span>
+            <span class="banca-tag">${escapeHtml(r.vestibular_nome)}</span>
+            <span style="font-size:0.78rem; color:var(--text-secondary);">Enviada em ${escapeHtml(dataFmt)}</span>
           </div>
-          <h3 style="font-size:1.05rem; margin:0 0 6px; font-weight:700;">${r.proposta_titulo}</h3>
+          <h3 style="font-size:1.05rem; margin:0 0 6px; font-weight:700;">${escapeHtml(r.proposta_titulo)}</h3>
           <div style="font-size:0.8rem; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap;">
             <span>📝 ${r.palavras} palavras</span>
             <span>·</span>
-            <span>⏱️ ${r.tempo_formatado}</span>
+            <span>⏱️ ${escapeHtml(r.tempo_formatado)}</span>
             <span>·</span>
             <span style="color:#f59e0b; font-weight:600;">Aguardando correção da banca</span>
           </div>
@@ -471,19 +567,17 @@ function abrirModalDetalhesRedacao(redacaoId) {
 
   conteudo.innerHTML = `
     <div style="margin-bottom:16px;">
-      <span class="banca-tag">${r.vestibular_nome}</span>
-      <h3 style="font-size:1.15rem; margin:8px 0 4px; font-family:var(--font-display);">${r.proposta_titulo}</h3>
+      <span class="banca-tag">${escapeHtml(r.vestibular_nome)}</span>
+      <h3 style="font-size:1.15rem; margin:8px 0 4px; font-family:var(--font-display);">${escapeHtml(r.proposta_titulo)}</h3>
       <div style="font-size:0.8rem; color:var(--text-secondary);">
-        Extensão: ${r.palavras} palavras · Tempo de escrita: ${r.tempo_formatado}
+        Extensão: ${r.palavras} palavras · Tempo de escrita: ${escapeHtml(r.tempo_formatado)}
       </div>
     </div>
 
     <!-- Texto do Aluno -->
     <div style="margin-bottom:20px;">
       <h4 style="font-size:0.9rem; margin-bottom:8px; color:var(--text-secondary);">Seu Texto Redigido:</h4>
-      <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:16px 18px; font-size:0.95rem; line-height:1.75; white-space:pre-wrap; max-height:260px; overflow-y:auto; color:var(--text-primary);">
-        ${r.texto}
-      </div>
+      <div id="modal-detalhe-texto-aluno" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:16px 18px; font-size:0.95rem; line-height:1.75; white-space:pre-wrap; max-height:260px; overflow-y:auto; color:var(--text-primary);"></div>
     </div>
 
     <!-- Matriz de Critérios Oficiais da Banca -->
@@ -512,6 +606,9 @@ function abrirModalDetalhesRedacao(redacaoId) {
       💡 Esta redação está registrada no seu portfólio. As competências acima orientam sua autoavaliação e correções futuras.
     </div>
   `;
+
+  const elTexto = document.getElementById('modal-detalhe-texto-aluno');
+  if (elTexto) elTexto.textContent = r.texto || '';
 
   modal.classList.add('open');
 }
@@ -567,6 +664,29 @@ function configurarEventosUI() {
     });
   });
 
+  // Filtros por Tipo (Oficial vs Treino)
+  const chipsTipos = document.querySelectorAll('#filtros-tipos .chip-banca');
+  chipsTipos.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chipsTipos.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      aplicarFiltros();
+    });
+  });
+
+  // Botão Limpar Filtros
+  const btnLimpar = document.getElementById('btn-limpar-filtros');
+  btnLimpar?.addEventListener('click', () => {
+    chipsBancas.forEach(c => c.classList.remove('active'));
+    document.querySelector('#filtros-bancas .chip-banca[data-banca="todas"]')?.classList.add('active');
+
+    chipsTipos.forEach(c => c.classList.remove('active'));
+    document.querySelector('#filtros-tipos .chip-banca[data-tipo="todos"]')?.classList.add('active');
+
+    if (inputBusca) inputBusca.value = '';
+    aplicarFiltros();
+  });
+
   // Busca Textual de Propostas
   const inputBusca = document.getElementById('busca-proposta-input');
   inputBusca?.addEventListener('input', () => {
@@ -575,6 +695,7 @@ function configurarEventosUI() {
 
   function aplicarFiltros() {
     const bancaAtiva = document.querySelector('#filtros-bancas .chip-banca.active')?.dataset.banca || 'todas';
+    const tipoAtivo = document.querySelector('#filtros-tipos .chip-banca.active')?.dataset.tipo || 'todos';
     const termo = (inputBusca?.value || '').toLowerCase().trim();
 
     let filtradas = propostasLista;
@@ -583,12 +704,23 @@ function configurarEventosUI() {
       filtradas = filtradas.filter(p => p.vestibular_id?.toLowerCase() === bancaAtiva);
     }
 
+    if (tipoAtivo === 'oficial') {
+      filtradas = filtradas.filter(p => p.edicao_oficial === true);
+    } else if (tipoAtivo === 'treino') {
+      filtradas = filtradas.filter(p => p.edicao_oficial === false);
+    }
+
     if (termo.length > 0) {
       filtradas = filtradas.filter(p =>
         p.titulo.toLowerCase().includes(termo) ||
         p.categoria.toLowerCase().includes(termo) ||
         p.vestibular_nome.toLowerCase().includes(termo)
       );
+    }
+
+    const filtrosAtivos = bancaAtiva !== 'todas' || tipoAtivo !== 'todos' || termo.length > 0;
+    if (btnLimpar) {
+      btnLimpar.style.display = filtrosAtivos ? 'inline-flex' : 'none';
     }
 
     renderizarPropostas(filtradas);
@@ -613,6 +745,19 @@ function configurarEventosUI() {
   });
 
   document.getElementById('btn-salvar-rascunho')?.addEventListener('click', salvarRascunho);
+  document.getElementById('btn-descartar-rascunho')?.addEventListener('click', () => {
+    if (!propostaAtiva) return;
+    const confirmou = confirm('Descartar o rascunho desta redação? Esta ação não pode ser desfeita.');
+    if (!confirmou) return;
+
+    localStorage.removeItem(getDraftKey(sessionUserId, propostaAtiva.id));
+    pararCronometro();
+    document.getElementById('tab-btn-editor').style.display = 'none';
+    propostaAtiva = null;
+    renderizarHero();
+    atualizarContadorHistorico();
+    document.getElementById('tab-btn-propostas').click();
+  });
   document.getElementById('btn-finalizar-redacao')?.addEventListener('click', finalizarRedacao);
 
   // Modais Close

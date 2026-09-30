@@ -302,11 +302,11 @@ Informe ao usuário exatamente:
 
 ---
 
-# ETAPA 12: LABORATÓRIO DE REDAÇÃO (PERSISTÊNCIA SUPABASE)
+# ETAPA 12.1: LABORATÓRIO DE REDAÇÃO (PERSISTÊNCIA DEFINITIVA SUPABASE)
 
-> **Contexto:** O Laboratório de Redação do Vestibular+ foi implementado no frontend (`src/pages/redacao.html`, `src/scripts/redacao.js`).  
-> O histórico e rascunhos são salvos com isolamento por usuário (`sessionUserId`) no `localStorage` e a sessão de estudo é registrada em `sessoes_estudo (tipo='redacao')`.  
-> Para garantir persistência remota definitiva de redações finalizadas e histórico de correções oficiais, execute a migration abaixo no Supabase SQL Editor.
+> **Contexto:** O Laboratório de Redação do Vestibular+ foi implementado e auditado no frontend (`src/pages/redacao.html`, `src/scripts/redacao.js`).  
+> O rascunho temporário é mantido isolado por usuário (`redacao_draft_<userId>_<propostaId>`) no `localStorage`.  
+> Para garantir persistência server-side definitiva de redações finalizadas com isolamento estrito e histórico de avaliações por banca, execute a migration abaixo no Supabase SQL Editor.
 
 ```sql
 -- ==============================================================================
@@ -333,6 +333,7 @@ CREATE TABLE IF NOT EXISTS public.redacoes (
 ALTER TABLE public.redacoes ENABLE ROW LEVEL SECURITY;
 
 -- Políticas de RLS: Isolamento estrito por usuário
+DROP POLICY IF EXISTS "Usuário acessa apenas suas próprias redações" ON public.redacoes;
 CREATE POLICY "Usuário acessa apenas suas próprias redações"
   ON public.redacoes FOR ALL
   TO authenticated
@@ -342,6 +343,10 @@ CREATE POLICY "Usuário acessa apenas suas próprias redações"
 -- Índices para consultas otimizadas
 CREATE INDEX IF NOT EXISTS idx_redacoes_user_data ON public.redacoes(user_id, criado_em DESC);
 CREATE INDEX IF NOT EXISTS idx_redacoes_banca ON public.redacoes(user_id, banca);
+
+-- Concessão de permissões de tabela para a API PostgREST do Supabase
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.redacoes TO authenticated;
+GRANT SELECT ON public.redacoes TO anon;
 
 -- ==============================================================================
 -- 2. TABELA DE AVALIAÇÕES / CRITÉRIOS DE CORREÇÃO POR BANCA
@@ -363,6 +368,7 @@ CREATE TABLE IF NOT EXISTS public.redacao_avaliacoes (
 -- Ativar RLS
 ALTER TABLE public.redacao_avaliacoes ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Usuário acessa apenas avaliações de suas próprias redações" ON public.redacao_avaliacoes;
 CREATE POLICY "Usuário acessa apenas avaliações de suas próprias redações"
   ON public.redacao_avaliacoes FOR ALL
   TO authenticated
@@ -370,4 +376,26 @@ CREATE POLICY "Usuário acessa apenas avaliações de suas próprias redações"
   WITH CHECK (auth.uid() = user_id);
 
 CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_redacao ON public.redacao_avaliacoes(redacao_id);
+CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_user ON public.redacao_avaliacoes(user_id);
+
+-- Concessão de permissões de tabela para a API PostgREST do Supabase
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.redacao_avaliacoes TO authenticated;
+GRANT SELECT ON public.redacao_avaliacoes TO anon;
+
+-- ==============================================================================
+-- 3. VERIFICAÇÃO FINAL
+-- ==============================================================================
+SELECT tablename, rowsecurity 
+FROM pg_tables 
+WHERE schemaname = 'public' 
+AND tablename IN ('redacoes', 'redacao_avaliacoes');
+```
+
+---
+
+## ROLLBACK (CASO NECESSÁRIO)
+
+```sql
+DROP TABLE IF EXISTS public.redacao_avaliacoes CASCADE;
+DROP TABLE IF EXISTS public.redacoes CASCADE;
 ```

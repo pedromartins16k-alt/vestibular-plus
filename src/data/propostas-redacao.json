@@ -262,6 +262,56 @@
           "fonte": "Caderno de Direitos Humanos e Internet"
         }
       ]
+    },
+    {
+      "id": "prop-fuvest-2023",
+      "titulo": "Refugiados ambientais e vulnerabilidade humana no mundo contemporâneo",
+      "vestibular_id": "fuvest",
+      "vestibular_nome": "FUVEST",
+      "ano": 2023,
+      "edicao_oficial": true,
+      "categoria": "Meio Ambiente e Sociedade",
+      "tipo_genero": "Dissertativo-argumentativo",
+      "dificuldade": "dificil",
+      "palavras_recomendadas": "Entre 300 e 500 palavras (20 a 30 linhas)",
+      "instrucoes": "Com base na coletânea e em seus conhecimentos, redija um texto dissertativo-argumentativo em prosa, com linguagem formal, posicionando-se sobre a condição dos refugiados ambientais e os impasses éticos e políticos da soberania nacional diante da crise climática global.",
+      "textos_motivadores": [
+        {
+          "titulo": "Texto I — O conceito de refugiado do clima",
+          "conteudo": "Milhões de indivíduos são forçados a abandonar suas regiões de origem em decorrência de secas severas, desertificação ou elevação do nível dos oceanos, encontrando barreiras jurídicas no direito internacional, que historicamente reconhece apenas perseguições políticas.",
+          "fonte": "ACNUR / Organização das Nações Unidas"
+        },
+        {
+          "titulo": "Texto II — As fronteiras da solidariedade",
+          "conteudo": "A crise socioecológica coloca à prova os pactos universais de direitos humanos, confrontando a lógica de contenção migratória dos Estados nacionais com a urgência humanitária de populações desprovidas de território habitável.",
+          "fonte": "Coletânea FUVEST 2023"
+        }
+      ]
+    },
+    {
+      "id": "prop-enem-2022",
+      "titulo": "Desafios para a valorização de comunidades e povos tradicionais no Brasil",
+      "vestibular_id": "enem",
+      "vestibular_nome": "ENEM",
+      "ano": 2022,
+      "edicao_oficial": true,
+      "categoria": "Sociedade e Cultura",
+      "tipo_genero": "Dissertativo-argumentativo",
+      "dificuldade": "medio",
+      "palavras_recomendadas": "Entre 300 e 550 palavras (mín. 7, máx. 30 linhas)",
+      "instrucoes": "A partir da leitura dos textos motivadores e com base nos conhecimentos construídos ao longo de sua formação, redija um texto dissertativo-argumentativo em modalidade escrita formal da língua portuguesa sobre o tema, apresentando proposta de intervenção que respeite os direitos humanos.",
+      "textos_motivadores": [
+        {
+          "titulo": "Texto I — Diversidade e preservação ancestral",
+          "conteudo": "Povos indígenas, quilombolas, ribeirinhos, caiçaras e seringueiros preservam práticas culturais e biomas essenciais para a conservação da biodiversidade nacional, enfrentando pressões fundiárias e apagamento institucional.",
+          "fonte": "Decreto nº 6.040/2007 — Política Nacional de Desenvolvimento Sustentável dos Povos e Comunidades Tradicionais"
+        },
+        {
+          "titulo": "Texto II — Direitos originários e território",
+          "conteudo": "A segurança jurídica sobre as terras tradicionalmente ocupadas constitui a salvaguarda basilar para a reprodução física, social e cultural dessas populações diante da expansão desordenada de atividades predatórias.",
+          "fonte": "Instituto Socioambiental (ISA)"
+        }
+      ]
     }
   ]
 }

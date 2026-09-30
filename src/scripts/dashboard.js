@@ -360,6 +360,20 @@ function atualizarRecomendacoesHoje(sessoes, diagnostico, revisoes, objetivo) {
     });
   }
 
+  // 4. PRIORIDADE 4: Laboratório de Redação Oficial
+  if (objetivo?.vestibular_id) {
+    itens.push({
+      icone: '✍️',
+      corIcone: '#ec4899',
+      bgIcone: 'rgba(236, 72, 153, 0.15)',
+      titulo: `Produção de Redação (${objetivo.vestibular_nome || objetivo.vestibular_id.toUpperCase()})`,
+      motivo: 'Treine produção textual com propostas oficiais e critérios detalhados da sua banca.',
+      tempoEstimado: '⏱️ ~60 min',
+      ctaTexto: 'Escrever Redação →',
+      ctaUrl: './redacao.html'
+    });
+  }
+
   // Renderiza até 3 itens prioritários
   container.innerHTML = itens.slice(0, 3).map(it => `
     <div class="recomendacao-card-item">
