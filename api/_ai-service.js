@@ -2,9 +2,9 @@
  * _ai-service.js — Camada desacoplada de IA para Correção de Redações
  * 
  * Suporta múltiplos provedores através de variáveis de ambiente:
- * 1. Google Gemini (GEMINI_API_KEY) — Recomendado
- * 2. OpenAI (OPENAI_API_KEY)
- * 3. Groq (GROQ_API_KEY)
+ * 1. Groq (GROQ_API_KEY) — Provedor de alta velocidade e modelo principal
+ * 2. Google Gemini (GEMINI_API_KEY) — Fallback / Alternativa
+ * 3. OpenAI (OPENAI_API_KEY) — Fallback / Alternativa
  * 
  * Não expõe chaves ou segredos ao cliente.
  */
@@ -20,10 +20,10 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto }) {
   const genero = matriz?.tipo_genero || 'Dissertativo-argumentativo';
   
   const competenciasDesc = (matriz?.competencias || []).map(c => 
-    `- Competência ${c.numero} (${c.nome}): peso máximo de ${c.peso} pontos. Critério: ${c.descricao}`
+    `- Competência ${c.numero} (${c.nome}): peso máximo de ${c.peso} pontos. Critério oficial: ${c.descricao}`
   ).join('\n');
 
-  return `Você é um avaliador e corretor oficial sênior de redações para bancas de vestibulares brasileiros (especialista em ${nomeBanca}).
+  return `Você é um avaliador e corretor oficial sênior de redações para bancas de vestibulares brasileiros (especialista na banca ${nomeBanca}).
 
 Sua missão é corrigir e avaliar a redação de um estudante com rigor técnico, empatia pedagógica e critérios objetivos.
 
@@ -33,7 +33,7 @@ INFORMAÇÕES DA PROPOSTA:
 - Pontuação máxima total: ${pontuacaoMax} pontos
 - Tema da proposta: "${tema}"
 
-MATRIZ OFICIAL DE COMPETÊNCIAS:
+MATRIZ OFICIAL DE COMPETÊNCIAS / CRITÉRIOS:
 ${competenciasDesc || '- Avaliação geral de domínio da norma padrão, repertório, coesão, coerência e proposta de intervenção/conclusão.'}
 
 TEXTO REDIGIDO PELO ESTUDANTE:
@@ -42,17 +42,19 @@ ${texto}
 """
 
 DIRETRIZES E REGRAS ABSOLUTAS DA AVALIAÇÃO:
-1. Avalie EXCLUSIVAMENTE o texto real acima redigido. NUNCA invente trechos, repertórios ou citações que o aluno não escreveu.
-2. Seja justo e condizente com a régua da banca ${nomeBanca}.
+1. Avalie EXCLUSIVAMENTE o texto real acima redigido. NUNCA invente trechos, repertórios, citações ou erros que o aluno não escreveu.
+2. Seja justo e condizente com a régua e matriz de correção da banca ${nomeBanca}.
 3. A soma das notas das competências DEVE ser exatamente igual ao campo "nota_total".
-4. Cada competência deve ter sua nota atribuída entre 0 e o peso máximo estipulado para ela.
+4. Cada competência deve ter sua nota atribuída entre 0 e o peso máximo estipulado para ela na matriz.
 5. Se for ENEM: as notas de cada competência devem ser múltiplos de 40 (0, 40, 80, 120, 160, 200) conforme a cartilha oficial do INEP. A nota total deve ser entre 0 e 1000.
 6. Se for FUVEST: notas graduadas de 0 a 20 na C1, 0 a 15 na C2 e 0 a 15 na C3 (total máx 50).
 7. Se for UNICAMP: notas graduadas de 0 a 16 por critério (total máx 48).
-8. Forneça justificativas analíticas claras, apontando trechos do próprio texto quando oportuno.
-9. Aponte entre 2 e 4 pontos fortes genuínos do texto.
-10. Aponte entre 2 e 4 pontos de melhoria com orientação prática.
-11. Forneça entre 2 e 3 sugestões práticas e acionáveis de estudo/reescrita.
+8. Se for UNESP: notas graduadas conforme sua matriz (total máx 28).
+9. Para CADA competência, forneça uma análise detalhada e justificada, citando trechos específicos da redação para ilustrar o acerto ou desvio.
+10. Aponte entre 2 e 4 pontos fortes genuínos demonstrados no texto.
+11. Aponte problemas identificados no texto (aspectos estruturais, gramaticais ou argumentativos) acompanhados de trechos que precisam de revisão quando aplicável.
+12. Forneça entre 2 e 3 sugestões práticas e acionáveis de reescrita e aprimoramento.
+13. Conclua com as prioridades claras de estudo recomendadas para a evolução do estudante.
 
 RESPONDA OBRIGATORIAMENTE EM JSON VÁLIDO no seguinte formato exato (sem markdown em volta, apenas o JSON puro):
 {
@@ -64,21 +66,93 @@ RESPONDA OBRIGATORIAMENTE EM JSON VÁLIDO no seguinte formato exato (sem markdow
       "nome": "string",
       "nota": number,
       "nota_maxima": number,
-      "justificativa": "string detalhada explicando a pontuação com base no texto"
+      "justificativa": "string com justificativa analítica fundamentada, referenciando aspectos do texto"
     }
   ],
   "pontos_fortes": [
     "string"
   ],
   "pontos_melhoria": [
-    "string"
+    "string apontando o problema e como corrigir"
+  ],
+  "exemplos_trechos": [
+    "string com exemplo de trecho do texto e como reescrever melhor"
   ],
   "sugestoes": [
-    "string"
+    "string com orientação prática de estudo"
   ],
-  "feedback_geral": "string com análise holística do texto, encorajamento pedagógico e considerações gerais",
+  "prioridades_estudo": [
+    "string indicando prioridade de estudo para o próximo texto"
+  ],
+  "feedback_geral": "string com análise holística do texto e conclusão pedagógica",
   "aviso_educacional": "Esta avaliação é uma estimativa pedagógica gerada por inteligência artificial para fins de treino e autoavaliação, não substituindo a correção oficial da banca examinadora."
 }`;
+}
+
+/**
+ * Chama a API oficial do Groq (compatível com OpenAI API v1/chat/completions)
+ */
+async function chamarGroq(apiKey, prompt) {
+  const modelo = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const url = 'https://api.groq.com/openai/v1/chat/completions';
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: modelo,
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um avaliador especialista em bancas de vestibulares brasileiros. Responda estritamente em JSON válido conforme solicitado.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      })
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      let msg = `Erro no serviço Groq (${response.status})`;
+      try {
+        const parsed = JSON.parse(errBody);
+        if (parsed.error?.message) {
+          msg += `: ${parsed.error.message}`;
+        }
+      } catch (_) {}
+      throw new Error(msg);
+    }
+
+    const data = await response.json();
+    const rawText = data.choices?.[0]?.message?.content;
+
+    if (!rawText) {
+      throw new Error('A Groq retornou uma resposta vazia.');
+    }
+
+    return { rawText, modelo: `groq/${modelo}` };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Tempo limite excedido ao aguardar resposta da IA (timeout de 25s).');
+    }
+    throw err;
+  }
 }
 
 /**
@@ -212,76 +286,10 @@ async function chamarOpenAI(apiKey, prompt) {
 }
 
 /**
- * Chama a Groq via API compatível com OpenAI
- */
-async function chamarGroq(apiKey, prompt) {
-  const modelo = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-  const url = 'https://api.groq.com/openai/v1/chat/completions';
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: modelo,
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content: 'Você é um avaliador de bancas de vestibulares. Responda estritamente em JSON válido conforme solicitado.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ]
-      })
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      let msg = `Erro no serviço Groq (${response.status})`;
-      try {
-        const parsed = JSON.parse(errBody);
-        if (parsed.error?.message) {
-          msg += `: ${parsed.error.message}`;
-        }
-      } catch (_) {}
-      throw new Error(msg);
-    }
-
-    const data = await response.json();
-    const rawText = data.choices?.[0]?.message?.content;
-
-    if (!rawText) {
-      throw new Error('A Groq retornou uma resposta vazia.');
-    }
-
-    return { rawText, modelo: `groq/${modelo}` };
-  } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') {
-      throw new Error('Tempo limite excedido ao aguardar resposta da IA (timeout de 25s).');
-    }
-    throw err;
-  }
-}
-
-/**
  * Limpa e valida o JSON retornado pela IA
  */
-function validarENormalizarResposta(rawText, matriz, modeloUsado) {
-  let cleaned = rawText.trim();
+export function validarENormalizarResposta(rawText, matriz, modeloUsado) {
+  let cleaned = (rawText || '').trim();
   // Remove markdown codeblock ```json ... ``` se presente
   if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
@@ -329,28 +337,31 @@ function validarENormalizarResposta(rawText, matriz, modeloUsado) {
     competencias: competenciasNormalizadas,
     pontos_fortes: Array.isArray(parsed.pontos_fortes) ? parsed.pontos_fortes.map(String) : [],
     pontos_melhoria: Array.isArray(parsed.pontos_melhoria) ? parsed.pontos_melhoria.map(String) : [],
+    exemplos_trechos: Array.isArray(parsed.exemplos_trechos) ? parsed.exemplos_trechos.map(String) : [],
     sugestoes: Array.isArray(parsed.sugestoes) ? parsed.sugestoes.map(String) : [],
+    prioridades_estudo: Array.isArray(parsed.prioridades_estudo) ? parsed.prioridades_estudo.map(String) : [],
     feedback_geral: String(parsed.feedback_geral || 'Redação corrigida e analisada com sucesso.'),
     aviso_educacional: String(
       parsed.aviso_educacional || 
       'Esta avaliação é uma estimativa pedagógica gerada por inteligência artificial para fins de treino e autoavaliação, não substituindo a correção oficial da banca examinadora.'
     ),
-    modelo_utilizado: modeloUsado,
+    modelo_utilizado: modeloUsado || 'ia',
     corrigido_em: new Date().toISOString()
   };
 }
 
 /**
  * Função principal exportada: avalia a redação utilizando o provedor configurado
+ * Prioriza Groq (GROQ_API_KEY) conforme diretrizes da Etapa atual.
  */
 export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto }) {
+  const groqKey = process.env.GROQ_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
-  const groqKey = process.env.GROQ_API_KEY;
 
-  if (!geminiKey && !openaiKey && !groqKey) {
+  if (!groqKey && !geminiKey && !openaiKey) {
     const erroConfig = new Error(
-      'Nenhum provedor de IA está configurado no servidor. Configure a variável GEMINI_API_KEY (ou OPENAI_API_KEY) nas variáveis de ambiente da Vercel.'
+      'Nenhum provedor de IA está configurado no servidor. Configure a variável GROQ_API_KEY (ou GEMINI_API_KEY) nas variáveis de ambiente da Vercel.'
     );
     erroConfig.statusCode = 503;
     erroConfig.isConfigError = true;
@@ -361,13 +372,13 @@ export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto }) {
 
   let resultadoBruto = null;
 
-  // Tenta Gemini primeiro
-  if (geminiKey) {
+  // Prioridade 1: Groq
+  if (groqKey) {
+    resultadoBruto = await chamarGroq(groqKey, prompt);
+  } else if (geminiKey) {
     resultadoBruto = await chamarGemini(geminiKey, prompt);
   } else if (openaiKey) {
     resultadoBruto = await chamarOpenAI(openaiKey, prompt);
-  } else if (groqKey) {
-    resultadoBruto = await chamarGroq(groqKey, prompt);
   }
 
   return validarENormalizarResposta(resultadoBruto.rawText, matriz, resultadoBruto.modelo);

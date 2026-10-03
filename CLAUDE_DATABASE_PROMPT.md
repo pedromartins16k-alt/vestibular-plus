@@ -329,7 +329,9 @@ CREATE TABLE IF NOT EXISTS public.redacao_avaliacoes (
   criterios_detalhe JSONB DEFAULT '[]'::jsonb,      -- Compatibilidade com versões prévias
   pontos_fortes TEXT[] DEFAULT '{}',
   pontos_melhoria TEXT[] DEFAULT '{}',
+  exemplos_trechos TEXT[] DEFAULT '{}',
   sugestoes TEXT[] DEFAULT '{}',
+  prioridades_estudo TEXT[] DEFAULT '{}',
   feedback_geral TEXT,
   status TEXT NOT NULL DEFAULT 'concluida',         -- 'concluida', 'pendente', 'reavaliada'
   criado_em TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
@@ -338,6 +340,8 @@ CREATE TABLE IF NOT EXISTS public.redacao_avaliacoes (
 -- Comentários de documentação do schema
 COMMENT ON TABLE public.redacao_avaliacoes IS 'Avaliações e correções de redações realizadas por IA ou banca avaliadora.';
 COMMENT ON COLUMN public.redacao_avaliacoes.competencias IS 'Array JSONB contendo as notas e justificativas por competência oficial da banca.';
+COMMENT ON COLUMN public.redacao_avaliacoes.exemplos_trechos IS 'Trechos da redação analisados com exemplos de reescrita.';
+COMMENT ON COLUMN public.redacao_avaliacoes.prioridades_estudo IS 'Prioridades pedagógicas de estudo recomendadas.';
 
 -- 2. HABILITAR ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.redacao_avaliacoes ENABLE ROW LEVEL SECURITY;

@@ -907,7 +907,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         <!-- Melhorias -->
         <div style="background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:var(--radius-md); padding:14px;">
           <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#f59e0b; display:flex; align-items:center; gap:6px;">
-            <span>🎯</span> Oportunidades de Melhoria
+            <span>🎯</span> Problemas Identificados
           </h5>
           <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
             ${(av.pontos_melhoria || []).map(p => `<li>${escapeHtml(p)}</li>`).join('')}
@@ -915,17 +915,42 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         </div>
       </div>
 
-      <!-- Sugestões de Estudo -->
-      ${(av.sugestoes && av.sugestoes.length > 0) ? `
-        <div style="background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.2); border-radius:var(--radius-md); padding:14px; margin-bottom:18px;">
-          <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#38bdf8; display:flex; align-items:center; gap:6px;">
-            <span>💡</span> Sugestões Práticas de Treino
+      <!-- Exemplos de Trechos para Revisão -->
+      ${(av.exemplos_trechos && av.exemplos_trechos.length > 0) ? `
+        <div style="background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.2); border-radius:var(--radius-md); padding:14px; margin-bottom:20px;">
+          <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#ef4444; display:flex; align-items:center; gap:6px;">
+            <span>🔍</span> Trechos que Precisam Melhorar & Reescrita Sugerida
           </h5>
-          <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
-            ${av.sugestoes.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+          <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.55;">
+            ${av.exemplos_trechos.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
           </ul>
         </div>
       ` : ''}
+
+      <!-- Sugestões de Estudo e Prioridades -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:18px;">
+        ${(av.sugestoes && av.sugestoes.length > 0) ? `
+          <div style="background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.2); border-radius:var(--radius-md); padding:14px;">
+            <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+              <span>💡</span> Sugestões Práticas de Treino
+            </h5>
+            <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
+              ${av.sugestoes.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+
+        ${(av.prioridades_estudo && av.prioridades_estudo.length > 0) ? `
+          <div style="background:rgba(168,85,247,0.06); border:1px solid rgba(168,85,247,0.2); border-radius:var(--radius-md); padding:14px;">
+            <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#c084fc; display:flex; align-items:center; gap:6px;">
+              <span>📌</span> Prioridades para o Próximo Texto
+            </h5>
+            <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
+              ${av.prioridades_estudo.map(pe => `<li>${escapeHtml(pe)}</li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      </div>
 
       <!-- Reavaliar Button & Aviso -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding-top:14px; border-top:1px solid var(--border-color);">
@@ -997,7 +1022,7 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
     if (!response.ok) {
       if (response.status === 503) {
         throw new Error(
-          '🔑 Provedor de IA não configurado no servidor. Configure a variável GEMINI_API_KEY (ou OPENAI_API_KEY) no painel da Vercel para habilitar a correção.'
+          '🔑 Provedor de IA não configurado no servidor. Configure a variável GROQ_API_KEY (ou GEMINI_API_KEY) no painel da Vercel para habilitar a correção.'
         );
       }
       throw new Error(data?.error || `Falha na requisição (${response.status})`);

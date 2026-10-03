@@ -225,7 +225,9 @@ export default async function handler(req, res) {
         competencias: avaliacaoIA.competencias,
         pontos_fortes: avaliacaoIA.pontos_fortes,
         pontos_melhoria: avaliacaoIA.pontos_melhoria,
+        exemplos_trechos: avaliacaoIA.exemplos_trechos || [],
         sugestoes: avaliacaoIA.sugestoes,
+        prioridades_estudo: avaliacaoIA.prioridades_estudo || [],
         feedback_geral: avaliacaoIA.feedback_geral,
         status: 'concluida'
       };
