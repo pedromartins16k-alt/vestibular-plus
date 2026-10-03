@@ -385,6 +385,8 @@ WHERE table_schema = 'public'
 ORDER BY ordinal_position;
 ```
 
+```
+
 ---
 
 ## ROLLBACK (CASO NECESSÁRIO)
@@ -392,4 +394,54 @@ ORDER BY ordinal_position;
 ```sql
 DROP TABLE IF EXISTS public.redacao_avaliacoes CASCADE;
 ```
+
+---
+
+# ETAPA 15: DIAGNÓSTICO DE PERSISTÊNCIA — persistido_no_banco=false
+
+### STATUS ATUAL (ETAPA 15):
+- ✅ A tabela `public.redacao_avaliacoes` existe com o schema correto.
+- ✅ O endpoint `/api/corrigir-redacao.js` tenta INSERT via `supabaseDb` após avaliação da IA.
+- ⚠️ Em produção, `persistido_no_banco` retorna `false` apesar da tabela existir.
+
+### CAUSA PROVÁVEL:
+
+O endpoint usa `SUPABASE_SERVICE_ROLE_KEY` se disponível. Se essa variável **não estiver configurada na Vercel**, o INSERT cai para `supabaseUser` (anonKey + JWT do usuário). Neste caso, o RLS exige que `auth.uid() = user_id` — o que é enviado corretamente.
+
+**Ação necessária para o operador:**
+1. Acesse https://vercel.com/dashboard → projeto `vestibular-plus` → Settings → Environment Variables
+2. Adicione: `SUPABASE_SERVICE_ROLE_KEY` = valor da chave de serviço do Supabase
+   - Encontre em: https://supabase.com/dashboard/project/jruyyzftoplcobketrsf/settings/api → **service_role** (secret)
+   - ⚠️ Nunca expor essa chave no frontend, GitHub, ou logs públicos
+3. Após salvar, re-deploy (Vercel faz automaticamente em novo commit)
+
+**Verificação alternativa (se SUPABASE_SERVICE_ROLE_KEY não puder ser usada):**
+- Verifique nos logs da Vercel a linha `[corrigir-redacao] Persistência via: user_token (RLS)`
+- Se o INSERT via user_token falhar, examine a política RLS:
+
+```sql
+-- Verificar políticas ativas em redacao_avaliacoes
+SELECT policyname, cmd, qual, with_check
+FROM pg_policies
+WHERE tablename = 'redacao_avaliacoes';
+
+-- Verificar grants
+SELECT grantee, privilege_type
+FROM information_schema.role_table_grants
+WHERE table_name = 'redacao_avaliacoes';
+```
+
+- Se a política de INSERT não existir separadamente (apenas ALL), verifique se `authenticated` tem grant INSERT:
+
+```sql
+-- Re-aplicar grants se necessário (idempotente)
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.redacao_avaliacoes TO authenticated;
+```
+
+### CORREÇÕES DE CÓDIGO APLICADAS NA ETAPA 15 (não requerem SQL):
+- `src/scripts/redacao.js`: Mensagem do modal corrigida (sem referência a arquivos internos)
+- `src/scripts/redacao.js`: Log de `pendencia_persistencia` adicionado para diagnóstico
+- `src/scripts/redacao.js`: Fallback quando redação não encontrada no localStorage (cria entrada mínima)
+- `src/scripts/redacao.js`: `carregarHistoricoSupabase` agora faz merge (atualiza entradas existentes com dados do banco, preservando `avaliacao_ia` local)
+- `api/corrigir-redacao.js`: Log informativo indica `service_role` ou `user_token (RLS)` para diagnóstico via Vercel logs
 

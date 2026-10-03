@@ -150,17 +150,23 @@ async function carregarHistoricoSupabase() {
 
     if (data && data.length > 0) {
       const historicoAtual = lerHistoricoLocal(sessionUserId);
-      const idsLocais = new Set(historicoAtual.map(h => h.id));
+      const mapaLocal = new Map(historicoAtual.map(h => [h.id, h]));
 
       data.forEach(row => {
-        if (!idsLocais.has(row.id)) {
-          historicoAtual.push(normalizarRedacaoBanco(row));
+        const normalizado = normalizarRedacaoBanco(row);
+        if (mapaLocal.has(row.id)) {
+          // Atualiza dados vindos do banco mas preserva avaliacao_ia local se banco não tem
+          const local = mapaLocal.get(row.id);
+          mapaLocal.set(row.id, { ...local, ...normalizado, avaliacao_ia: local.avaliacao_ia || normalizado.avaliacao_ia });
+        } else {
+          mapaLocal.set(row.id, normalizado);
         }
       });
 
+      const historicoAtualizado = Array.from(mapaLocal.values());
       // Ordena por data decrescente
-      historicoAtual.sort((a, b) => new Date(b.data_envio) - new Date(a.data_envio));
-      localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historicoAtual));
+      historicoAtualizado.sort((a, b) => new Date(b.data_envio) - new Date(a.data_envio));
+      localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historicoAtualizado));
     }
 
     // Consulta defensiva de avaliações salvas no Supabase (se a tabela redacao_avaliacoes já existir)
@@ -852,7 +858,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         ${av.persistido_no_banco ? `
           <span>✓ <strong>Avaliação gravada com segurança no Supabase</strong> (persistência definitiva vinculada ao seu perfil).</span>
         ` : `
-          <span>⚠️ <strong>Avaliação em tempo real</strong>: Esta correção foi calculada com sucesso pela IA, mas a gravação definitiva no banco está aguardando a aplicação da migration no Supabase via <code>CLAUDE_DATABASE_PROMPT.md</code>.</span>
+          <span>⚠️ <strong>Avaliação em tempo real</strong>: Esta correção foi calculada com sucesso pela IA. A gravação definitiva no banco não pôde ser confirmada — recarregue a página e repita a correção se necessário.</span>
         `}
       </div>
 
@@ -1040,6 +1046,11 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
       throw new Error('A resposta do servidor não continha os dados da avaliação.');
     }
 
+    // Diagnóstico de falha de persistência (sem expor tokens nem texto da redação)
+    if (!data.persistido_no_banco && data.pendencia_persistencia) {
+      console.warn('[redacao] Falha na persistência da avaliação:', data.pendencia_persistencia);
+    }
+
     // Atualiza histórico local com o retorno autêntico do servidor
     const historico = lerHistoricoLocal(sessionUserId);
     const itemIndex = historico.findIndex(item => item.id === redacaoId);
@@ -1049,8 +1060,19 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
         persistido_no_banco: Boolean(data.persistido_no_banco)
       };
       historico[itemIndex].status = 'corrigida_por_ia';
-      localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historico));
+    } else {
+      // Redação não estava no histórico local (ex: localStorage limpo) — cria entrada mínima
+      historico.unshift({
+        id: redacaoId,
+        status: 'corrigida_por_ia',
+        data_envio: new Date().toISOString(),
+        avaliacao_ia: {
+          ...data.avaliacao,
+          persistido_no_banco: Boolean(data.persistido_no_banco)
+        }
+      });
     }
+    localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historico));
 
     // Sucesso! Re-renderiza o modal atualizado
     abrirModalDetalhesRedacao(redacaoId);

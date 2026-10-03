@@ -238,6 +238,11 @@ export default async function handler(req, res) {
         ? createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
         : supabaseUser;
 
+      console.info(
+        '[corrigir-redacao] Persistência via:',
+        supabaseServiceKey ? 'service_role (admin)' : 'user_token (RLS)'
+      );
+
       const { data: insertedAvaliacao, error: insertAvaliacaoError } = await supabaseDb
         .from('redacao_avaliacoes')
         .insert(payloadAvaliacao)
