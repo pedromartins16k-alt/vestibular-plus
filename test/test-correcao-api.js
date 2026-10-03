@@ -254,6 +254,25 @@ async function runTests() {
     console.error('❌ Teste 10 falhou:', err.message);
   }
 
+  // TESTE 10.1: Verificação estrita do parâmetro reasoning_effort no serviço Groq
+  total++;
+  try {
+    const fs = await import('fs');
+    const aiServiceCode = fs.readFileSync('api/_ai-service.js', 'utf8');
+    assert.ok(
+      aiServiceCode.includes("reasoning_effort: 'medium'"),
+      "Deve utilizar reasoning_effort: 'medium' compatível com openai/gpt-oss-120b"
+    );
+    assert.ok(
+      !aiServiceCode.includes("reasoning_effort: 'default'"),
+      "Não deve conter reasoning_effort: 'default' que gera HTTP 400 no Groq"
+    );
+    console.log("✅ Teste 10.1: Parâmetro reasoning_effort verificado estritamente como 'medium'.");
+    passados++;
+  } catch (err) {
+    console.error('❌ Teste 10.1 falhou:', err.message);
+  }
+
   // TESTE 11: Chamada real com Groq (se variável estiver presente no ambiente)
   total++;
   if (process.env.GROQ_API_KEY) {

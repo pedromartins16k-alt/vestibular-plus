@@ -304,6 +304,11 @@ Informe ao usuário exatamente:
 
 # ETAPA 13: CORREÇÃO DE REDAÇÃO POR IA (TABELA DE AVALIAÇÕES)
 
+### DIAGNÓSTICO DO ERRO HTTP 400 NO SUPABASE REST:
+- **Causa Confirmada:** O frontend do Laboratório de Redação executa consultas defensivas à tabela `public.redacao_avaliacoes` para sincronizar correções anteriores. Como a migration ainda não foi executada no banco, a API PostgREST do Supabase retorna erro HTTP 400/404 (`PGRST200` / `PGRST205` / `relation "public.redacao_avaliacoes" does not exist` ou ausência de schema cache).
+- **Tratamento Atual na Aplicação:** O frontend e o backend tratam a ausência da tabela defensivamente (a correção por IA funciona, exibe notas, competências e sugestões com aviso transparente de que a persistência está aguardando a migration, sem travar a interface).
+- **Ação Necessária:** O Claude deve executar o script SQL idempotente abaixo no SQL Editor do Supabase para criar a tabela `public.redacao_avaliacoes` com suas colunas, RLS, índices e permissões.
+
 > **Contexto:** O Laboratório de Redação do Vestibular+ possui agora a funcionalidade de **Correção por IA** (`/api/corrigir-redacao.js` e `src/scripts/redacao.js`).
 > A tabela `public.redacoes` já existe no banco Supabase com os campos: `id`, `user_id`, `proposta_id`, `titulo`, `vestibular_id`, `conteudo`, `total_palavras`, `total_caracteres`, `total_linhas`, `tempo_segundos`, `status`, `finalizada_em`, `created_at`.
 >

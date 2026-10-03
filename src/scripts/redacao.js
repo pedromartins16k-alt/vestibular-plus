@@ -168,9 +168,15 @@ async function carregarHistoricoSupabase() {
       const { data: avaliacoes, error: errAvaliacoes } = await supabase
         .from('redacao_avaliacoes')
         .select('*')
+        .eq('user_id', sessionUserId)
         .order('criado_em', { ascending: false });
 
-      if (!errAvaliacoes && avaliacoes && avaliacoes.length > 0) {
+      if (errAvaliacoes) {
+        // Loga detalhadamente para diagnóstico se a tabela ainda não existir (404/400) ou RLS
+        console.info(
+          `[redacao] Tabela 'redacao_avaliacoes' não sincronizada (${errAvaliacoes.code || errAvaliacoes.message}). Gravação em banco pendente da migration no Supabase.`
+        );
+      } else if (avaliacoes && avaliacoes.length > 0) {
         const historicoAtual = lerHistoricoLocal(sessionUserId);
         const mapaAvaliacoes = new Map();
         avaliacoes.forEach(av => {
@@ -204,8 +210,8 @@ async function carregarHistoricoSupabase() {
           localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historicoAtual));
         }
       }
-    } catch (_) {
-      // Ignora silenciosamente caso a migration de redacao_avaliacoes ainda esteja pendente
+    } catch (eCatch) {
+      console.info('[redacao] Consulta de avaliações postergada (migration de redacao_avaliacoes ainda não aplicada).');
     }
   } catch (err) {
     console.warn('[redacao] Erro na sincronização Supabase -> Local:', err);

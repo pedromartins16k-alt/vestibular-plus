@@ -112,7 +112,7 @@ async function chamarGroq(apiKey, prompt) {
       body: JSON.stringify({
         model: modelo,
         temperature: 0.2,
-        reasoning_effort: 'default',
+        reasoning_effort: 'medium',
         response_format: { type: 'json_object' },
         messages: [
           {
