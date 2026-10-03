@@ -1356,3 +1356,96 @@ function configurarEventosUI() {
 }
 
 iniciar();
+
+// ================================================================
+// DIAGNÓSTICO DE AMBIENTE — APENAS PARA DEVTOOLS
+// ================================================================
+// Uso: abra DevTools (F12) → Console e execute:
+//   await __vpDiag()              — verifica variáveis de ambiente no backend
+//   await __vpDiag('id-redacao')  — também testa correção real e exibe pendencia_persistencia
+//
+// Nunca expõe tokens, chaves ou texto de redação. Usa a sessão existente automaticamente.
+// Não está visível na interface. Removível após diagnóstico concluído.
+// ================================================================
+window.__vpDiag = async function(redacaoId) {
+  const PREFIXO = '[vpDiag]';
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      console.warn(PREFIXO, 'Nenhuma sessão ativa. Faça login no Vestibular+ primeiro.');
+      return { erro: 'Sem sessão autenticada' };
+    }
+
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'X-VP-Diag': '1'
+    };
+
+    // 1. Diagnóstico de variáveis de ambiente
+    console.group(PREFIXO + ' Verificando variáveis de ambiente do backend...');
+    let resultadoDiag = null;
+    try {
+      const resp = await fetch('/api/diagnostico-env', { headers });
+      resultadoDiag = await resp.json();
+      if (resp.ok && resultadoDiag.diagnostico) {
+        const d = resultadoDiag.diagnostico;
+        console.log('SUPABASE_SERVICE_ROLE_KEY presente:', d.SUPABASE_SERVICE_ROLE_KEY);
+        console.log('GROQ_API_KEY presente:', d.GROQ_API_KEY);
+        console.log('SUPABASE_URL presente:', d.SUPABASE_URL, '| VITE_SUPABASE_URL:', d.VITE_SUPABASE_URL);
+        console.log('Supabase URL (prefixo):', d.supabase_url_prefixo);
+        console.log('Cliente que será usado no INSERT:', d.cliente_insert_usara);
+        if (d.GROQ_MODEL) console.log('Modelo Groq configurado:', d.GROQ_MODEL);
+      } else {
+        console.warn(PREFIXO, 'Resposta inesperada do /api/diagnostico-env:', resultadoDiag);
+      }
+    } catch (e) {
+      console.error(PREFIXO, 'Falha ao chamar /api/diagnostico-env:', e.message);
+    }
+    console.groupEnd();
+
+    // 2. Teste de correção real (opcional — só executa se redacaoId fornecido)
+    let resultadoCorrecao = null;
+    if (redacaoId) {
+      console.group(PREFIXO + ` Testando correção da redação ${redacaoId}...`);
+      try {
+        const respCorr = await fetch('/api/corrigir-redacao', {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ redacaoId })
+        });
+        resultadoCorrecao = await respCorr.json();
+
+        if (respCorr.ok) {
+          console.log('persistido_no_banco:', resultadoCorrecao.persistido_no_banco);
+          console.log('avaliacao_id (banco):', resultadoCorrecao.avaliacao_id);
+
+          if (!resultadoCorrecao.persistido_no_banco && resultadoCorrecao.pendencia_persistencia) {
+            const p = resultadoCorrecao.pendencia_persistencia;
+            console.group('⚠️ Falha na persistência — detalhes do Supabase:');
+            console.log('code:', p.code);
+            console.log('message:', p.message);
+            console.log('details:', p.details);
+            console.log('hint:', p.hint);
+            console.log('cliente usado:', p.cliente);
+            console.log('campos do payload:', p.payload_campos);
+            console.groupEnd();
+          } else if (resultadoCorrecao.persistido_no_banco) {
+            console.log('✅ Persistência confirmada! ID:', resultadoCorrecao.avaliacao_id);
+          }
+        } else {
+          console.warn(PREFIXO, 'Erro HTTP na correção:', respCorr.status, resultadoCorrecao?.error);
+        }
+      } catch (e) {
+        console.error(PREFIXO, 'Falha ao chamar /api/corrigir-redacao:', e.message);
+      }
+      console.groupEnd();
+    } else {
+      console.info(PREFIXO, 'Para testar a correção completa, passe um ID de redação: await __vpDiag("uuid-da-redacao")');
+    }
+
+    return { diag: resultadoDiag, correcao: resultadoCorrecao };
+  } catch (err) {
+    console.error(PREFIXO, 'Erro inesperado no diagnóstico:', err.message);
+    return { erro: err.message };
+  }
+};

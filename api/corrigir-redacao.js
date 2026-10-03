@@ -250,6 +250,7 @@ export default async function handler(req, res) {
         .maybeSingle();
 
       if (!insertAvaliacaoError && insertedAvaliacao?.id) {
+        // CASO 1: INSERT confirmado com ID retornado — persistência real
         persistidoNoBanco = true;
         avaliacaoIdBanco = insertedAvaliacao.id;
 
@@ -276,8 +277,26 @@ export default async function handler(req, res) {
         } catch (errStatus) {
           console.warn('[corrigir-redacao] Exceção ao atualizar status em redacoes:', errStatus?.message);
         }
+
+      } else if (!insertAvaliacaoError && !insertedAvaliacao?.id) {
+        // CASO 2: Sem erro explícito MAS sem ID retornado.
+        // Causas prováveis: política RLS WITH CHECK silenciosamente rejeitou a linha,
+        // ou PostgREST retornou 0 rows com 200 OK (comportamento conhecido com Prefer: return=representation
+        // quando RLS WITH CHECK bloqueia sem lançar exceção).
+        // Pode também indicar que o service_role key é inválido e o cliente caiu para anonKey.
+        const diagSilencioso = {
+          code: 'SILENT_REJECTION',
+          message: 'INSERT executado sem erro mas sem ID retornado. Possível bloqueio silencioso de RLS WITH CHECK ou service_role key inválida.',
+          details: null,
+          hint: 'Verifique: (1) SUPABASE_SERVICE_ROLE_KEY está corretamente configurada na Vercel; (2) política RLS permite INSERT para authenticated; (3) user_id do payload corresponde ao auth.uid() do contexto.',
+          cliente: supabaseServiceKey ? 'service_role' : 'user_token',
+          payload_campos: Object.keys(payloadAvaliacao)
+        };
+        pendenciaPersistencia = diagSilencioso;
+        console.warn('[corrigir-redacao] INSERT silencioso (sem erro, sem ID):', diagSilencioso);
+
       } else {
-        // Logar erro completo do PostgREST para diagnóstico (sem expor dados sensíveis)
+        // CASO 3: Erro explícito retornado pelo PostgREST
         const errCode = insertAvaliacaoError?.code || 'UNKNOWN';
         const errMsg = insertAvaliacaoError?.message || 'Sem mensagem de erro';
         const errDetails = insertAvaliacaoError?.details || null;
@@ -290,7 +309,6 @@ export default async function handler(req, res) {
           hint: errHint
         });
 
-        // Estrutura de diagnóstico segura para retornar ao cliente (sem dados do usuário)
         pendenciaPersistencia = {
           code: errCode,
           message: errMsg,
@@ -301,7 +319,14 @@ export default async function handler(req, res) {
         };
       }
     } catch (errPersist) {
-      pendenciaPersistencia = errPersist?.message || 'Erro inesperado na persistência';
+      pendenciaPersistencia = {
+        code: 'EXCEPTION',
+        message: errPersist?.message || 'Erro inesperado na persistência',
+        details: null,
+        hint: null,
+        cliente: supabaseServiceKey ? 'service_role' : 'user_token',
+        payload_campos: []
+      };
       console.warn('[corrigir-redacao] Exceção ao persistir avaliação:', errPersist?.message);
     }
 
