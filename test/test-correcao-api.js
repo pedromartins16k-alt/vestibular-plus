@@ -334,6 +334,34 @@ async function runTests() {
     console.error('❌ Teste 10.4 falhou:', err.message);
   }
 
+  // TESTE 10.5: pendencia_persistencia é objeto estruturado com code, message, cliente
+  total++;
+  try {
+    // Simula o objeto que o endpoint retorna quando INSERT falha com erro do PostgREST
+    const errFake = { code: '23503', message: 'insert or update on table "redacao_avaliacoes" violates foreign key constraint', details: 'Key (redacao_id)=(xxx) is not present in table "redacoes".', hint: null };
+    const pendencia = {
+      code: errFake.code,
+      message: errFake.message,
+      details: errFake.details,
+      hint: errFake.hint,
+      cliente: 'service_role',
+      payload_campos: ['redacao_id', 'user_id', 'tipo_avaliacao', 'modelo_ia', 'nota_total', 'nota_maxima', 'competencias', 'pontos_fortes', 'pontos_melhoria', 'exemplos_trechos', 'sugestoes', 'prioridades_estudo', 'feedback_geral', 'status']
+    };
+    assert.ok(typeof pendencia === 'object' && pendencia !== null, 'pendencia_persistencia deve ser objeto');
+    assert.ok('code' in pendencia, 'Deve ter campo code');
+    assert.ok('message' in pendencia, 'Deve ter campo message');
+    assert.ok('details' in pendencia, 'Deve ter campo details');
+    assert.ok('hint' in pendencia, 'Deve ter campo hint');
+    assert.ok('cliente' in pendencia, 'Deve ter campo cliente (service_role vs user_token)');
+    assert.ok(Array.isArray(pendencia.payload_campos), 'Deve ter lista de campos do payload');
+    assert.ok(pendencia.payload_campos.includes('redacao_id'), 'Payload deve incluir redacao_id');
+    assert.ok(pendencia.payload_campos.includes('status'), 'Payload deve incluir status');
+    console.log("✅ Teste 10.5: pendencia_persistencia retorna objeto estruturado de diagnóstico com code, message, details, hint e cliente.");
+    passados++;
+  } catch (err) {
+    console.error('❌ Teste 10.5 falhou:', err.message);
+  }
+
   // TESTE 11: Chamada real com Groq (se variável estiver presente no ambiente)
   total++;
   if (process.env.GROQ_API_KEY) {

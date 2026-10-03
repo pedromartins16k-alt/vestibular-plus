@@ -277,11 +277,28 @@ export default async function handler(req, res) {
           console.warn('[corrigir-redacao] Exceção ao atualizar status em redacoes:', errStatus?.message);
         }
       } else {
-        pendenciaPersistencia = insertAvaliacaoError?.message || 'Tabela redacao_avaliacoes não acessível';
-        console.warn(
-          '[corrigir-redacao] Falha na persistência de redacao_avaliacoes:',
-          insertAvaliacaoError?.code || insertAvaliacaoError?.message
-        );
+        // Logar erro completo do PostgREST para diagnóstico (sem expor dados sensíveis)
+        const errCode = insertAvaliacaoError?.code || 'UNKNOWN';
+        const errMsg = insertAvaliacaoError?.message || 'Sem mensagem de erro';
+        const errDetails = insertAvaliacaoError?.details || null;
+        const errHint = insertAvaliacaoError?.hint || null;
+
+        console.warn('[corrigir-redacao] Falha na persistência de redacao_avaliacoes:', {
+          code: errCode,
+          message: errMsg,
+          details: errDetails,
+          hint: errHint
+        });
+
+        // Estrutura de diagnóstico segura para retornar ao cliente (sem dados do usuário)
+        pendenciaPersistencia = {
+          code: errCode,
+          message: errMsg,
+          details: errDetails,
+          hint: errHint,
+          cliente: supabaseServiceKey ? 'service_role' : 'user_token',
+          payload_campos: Object.keys(payloadAvaliacao)
+        };
       }
     } catch (errPersist) {
       pendenciaPersistencia = errPersist?.message || 'Erro inesperado na persistência';
