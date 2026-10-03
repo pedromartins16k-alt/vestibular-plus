@@ -302,17 +302,24 @@ Informe ao usuário exatamente:
 
 ---
 
-# ETAPA 13: CORREÇÃO DE REDAÇÃO POR IA (TABELA DE AVALIAÇÕES)
+# ETAPA 13 & 14: CORREÇÃO DE REDAÇÃO POR IA (TABELA DE AVALIAÇÕES E PERSISTÊNCIA)
 
-### DIAGNÓSTICO DO ERRO HTTP 400 NO SUPABASE REST:
-- **Causa Confirmada:** O frontend do Laboratório de Redação executa consultas defensivas à tabela `public.redacao_avaliacoes` para sincronizar correções anteriores. Como a migration ainda não foi executada no banco, a API PostgREST do Supabase retorna erro HTTP 400/404 (`PGRST200` / `PGRST205` / `relation "public.redacao_avaliacoes" does not exist` ou ausência de schema cache).
-- **Tratamento Atual na Aplicação:** O frontend e o backend tratam a ausência da tabela defensivamente (a correção por IA funciona, exibe notas, competências e sugestões com aviso transparente de que a persistência está aguardando a migration, sem travar a interface).
-- **Ação Necessária:** O Claude deve executar o script SQL idempotente abaixo no SQL Editor do Supabase para criar a tabela `public.redacao_avaliacoes` com suas colunas, RLS, índices e permissões.
+### STATUS ATUAL (ETAPA 14):
+- ✅ A tabela `public.redacao_avaliacoes` está criada e validada pelo Claude com todas as colunas necessárias (`competencias`, `exemplos_trechos`, `prioridades_estudo`, `pontos_fortes`, `pontos_melhoria`, etc.).
+- ✅ O endpoint `/api/corrigir-redacao.js` grava com `supabaseDb` no backend após validação estrita de identidade, token JWT e verificação de propriedade (`user_id = authenticatedUserId`).
+- ✅ O status da redação é atualizado com `status: 'corrigida'` e `updated_at: new Date().toISOString()`, compatível com o schema real da tabela `public.redacoes`.
+- ✅ A gravação é isolada: caso ocorra qualquer erro na atualização do status da redação, a avaliação persistida em `redacao_avaliacoes` é preservada integralmente e `persistido_no_banco` retorna `true`.
+- ✅ O histórico do frontend sincroniza todos os campos pedagógicos e persiste no cache local do estudante.
+
+### DIAGNÓSTICO E ESTRUTURA DO SCHEMA:
+- **Tabela:** `public.redacao_avaliacoes`
+- **Isolamento:** RLS habilitado com política restrita `auth.uid() = user_id`.
+- **Campos:** `id`, `redacao_id`, `user_id`, `tipo_avaliacao`, `modelo_ia`, `nota_total`, `nota_maxima`, `competencias`, `criterios_detalhe`, `pontos_fortes`, `pontos_melhoria`, `exemplos_trechos`, `sugestoes`, `prioridades_estudo`, `feedback_geral`, `status`, `criado_em`.
 
 > **Contexto:** O Laboratório de Redação do Vestibular+ possui agora a funcionalidade de **Correção por IA** (`/api/corrigir-redacao.js` e `src/scripts/redacao.js`).
-> A tabela `public.redacoes` já existe no banco Supabase com os campos: `id`, `user_id`, `proposta_id`, `titulo`, `vestibular_id`, `conteudo`, `total_palavras`, `total_caracteres`, `total_linhas`, `tempo_segundos`, `status`, `finalizada_em`, `created_at`.
+> A tabela `public.redacoes` já existe no banco Supabase com os campos: `id`, `user_id`, `proposta_id`, `titulo`, `vestibular_id`, `conteudo`, `total_palavras`, `total_caracteres`, `total_linhas`, `tempo_segundos`, `status`, `finalizada_em`, `created_at`, `updated_at`.
 >
-> Para persistir permanentemente as correções e avaliações geradas pela IA com histórico completo e suporte a reavaliações, execute a migration idempotente abaixo no Supabase SQL Editor:
+> Script idempotente para referência ou novos ambientes (SQL Editor do Supabase):
 > `https://supabase.com/dashboard/project/jruyyzftoplcobketrsf/sql`
 
 ```sql

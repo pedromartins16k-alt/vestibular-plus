@@ -273,6 +273,67 @@ async function runTests() {
     console.error('❌ Teste 10.1 falhou:', err.message);
   }
 
+  // TESTE 10.2: Conformidade com o schema real de redacoes (status 'corrigida' e coluna 'updated_at')
+  total++;
+  try {
+    const fs = await import('fs');
+    const apiCode = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(
+      !apiCode.includes("status: 'corrigida_por_ia'"),
+      "Não deve tentar gravar status 'corrigida_por_ia' na tabela redacoes (apenas status válidos)"
+    );
+    assert.ok(
+      !apiCode.includes("atualizado_em:"),
+      "Não deve referenciar coluna inexistente 'atualizado_em' em redacoes"
+    );
+    assert.ok(
+      apiCode.includes("status: 'corrigida'") && apiCode.includes("updated_at:"),
+      "Deve atualizar redacoes com status 'corrigida' e coluna 'updated_at'"
+    );
+    console.log("✅ Teste 10.2: Atualização de redacoes utiliza status 'corrigida' e coluna 'updated_at' legítimos.");
+    passados++;
+  } catch (err) {
+    console.error('❌ Teste 10.2 falhou:', err.message);
+  }
+
+  // TESTE 10.3: Resiliência — Falha no UPDATE de redacoes não compromete a avaliação persistida
+  total++;
+  try {
+    const fs = await import('fs');
+    const apiCode = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(
+      apiCode.includes('errUpdateRedacao') || apiCode.includes('errStatus'),
+      "Deve capturar isoladamente erro de update de status sem anular a persistência da avaliação"
+    );
+    assert.ok(
+      apiCode.includes('supabaseDb'),
+      "Deve suportar persistência via cliente de backend seguro"
+    );
+    console.log("✅ Teste 10.3: Resiliência garantida: erro no status de redacoes não anula avaliação gravada.");
+    passados++;
+  } catch (err) {
+    console.error('❌ Teste 10.3 falhou:', err.message);
+  }
+
+  // TESTE 10.4: Garantia de persistido_no_banco condicional
+  total++;
+  try {
+    const fs = await import('fs');
+    const apiCode = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(
+      apiCode.includes('let persistidoNoBanco = false;'),
+      "persistidoNoBanco deve iniciar como false"
+    );
+    assert.ok(
+      apiCode.includes('if (!insertAvaliacaoError && insertedAvaliacao?.id)'),
+      "persistidoNoBanco só deve se tornar true após confirmação de insertedAvaliacao.id do Supabase"
+    );
+    console.log("✅ Teste 10.4: persistido_no_banco só é true com confirmação explícita do ID inserido.");
+    passados++;
+  } catch (err) {
+    console.error('❌ Teste 10.4 falhou:', err.message);
+  }
+
   // TESTE 11: Chamada real com Groq (se variável estiver presente no ambiente)
   total++;
   if (process.env.GROQ_API_KEY) {

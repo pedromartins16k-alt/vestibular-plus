@@ -207,9 +207,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // 8. Tentativa de persistência na tabela public.redacao_avaliacoes
-    // Se a migration do Claude já tiver sido executada, grava definitivamente.
-    // Se ainda não tiver sido executada, não quebra a resposta: informa o status com transparência.
+    // 8. Persistência na tabela public.redacao_avaliacoes
+    // O INSERT é feito no backend após validação estrita de token, identidade e propriedade da redação.
+    // O user_id é sempre o authenticatedUserId do JWT validado, nunca confiado ao cliente.
+    // Se supabaseServiceKey estiver disponível, utiliza o cliente administrativo para garantir a gravação segura no backend.
     let persistidoNoBanco = false;
     let avaliacaoIdBanco = null;
     let pendenciaPersistencia = null;
@@ -232,7 +233,12 @@ export default async function handler(req, res) {
         status: 'concluida'
       };
 
-      const { data: insertedAvaliacao, error: insertAvaliacaoError } = await supabaseUser
+      // Cliente apropriado para a gravação no backend
+      const supabaseDb = supabaseServiceKey
+        ? createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
+        : supabaseUser;
+
+      const { data: insertedAvaliacao, error: insertAvaliacaoError } = await supabaseDb
         .from('redacao_avaliacoes')
         .insert(payloadAvaliacao)
         .select('id')
@@ -242,20 +248,39 @@ export default async function handler(req, res) {
         persistidoNoBanco = true;
         avaliacaoIdBanco = insertedAvaliacao.id;
 
-        // Tenta atualizar status da redação para 'corrigida' ou 'corrigida_por_ia' se permitido
+        // Atualização opcional do status da redação na tabela public.redacoes
+        // Nota: O schema aceita os status 'rascunho', 'aguardando_correcao', 'corrigida'
+        // e utiliza a coluna 'updated_at' (não 'atualizado_em').
+        // Esta operação é tratada de forma estritamente isolada: caso a política RLS
+        // ou constraints impeçam o update, a avaliação gravada NÃO é comprometida.
         try {
-          await supabaseUser
+          const { error: errUpdateRedacao } = await supabaseDb
             .from('redacoes')
-            .update({ status: 'corrigida_por_ia', atualizado_em: new Date().toISOString() })
+            .update({
+              status: 'corrigida',
+              updated_at: new Date().toISOString()
+            })
             .eq('id', redacao.id);
-        } catch (_) {
-          // Se falhar devido a constraint de status, ignora sem quebrar
+
+          if (errUpdateRedacao) {
+            console.warn(
+              '[corrigir-redacao] Aviso: Não foi possível atualizar status em redacoes:',
+              errUpdateRedacao.code || errUpdateRedacao.message
+            );
+          }
+        } catch (errStatus) {
+          console.warn('[corrigir-redacao] Exceção ao atualizar status em redacoes:', errStatus?.message);
         }
       } else {
         pendenciaPersistencia = insertAvaliacaoError?.message || 'Tabela redacao_avaliacoes não acessível';
+        console.warn(
+          '[corrigir-redacao] Falha na persistência de redacao_avaliacoes:',
+          insertAvaliacaoError?.code || insertAvaliacaoError?.message
+        );
       }
     } catch (errPersist) {
-      pendenciaPersistencia = errPersist?.message || 'Estrutura de banco pendente';
+      pendenciaPersistencia = errPersist?.message || 'Erro inesperado na persistência';
+      console.warn('[corrigir-redacao] Exceção ao persistir avaliação:', errPersist?.message);
     }
 
     // 9. Resposta de sucesso estruturada
