@@ -162,6 +162,51 @@ async function carregarHistoricoSupabase() {
       historicoAtual.sort((a, b) => new Date(b.data_envio) - new Date(a.data_envio));
       localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historicoAtual));
     }
+
+    // Consulta defensiva de avaliações salvas no Supabase (se a tabela redacao_avaliacoes já existir)
+    try {
+      const { data: avaliacoes, error: errAvaliacoes } = await supabase
+        .from('redacao_avaliacoes')
+        .select('*')
+        .order('criado_em', { ascending: false });
+
+      if (!errAvaliacoes && avaliacoes && avaliacoes.length > 0) {
+        const historicoAtual = lerHistoricoLocal(sessionUserId);
+        const mapaAvaliacoes = new Map();
+        avaliacoes.forEach(av => {
+          if (!mapaAvaliacoes.has(av.redacao_id)) {
+            mapaAvaliacoes.set(av.redacao_id, av);
+          }
+        });
+
+        let houveAtualizacao = false;
+        historicoAtual.forEach(r => {
+          if (mapaAvaliacoes.has(r.id)) {
+            const av = mapaAvaliacoes.get(r.id);
+            r.avaliacao_ia = {
+              nota_total: Number(av.nota_total),
+              nota_maxima: Number(av.nota_maxima) || 1000,
+              competencias: av.competencias || av.criterios_detalhe || [],
+              pontos_fortes: av.pontos_fortes || [],
+              pontos_melhoria: av.pontos_melhoria || [],
+              sugestoes: av.sugestoes || [],
+              feedback_geral: av.feedback_geral || '',
+              modelo_utilizado: av.modelo_ia || 'ia',
+              corrigido_em: av.criado_em,
+              persistido_no_banco: true
+            };
+            r.status = 'corrigida_por_ia';
+            houveAtualizacao = true;
+          }
+        });
+
+        if (houveAtualizacao) {
+          localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historicoAtual));
+        }
+      }
+    } catch (_) {
+      // Ignora silenciosamente caso a migration de redacao_avaliacoes ainda esteja pendente
+    }
   } catch (err) {
     console.warn('[redacao] Erro na sincronização Supabase -> Local:', err);
   }
@@ -693,6 +738,9 @@ function renderizarHistorico() {
 
   container.innerHTML = historico.map(r => {
     const dataFmt = new Date(r.data_envio).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const temAvaliacao = Boolean(r.avaliacao_ia);
+    const notaTotal = r.avaliacao_ia?.nota_total;
+    const notaMax = r.avaliacao_ia?.nota_maxima || 1000;
 
     return `
       <div class="redacao-historico-card">
@@ -700,20 +748,29 @@ function renderizarHistorico() {
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
             <span class="banca-tag">${escapeHtml(r.vestibular_nome)}</span>
             <span style="font-size:0.78rem; color:var(--text-secondary);">Enviada em ${escapeHtml(dataFmt)}</span>
+            ${temAvaliacao ? `
+              <span style="font-size:0.72rem; font-weight:800; background:rgba(34,197,94,0.14); color:#22c55e; border:1px solid rgba(34,197,94,0.3); padding:2px 8px; border-radius:var(--radius-full);">
+                ✨ Corrigida por IA
+              </span>
+            ` : ''}
           </div>
           <h3 style="font-size:1.05rem; margin:0 0 6px; font-weight:700;">${escapeHtml(r.proposta_titulo)}</h3>
-          <div style="font-size:0.8rem; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap;">
+          <div style="font-size:0.8rem; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
             <span>📝 ${r.palavras} palavras</span>
             <span>·</span>
             <span>⏱️ ${escapeHtml(r.tempo_formatado)}</span>
             <span>·</span>
-            <span style="color:#f59e0b; font-weight:600;">Aguardando correção da banca</span>
+            ${temAvaliacao ? `
+              <span style="color:#22c55e; font-weight:800;">🎯 Nota: ${notaTotal} / ${notaMax}</span>
+            ` : `
+              <span style="color:#f59e0b; font-weight:600;">Aguardando correção</span>
+            `}
           </div>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px;">
-          <button class="btn btn-secondary btn-ver-redacao" data-id="${r.id}" style="font-size:0.82rem; padding:8px 16px;">
-            Ver Texto & Critérios 📄
+          <button class="btn ${temAvaliacao ? 'btn-primary' : 'btn-secondary'} btn-ver-redacao" data-id="${r.id}" style="font-size:0.82rem; padding:8px 16px;">
+            ${temAvaliacao ? 'Ver Avaliação & Texto ✨' : 'Corrigir com IA ✨'}
           </button>
         </div>
       </div>
@@ -728,6 +785,260 @@ function renderizarHistorico() {
   });
 }
 
+/**
+ * Renderiza o bloco de avaliação da IA (ou convite para iniciar)
+ */
+function renderizarBlocoAvaliacaoIA(r, matriz) {
+  const av = r.avaliacao_ia;
+
+  if (!av) {
+    return `
+      <div id="box-solicitar-correcao" style="background:var(--bg-elevated); border:1px solid rgba(124,58,237,0.3); border-radius:var(--radius-lg); padding:20px; text-align:center; margin-bottom:20px;">
+        <div style="font-size:1.8rem; margin-bottom:6px;">✨</div>
+        <h4 style="font-size:1.05rem; font-weight:800; font-family:var(--font-display); margin:0 0 6px; color:var(--text-primary);">
+          Correção Pedagógica com Inteligência Artificial
+        </h4>
+        <p style="font-size:0.84rem; color:var(--text-secondary); max-width:480px; margin:0 auto 16px; line-height:1.5;">
+          Obtenha pontuação por competência oficial da banca <strong>${escapeHtml(matriz.nome)}</strong>, pontos fortes, oportunidades de melhoria e orientações práticas de reescrita.
+        </p>
+        <button id="btn-disparar-correcao-ia" class="btn btn-primary" data-id="${r.id}" style="padding:10px 24px; font-weight:700; font-size:0.9rem; box-shadow:0 4px 16px rgba(124,58,237,0.35);">
+          Corrigir com IA ✨
+        </button>
+        <div id="correcao-ia-feedback" style="margin-top:12px; font-size:0.82rem; display:none;"></div>
+      </div>
+    `;
+  }
+
+  // Se já possui avaliação
+  const percentual = Math.round((av.nota_total / (av.nota_maxima || 1000)) * 100);
+  const corNota = percentual >= 80 ? '#22c55e' : percentual >= 60 ? '#38bdf8' : '#f59e0b';
+
+  return `
+    <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:22px; margin-bottom:24px; box-shadow:var(--shadow-soft);">
+      <!-- Topo da Avaliação -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; border-bottom:1px solid var(--border-color); padding-bottom:16px; margin-bottom:18px;">
+        <div>
+          <span style="font-size:0.74rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--color-primary-400); background:rgba(124,58,237,0.12); padding:3px 10px; border-radius:var(--radius-full);">
+            Parecer Oficial da IA (${escapeHtml(av.modelo_utilizado || 'IA')})
+          </span>
+          <h4 style="font-size:1.15rem; font-weight:800; font-family:var(--font-display); margin:8px 0 2px;">
+            Resultado da Avaliação
+          </h4>
+          <span style="font-size:0.78rem; color:var(--text-secondary);">
+            Avaliado em ${new Date(av.corrigido_em || Date.now()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+
+        <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:12px 20px; text-align:center;">
+          <div style="font-size:1.75rem; font-weight:900; font-family:var(--font-display); color:${corNota};">
+            ${av.nota_total} <span style="font-size:0.95rem; font-weight:600; color:var(--text-secondary);">/ ${av.nota_maxima}</span>
+          </div>
+          <div style="font-size:0.72rem; text-transform:uppercase; color:var(--text-secondary); margin-top:2px;">
+            Aproveitamento (${percentual}%)
+          </div>
+        </div>
+      </div>
+
+      <!-- Status de Persistência com Transparência -->
+      <div style="margin-bottom:18px; padding:10px 14px; border-radius:var(--radius-md); font-size:0.8rem; ${av.persistido_no_banco ? 'background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); color:#22c55e;' : 'background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); color:#f59e0b;'}">
+        ${av.persistido_no_banco ? `
+          <span>✓ <strong>Avaliação gravada com segurança no Supabase</strong> (persistência definitiva vinculada ao seu perfil).</span>
+        ` : `
+          <span>⚠️ <strong>Avaliação em tempo real</strong>: Esta correção foi calculada com sucesso pela IA, mas a gravação definitiva no banco está aguardando a aplicação da migration no Supabase via <code>CLAUDE_DATABASE_PROMPT.md</code>.</span>
+        `}
+      </div>
+
+      <!-- Competências Avaliadas -->
+      <div style="margin-bottom:20px;">
+        <h5 style="font-size:0.92rem; font-weight:800; margin-bottom:12px; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em;">
+          Detalhamento por Competência
+        </h5>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          ${(av.competencias || []).map(c => {
+            const peso = Number(c.nota_maxima) || 200;
+            const pct = Math.min(100, Math.round((c.nota / peso) * 100));
+            return `
+              <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <span style="font-weight:700; font-size:0.88rem; color:var(--text-primary);">
+                    Competência ${c.numero}: ${escapeHtml(c.nome)}
+                  </span>
+                  <span style="font-weight:800; font-size:0.9rem; color:var(--color-primary-400);">
+                    ${c.nota} / ${peso} pts
+                  </span>
+                </div>
+                <!-- Barra de progresso da competência -->
+                <div style="background:rgba(255,255,255,0.06); height:6px; border-radius:var(--radius-full); overflow:hidden; margin-bottom:8px;">
+                  <div style="background:var(--gradient-primary); height:100%; width:${pct}%; transition:width 0.4s ease;"></div>
+                </div>
+                <p style="margin:0; font-size:0.82rem; color:var(--text-secondary); line-height:1.45;">
+                  ${escapeHtml(c.justificativa)}
+                </p>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Feedback Geral -->
+      ${av.feedback_geral ? `
+        <div style="margin-bottom:20px; background:rgba(124,58,237,0.06); border:1px solid rgba(124,58,237,0.18); border-radius:var(--radius-md); padding:14px 16px;">
+          <h5 style="font-size:0.88rem; font-weight:800; margin:0 0 6px; color:var(--color-primary-400);">
+            Análise Geral do Avaliador:
+          </h5>
+          <p style="margin:0; font-size:0.84rem; line-height:1.55; color:var(--text-primary);">
+            ${escapeHtml(av.feedback_geral)}
+          </p>
+        </div>
+      ` : ''}
+
+      <!-- Pontos Fortes e Pontos a Melhorar -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:20px;">
+        <!-- Fortes -->
+        <div style="background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.2); border-radius:var(--radius-md); padding:14px;">
+          <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#22c55e; display:flex; align-items:center; gap:6px;">
+            <span>👍</span> Pontos Fortes
+          </h5>
+          <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
+            ${(av.pontos_fortes || []).map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+          </ul>
+        </div>
+
+        <!-- Melhorias -->
+        <div style="background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:var(--radius-md); padding:14px;">
+          <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#f59e0b; display:flex; align-items:center; gap:6px;">
+            <span>🎯</span> Oportunidades de Melhoria
+          </h5>
+          <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
+            ${(av.pontos_melhoria || []).map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+
+      <!-- Sugestões de Estudo -->
+      ${(av.sugestoes && av.sugestoes.length > 0) ? `
+        <div style="background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.2); border-radius:var(--radius-md); padding:14px; margin-bottom:18px;">
+          <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+            <span>💡</span> Sugestões Práticas de Treino
+          </h5>
+          <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
+            ${av.sugestoes.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+
+      <!-- Reavaliar Button & Aviso -->
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding-top:14px; border-top:1px solid var(--border-color);">
+        <button id="btn-reavaliar-ia" class="btn btn-secondary" data-id="${r.id}" style="font-size:0.8rem; padding:6px 14px;">
+          Reavaliar com IA 🔄
+        </button>
+        <span style="font-size:0.74rem; color:var(--text-secondary); max-width:440px;">
+          ${escapeHtml(av.aviso_educacional || 'Estimativa pedagógica de treino gerada por IA.')}
+        </span>
+      </div>
+      <div id="correcao-ia-feedback" style="margin-top:10px; font-size:0.82rem; display:none;"></div>
+    </div>
+  `;
+}
+
+async function solicitarCorrecaoIA(redacaoId, btn) {
+  if (!btn || btn.disabled) return;
+
+  const feedbackEl = document.getElementById('correcao-ia-feedback');
+  if (feedbackEl) {
+    feedbackEl.style.display = 'block';
+    feedbackEl.style.color = 'var(--text-secondary)';
+    feedbackEl.textContent = '⏳ Verificando credenciais e iniciando análise com IA...';
+  }
+
+  // Verifica autenticação
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    if (feedbackEl) {
+      feedbackEl.style.color = '#ef4444';
+      feedbackEl.textContent = '⚠️ É necessário estar logado na sua conta para solicitar a correção por IA.';
+    }
+    alert('⚠️ Faça login na sua conta do Vestibular+ para corrigir a redação.');
+    return;
+  }
+
+  // Bloqueio de cliques duplicados e estado de carregamento
+  btn.disabled = true;
+  const textoOriginalBtn = btn.innerHTML;
+  btn.innerHTML = 'Analisando redação com IA... ⏳';
+
+  // Animação de status pedagógico
+  let step = 0;
+  const statusMsgs = [
+    'Analisando estrutura dissertativa e gramática... ⏳',
+    'Avaliando repertório sociocultural e argumentação... ⏳',
+    'Computando notas oficiais por competência da banca... ⏳',
+    'Sintetizando pontos fortes e orientações práticas... ⏳'
+  ];
+  const intervalStatus = setInterval(() => {
+    step = (step + 1) % statusMsgs.length;
+    if (feedbackEl) feedbackEl.textContent = statusMsgs[step];
+  }, 3500);
+
+  try {
+    const response = await fetch('/api/corrigir-redacao', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ redacaoId })
+    });
+
+    clearInterval(intervalStatus);
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (response.status === 503) {
+        throw new Error(
+          '🔑 Provedor de IA não configurado no servidor. Configure a variável GEMINI_API_KEY (ou OPENAI_API_KEY) no painel da Vercel para habilitar a correção.'
+        );
+      }
+      throw new Error(data?.error || `Falha na requisição (${response.status})`);
+    }
+
+    if (!data.avaliacao) {
+      throw new Error('A resposta do servidor não continha os dados da avaliação.');
+    }
+
+    // Atualiza histórico local com o retorno autêntico do servidor
+    const historico = lerHistoricoLocal(sessionUserId);
+    const itemIndex = historico.findIndex(item => item.id === redacaoId);
+    if (itemIndex !== -1) {
+      historico[itemIndex].avaliacao_ia = {
+        ...data.avaliacao,
+        persistido_no_banco: Boolean(data.persistido_no_banco)
+      };
+      historico[itemIndex].status = 'corrigida_por_ia';
+      localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historico));
+    }
+
+    // Sucesso! Re-renderiza o modal atualizado
+    abrirModalDetalhesRedacao(redacaoId);
+    renderizarHistorico();
+
+  } catch (err) {
+    clearInterval(intervalStatus);
+    console.error('[redacao] Erro na correção por IA:', err);
+    btn.disabled = false;
+    btn.innerHTML = textoOriginalBtn;
+
+    if (feedbackEl) {
+      feedbackEl.style.display = 'block';
+      feedbackEl.style.color = '#ef4444';
+      feedbackEl.innerHTML = `❌ ${escapeHtml(err.message)}`;
+    } else {
+      alert(`❌ ${err.message}`);
+    }
+  }
+}
+
 function abrirModalDetalhesRedacao(redacaoId) {
   const historico = lerHistoricoLocal(sessionUserId);
   const r = historico.find(item => item.id === redacaoId);
@@ -740,12 +1051,22 @@ function abrirModalDetalhesRedacao(redacaoId) {
 
   conteudo.innerHTML = `
     <div style="margin-bottom:16px;">
-      <span class="banca-tag">${escapeHtml(r.vestibular_nome)}</span>
-      <h3 style="font-size:1.15rem; margin:8px 0 4px; font-family:var(--font-display);">${escapeHtml(r.proposta_titulo)}</h3>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+        <span class="banca-tag">${escapeHtml(r.vestibular_nome)}</span>
+        ${r.avaliacao_ia ? `
+          <span style="font-size:0.75rem; font-weight:800; color:#22c55e;">
+            ✓ Redação Avaliada
+          </span>
+        ` : ''}
+      </div>
+      <h3 style="font-size:1.15rem; margin:6px 0 4px; font-family:var(--font-display);">${escapeHtml(r.proposta_titulo)}</h3>
       <div style="font-size:0.8rem; color:var(--text-secondary);">
         Extensão: ${r.palavras} palavras · Tempo de escrita: ${escapeHtml(r.tempo_formatado)}
       </div>
     </div>
+
+    <!-- Bloco Dinâmico de Correção com IA -->
+    ${renderizarBlocoAvaliacaoIA(r, matriz)}
 
     <!-- Texto do Aluno -->
     <div style="margin-bottom:20px;">
@@ -754,10 +1075,10 @@ function abrirModalDetalhesRedacao(redacaoId) {
     </div>
 
     <!-- Matriz de Critérios Oficiais da Banca -->
-    <div style="background:rgba(124,58,237,0.08); border:1px solid rgba(124,58,237,0.2); border-radius:var(--radius-md); padding:16px;">
+    <div style="background:rgba(124,58,237,0.06); border:1px solid rgba(124,58,237,0.2); border-radius:var(--radius-md); padding:16px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <strong style="font-size:0.92rem; color:var(--color-primary-400);">
-          Critérios de Avaliação (${matriz.nome})
+          Critérios de Avaliação Oficiais (${matriz.nome})
         </strong>
         <span style="font-size:0.8rem; font-weight:700;">Máx: ${matriz.pontuacao_maxima} pts</span>
       </div>
@@ -774,14 +1095,28 @@ function abrirModalDetalhesRedacao(redacaoId) {
         `).join('')}
       </div>
     </div>
-
-    <div style="margin-top:18px; font-size:0.82rem; color:var(--text-secondary); text-align:center;">
-      💡 Esta redação está registrada no seu portfólio. As competências acima orientam sua autoavaliação e correções futuras.
-    </div>
   `;
 
   const elTexto = document.getElementById('modal-detalhe-texto-aluno');
   if (elTexto) elTexto.textContent = r.texto || '';
+
+  // Configura listeners do botão de correção
+  const btnCorrigir = document.getElementById('btn-disparar-correcao-ia');
+  if (btnCorrigir) {
+    btnCorrigir.addEventListener('click', () => {
+      solicitarCorrecaoIA(r.id, btnCorrigir);
+    });
+  }
+
+  const btnReavaliar = document.getElementById('btn-reavaliar-ia');
+  if (btnReavaliar) {
+    btnReavaliar.addEventListener('click', () => {
+      const confirmou = confirm('Deseja solicitar uma nova avaliação desta redação pela IA?');
+      if (confirmou) {
+        solicitarCorrecaoIA(r.id, btnReavaliar);
+      }
+    });
+  }
 
   modal.classList.add('open');
 }

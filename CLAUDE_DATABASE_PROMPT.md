@@ -302,72 +302,47 @@ Informe ao usuário exatamente:
 
 ---
 
-# ETAPA 12.1: LABORATÓRIO DE REDAÇÃO (PERSISTÊNCIA DEFINITIVA SUPABASE)
+# ETAPA 13: CORREÇÃO DE REDAÇÃO POR IA (TABELA DE AVALIAÇÕES)
 
-> **Contexto:** O Laboratório de Redação do Vestibular+ foi implementado e auditado no frontend (`src/pages/redacao.html`, `src/scripts/redacao.js`).  
-> O rascunho temporário é mantido isolado por usuário (`redacao_draft_<userId>_<propostaId>`) no `localStorage`.  
-> Para garantir persistência server-side definitiva de redações finalizadas com isolamento estrito e histórico de avaliações por banca, execute a migration abaixo no Supabase SQL Editor.
+> **Contexto:** O Laboratório de Redação do Vestibular+ possui agora a funcionalidade de **Correção por IA** (`/api/corrigir-redacao.js` e `src/scripts/redacao.js`).
+> A tabela `public.redacoes` já existe no banco Supabase com os campos: `id`, `user_id`, `proposta_id`, `titulo`, `vestibular_id`, `conteudo`, `total_palavras`, `total_caracteres`, `total_linhas`, `tempo_segundos`, `status`, `finalizada_em`, `created_at`.
+>
+> Para persistir permanentemente as correções e avaliações geradas pela IA com histórico completo e suporte a reavaliações, execute a migration idempotente abaixo no Supabase SQL Editor:
+> `https://supabase.com/dashboard/project/jruyyzftoplcobketrsf/sql`
 
 ```sql
 -- ==============================================================================
--- 1. TABELA DE REDAÇÕES ENTREGUES
+-- VESTIBULAR+ — ETAPA 13: TABELA DE AVALIAÇÕES DE REDAÇÃO (IA E BANCAS)
+-- Executar no SQL Editor do Supabase (Project: jruyyzftoplcobketrsf)
 -- ==============================================================================
-CREATE TABLE IF NOT EXISTS public.redacoes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  proposta_id TEXT NOT NULL,
-  titulo_proposta TEXT NOT NULL,
-  banca TEXT NOT NULL,
-  ano INTEGER,
-  texto TEXT NOT NULL,
-  palavras INTEGER NOT NULL DEFAULT 0,
-  caracteres INTEGER NOT NULL DEFAULT 0,
-  linhas INTEGER NOT NULL DEFAULT 0,
-  tempo_segundos INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'aguardando_correcao', -- 'rascunho', 'aguardando_correcao', 'corrigida'
-  criado_em TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
-  atualizado_em TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
-);
 
--- Ativar RLS
-ALTER TABLE public.redacoes ENABLE ROW LEVEL SECURITY;
-
--- Políticas de RLS: Isolamento estrito por usuário
-DROP POLICY IF EXISTS "Usuário acessa apenas suas próprias redações" ON public.redacoes;
-CREATE POLICY "Usuário acessa apenas suas próprias redações"
-  ON public.redacoes FOR ALL
-  TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- Índices para consultas otimizadas
-CREATE INDEX IF NOT EXISTS idx_redacoes_user_data ON public.redacoes(user_id, criado_em DESC);
-CREATE INDEX IF NOT EXISTS idx_redacoes_banca ON public.redacoes(user_id, banca);
-
--- Concessão de permissões de tabela para a API PostgREST do Supabase
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.redacoes TO authenticated;
-GRANT SELECT ON public.redacoes TO anon;
-
--- ==============================================================================
--- 2. TABELA DE AVALIAÇÕES / CRITÉRIOS DE CORREÇÃO POR BANCA
--- ==============================================================================
+-- 1. CRIAÇÃO DA TABELA redacao_avaliacoes (Idempotente)
 CREATE TABLE IF NOT EXISTS public.redacao_avaliacoes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   redacao_id UUID NOT NULL REFERENCES public.redacoes(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  tipo_avaliacao TEXT NOT NULL DEFAULT 'autoavaliacao', -- 'autoavaliacao', 'monitor', 'ia', 'banca_oficial'
-  nota_total NUMERIC(6, 2),
+  tipo_avaliacao TEXT NOT NULL DEFAULT 'ia', -- 'ia', 'autoavaliacao', 'monitor', 'banca_oficial'
+  modelo_ia TEXT,                            -- ex: 'google/gemini-1.5-flash', 'openai/gpt-4o-mini'
+  nota_total NUMERIC(6, 2) NOT NULL,
   nota_maxima NUMERIC(6, 2) NOT NULL DEFAULT 1000,
-  criterios_detalhe JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{ "criterio": "C1", "nome": "...", "nota": 160, "max": 200, "comentario": "..." }]
+  competencias JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{ "numero": 1, "nome": "...", "nota": 160, "nota_maxima": 200, "justificativa": "..." }]
+  criterios_detalhe JSONB DEFAULT '[]'::jsonb,      -- Compatibilidade com versões prévias
   pontos_fortes TEXT[] DEFAULT '{}',
   pontos_melhoria TEXT[] DEFAULT '{}',
-  comentario_geral TEXT,
+  sugestoes TEXT[] DEFAULT '{}',
+  feedback_geral TEXT,
+  status TEXT NOT NULL DEFAULT 'concluida',         -- 'concluida', 'pendente', 'reavaliada'
   criado_em TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
 
--- Ativar RLS
+-- Comentários de documentação do schema
+COMMENT ON TABLE public.redacao_avaliacoes IS 'Avaliações e correções de redações realizadas por IA ou banca avaliadora.';
+COMMENT ON COLUMN public.redacao_avaliacoes.competencias IS 'Array JSONB contendo as notas e justificativas por competência oficial da banca.';
+
+-- 2. HABILITAR ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.redacao_avaliacoes ENABLE ROW LEVEL SECURITY;
 
+-- 3. POLÍTICA DE ACESSO: Isolamento estrito por usuário
 DROP POLICY IF EXISTS "Usuário acessa apenas avaliações de suas próprias redações" ON public.redacao_avaliacoes;
 CREATE POLICY "Usuário acessa apenas avaliações de suas próprias redações"
   ON public.redacao_avaliacoes FOR ALL
@@ -375,20 +350,23 @@ CREATE POLICY "Usuário acessa apenas avaliações de suas próprias redações"
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
-CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_redacao ON public.redacao_avaliacoes(redacao_id);
-CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_user ON public.redacao_avaliacoes(user_id);
+-- 4. ÍNDICES DE PERFORMANCE E CONSULTAS
+CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_redacao ON public.redacao_avaliacoes(redacao_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_user ON public.redacao_avaliacoes(user_id, criado_em DESC);
 
--- Concessão de permissões de tabela para a API PostgREST do Supabase
+-- 5. GRANTS PARA A API POSTGREST DO SUPABASE
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.redacao_avaliacoes TO authenticated;
 GRANT SELECT ON public.redacao_avaliacoes TO anon;
 
--- ==============================================================================
--- 3. VERIFICAÇÃO FINAL
--- ==============================================================================
-SELECT tablename, rowsecurity 
-FROM pg_tables 
-WHERE schemaname = 'public' 
-AND tablename IN ('redacoes', 'redacao_avaliacoes');
+-- 6. VERIFICAÇÃO FINAL APÓS EXECUÇÃO
+SELECT 
+  column_name, 
+  data_type, 
+  is_nullable 
+FROM information_schema.columns 
+WHERE table_schema = 'public' 
+  AND table_name = 'redacao_avaliacoes'
+ORDER BY ordinal_position;
 ```
 
 ---
@@ -397,5 +375,5 @@ AND tablename IN ('redacoes', 'redacao_avaliacoes');
 
 ```sql
 DROP TABLE IF EXISTS public.redacao_avaliacoes CASCADE;
-DROP TABLE IF EXISTS public.redacoes CASCADE;
 ```
+
