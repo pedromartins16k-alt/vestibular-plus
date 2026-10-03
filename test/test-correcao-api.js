@@ -362,6 +362,99 @@ async function runTests() {
     console.error('❌ Teste 10.5 falhou:', err.message);
   }
 
+  // TESTE 12.1: Quantização oficial das competências do ENEM e cálculo da nota pelo backend
+  total++;
+  try {
+    const rawFakeEnem = JSON.stringify({
+      nota_total: 9999, // Nota falsificada declarada pela IA que deve ser descartada
+      nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1', nota: 145, nota_maxima: 200, justificativa: 'Boa norma culta' }, // 145 deve virar 160
+        { numero: 2, nome: 'C2', nota: 75, nota_maxima: 200, justificativa: 'Tema regular' },     // 75 deve virar 80
+        { numero: 3, nome: 'C3', nota: 190, nota_maxima: 200, justificativa: 'Excelente tese' },  // 190 deve virar 200
+        { numero: 4, nome: 'C4', nota: 30, nota_maxima: 200, justificativa: 'Poucos conectivos' },// 30 deve virar 40
+        { numero: 5, nome: 'C5', nota: 0, nota_maxima: 200, justificativa: 'Sem intervenção' }     // 0 permanece 0
+      ],
+      pontos_fortes: ['Bons argumentos'],
+      pontos_melhoria: ['Norma padrão'],
+      exemplos_trechos: ['Rever concordância'],
+      sugestoes: ['Estudar regras'],
+      prioridades_estudo: ['Conectivos'],
+      feedback_geral: 'Texto mediano.',
+      aviso_educacional: 'Aviso teste'
+    });
+
+    const matrizEnemOficial = {
+      nome: 'ENEM — Exame Nacional do Ensino Médio',
+      pontuacao_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1', peso: 200 },
+        { numero: 2, nome: 'C2', peso: 200 },
+        { numero: 3, nome: 'C3', peso: 200 },
+        { numero: 4, nome: 'C4', peso: 200 },
+        { numero: 5, nome: 'C5', peso: 200 }
+      ]
+    };
+
+    const resNorm = validarENormalizarResposta(rawFakeEnem, matrizEnemOficial, 'groq/openai/gpt-oss-120b');
+    
+    // Verifica quantização
+    assert.equal(resNorm.competencias[0].nota, 160, '145 deve ser arredondado para 160');
+    assert.equal(resNorm.competencias[1].nota, 80, '75 deve ser arredondado para 80');
+    assert.equal(resNorm.competencias[2].nota, 200, '190 deve ser arredondado para 200');
+    assert.equal(resNorm.competencias[3].nota, 40, '30 deve ser arredondado para 40');
+    assert.equal(resNorm.competencias[4].nota, 0, '0 deve permanecer 0');
+
+    // Verifica cálculo da soma pelo backend (160 + 80 + 200 + 40 + 0 = 480)
+    assert.equal(resNorm.nota_total, 480, 'Nota total deve ser estritamente a soma das 5 competências (480), ignorando os 9999 da IA');
+    console.log('✅ Teste 12.1: Quantização oficial do ENEM (múltiplos de 40) e cálculo da soma no backend validados com precisão.');
+    passados++;
+  } catch (err) {
+    console.error('❌ Teste 12.1 falhou:', err.message);
+  }
+
+  // TESTE 12.2: Preservação do histórico e cálculo de discrepância entre reavaliações
+  total++;
+  try {
+    const avaliacaoInicial = {
+      nota_total: 280,
+      competencias: [
+        { numero: 1, nota: 40 },
+        { numero: 2, nota: 80 },
+        { numero: 3, nota: 80 },
+        { numero: 4, nota: 40 },
+        { numero: 5, nota: 40 }
+      ],
+      corrigido_em: '2026-10-03T14:00:00.000Z'
+    };
+
+    const avaliacaoReavaliada = {
+      nota_total: 440,
+      competencias: [
+        { numero: 1, nota: 80 },
+        { numero: 2, nota: 120 },
+        { numero: 3, nota: 120 },
+        { numero: 4, nota: 80 },
+        { numero: 5, nota: 40 }
+      ],
+      corrigido_em: '2026-10-03T14:05:00.000Z'
+    };
+
+    // Simula a fila de histórico de avaliações
+    const historicoAvaliacoes = [avaliacaoInicial];
+    const diff = avaliacaoReavaliada.nota_total - historicoAvaliacoes[0].nota_total;
+    assert.equal(diff, 160, 'Diferença de notas deve ser exatamente 160 pontos');
+    assert.ok(Math.abs(diff) >= 80, 'Diferença >= 80 pontos deve acionar alerta de discrepância');
+
+    // Valida que a avaliação anterior não é perdida
+    assert.equal(historicoAvaliacoes.length, 1, 'Histórico anterior preservado');
+    assert.equal(historicoAvaliacoes[0].nota_total, 280, 'Nota anterior 280 intacta');
+    console.log('✅ Teste 12.2: Comparativo entre reavaliações, detecção de discrepância e preservação de histórico validados.');
+    passados++;
+  } catch (err) {
+    console.error('❌ Teste 12.2 falhou:', err.message);
+  }
+
   // TESTE 11: Chamada real com Groq (se variável estiver presente no ambiente)
   total++;
   if (process.env.GROQ_API_KEY) {

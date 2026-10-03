@@ -20,14 +20,15 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto }) {
   const nomeBanca = matriz?.nome || vestibular?.toUpperCase() || 'Vestibular';
   const pontuacaoMax = matriz?.pontuacao_maxima || 1000;
   const genero = matriz?.tipo_genero || 'Dissertativo-argumentativo';
+  const isEnem = (vestibular || '').toLowerCase() === 'enem' || nomeBanca.includes('ENEM');
   
   const competenciasDesc = (matriz?.competencias || []).map(c => 
     `- Competência ${c.numero} (${c.nome}): peso máximo de ${c.peso} pontos. Critério oficial: ${c.descricao}`
   ).join('\n');
 
-  return `Você é um avaliador e corretor oficial sênior de redações para bancas de vestibulares brasileiros (especialista na banca ${nomeBanca}).
+  return `Você é um avaliador e corretor oficial sênior de redações para bancas de vestibulares brasileiros (especialista rigoroso na banca ${nomeBanca}).
 
-Sua missão é corrigir e avaliar a redação de um estudante com rigor técnico, empatia pedagógica e critérios objetivos.
+Sua missão é corrigir e avaliar a redação de um estudante com rigor técnico estrito, fidelidade total à grade oficial do exame e critérios estritamente objetivos.
 
 INFORMAÇÕES DA PROPOSTA:
 - Vestibular / Banca: ${nomeBanca}
@@ -38,27 +39,33 @@ INFORMAÇÕES DA PROPOSTA:
 MATRIZ OFICIAL DE COMPETÊNCIAS / CRITÉRIOS:
 ${competenciasDesc || '- Avaliação geral de domínio da norma padrão, repertório, coesão, coerência e proposta de intervenção/conclusão.'}
 
-TEXTO REDIGIDO PELO ESTUDANTE:
+TEXTO REDIGIDO PELO ESTUDANTE (analise caractere por caractere, parágrafo por parágrafo):
 """
 ${texto}
 """
 
-DIRETRIZES E REGRAS ABSOLUTAS DA AVALIAÇÃO:
-1. Avalie EXCLUSIVAMENTE o texto real acima redigido. NUNCA invente trechos, repertórios, citações ou erros que o aluno não escreveu.
-2. Seja justo e condizente com a régua e matriz de correção da banca ${nomeBanca}.
-3. A soma das notas das competências DEVE ser exatamente igual ao campo "nota_total".
-4. Cada competência deve ter sua nota atribuída entre 0 e o peso máximo estipulado para ela na matriz.
-5. Se for ENEM: as notas de cada competência devem ser múltiplos de 40 (0, 40, 80, 120, 160, 200) conforme a cartilha oficial do INEP. A nota total deve ser entre 0 e 1000.
-6. Se for FUVEST: notas graduadas de 0 a 20 na C1, 0 a 15 na C2 e 0 a 15 na C3 (total máx 50).
-7. Se for UNICAMP: notas graduadas de 0 a 16 por critério (total máx 48).
-8. Se for UNESP: notas graduadas conforme sua matriz (total máx 28).
-9. Para CADA competência, forneça uma análise detalhada e justificada, citando trechos específicos da redação para ilustrar o acerto ou desvio.
-10. Aponte entre 2 e 4 pontos fortes genuínos demonstrados no texto.
-11. Aponte problemas identificados no texto (aspectos estruturais, gramaticais ou argumentativos) acompanhados de trechos que precisam de revisão quando aplicável.
-12. Forneça entre 2 e 3 sugestões práticas e acionáveis de reescrita e aprimoramento.
-13. Conclua com as prioridades claras de estudo recomendadas para a evolução do estudante.
+DIRETRIZES E REGRAS ABSOLUTAS DE AVALIAÇÃO E CONSISTÊNCIA:
+1. Avalie EXCLUSIVAMENTE o texto real acima transcrito. É ESTRITAMENTE PROIBIDO inventar repertórios, citações, parágrafos ou erros inexistentes.
+2. Seja calibrado e imparcial. Não altere a régua de avaliação arbitrariamente.
+3. Critérios de fuga ao tema e extensão:
+   - Se o texto possuir até 7 linhas ou demonstrar fuga total ao tema/não atendimento ao gênero: a nota deve ser 0 (anulação sumária).
+   - Se houver tangenciamento do tema: limite severo na Competência 2 (máximo 40 pontos no ENEM).
+${isEnem ? `4. REGRA DE OURO DO ENEM (Escala Oficial INEP):
+   - Cada uma das 5 competências DEVE receber OBRIGATORIAMENTE uma das 6 notas da matriz oficial: 0, 40, 80, 120, 160 ou 200 pontos. NUNCA atribua valores intermediários como 70, 90, 110, 130, 150 ou 175.
+   - Níveis de desempenho por competência (0 a 200):
+     * 0 pontos: Ausência total / Não atende / Desvio completo.
+     * 40 pontos: Desempenho precário (muitos desvios gramaticais graves / repertório não legitimado ou cópia dos textos / sem projeto de texto perceptível / intervenção vaga).
+     * 80 pontos: Desempenho insuficiente (domínio rudimentar / repertório baseado apenas no senso comum / argumentação com falhas e contradições / intervenção incompleta com apenas 1 ou 2 elementos).
+     * 120 pontos: Desempenho mediano (domínio regular da norma culta com alguns desvios / repertório legitimado mas não totalmente produtivo / projeto de texto com deslizes / proposta com 3 elementos válidos).
+     * 160 pontos: Desempenho bom (bom domínio, poucos desvios gramaticais / repertório legitimado e produtivo articulado à tese / projeto de texto estratégico / proposta com 4 elementos válidos).
+     * 200 pontos: Desempenho excelente (estrutura sintática excelente, no máximo 2 desvios gramaticais leves / repertório legítimo, pertinente e altamente produtivo / projeto de texto impecável / intervenção completa com os 5 elementos: agente, ação, meio/modo, efeito e detalhamento).` : `4. Atribua as notas de cada critério conforme os pesos oficiais estipulados na matriz (${pontuacaoMax} pts).`}
+5. Em cada competência, fundamente a nota com base em EVIDÊNCIAS CONCRETAS do texto do aluno (ex: desvios gramaticais específicos para a C1, repertório citado para a C2, operadores argumentativos para a C4, proposta de intervenção para a C5).
+6. Aponte de 2 a 4 pontos fortes reais do texto.
+7. Aponte problemas identificados no texto de forma construtiva e realista.
+8. Forneça trechos literais do texto e a respectiva sugestão de reescrita aprimorada.
+9. Forneça sugestões práticas de estudo e prioridades de treino.
 
-RESPONDA OBRIGATORIAMENTE EM JSON VÁLIDO no seguinte formato exato (sem markdown em volta, apenas o JSON puro):
+RESPONDA OBRIGATORIAMENTE EM JSON VÁLIDO no seguinte formato exato (sem blocos markdown adicionais):
 {
   "nota_total": number,
   "nota_maxima": ${pontuacaoMax},
@@ -68,25 +75,25 @@ RESPONDA OBRIGATORIAMENTE EM JSON VÁLIDO no seguinte formato exato (sem markdow
       "nome": "string",
       "nota": number,
       "nota_maxima": number,
-      "justificativa": "string com justificativa analítica fundamentada, referenciando aspectos do texto"
+      "justificativa": "string com justificativa analítica fundamentada citando trechos reais"
     }
   ],
   "pontos_fortes": [
     "string"
   ],
   "pontos_melhoria": [
-    "string apontando o problema e como corrigir"
+    "string"
   ],
   "exemplos_trechos": [
-    "string com exemplo de trecho do texto e como reescrever melhor"
+    "string"
   ],
   "sugestoes": [
-    "string com orientação prática de estudo"
+    "string"
   ],
   "prioridades_estudo": [
-    "string indicando prioridade de estudo para o próximo texto"
+    "string"
   ],
-  "feedback_geral": "string com análise holística do texto e conclusão pedagógica",
+  "feedback_geral": "string com parecer pedagógico geral",
   "aviso_educacional": "Esta avaliação é uma estimativa pedagógica gerada por inteligência artificial para fins de treino e autoavaliação, não substituindo a correção oficial da banca examinadora."
 }`;
 }
@@ -111,7 +118,7 @@ async function chamarGroq(apiKey, prompt) {
       signal: controller.signal,
       body: JSON.stringify({
         model: modelo,
-        temperature: 0.2,
+        temperature: 0.05,
         reasoning_effort: 'medium',
         response_format: { type: 'json_object' },
         messages: [
@@ -311,24 +318,31 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado) {
 
   const pontuacaoMaximaOficial = Number(matriz?.pontuacao_maxima) || 1000;
   const competenciasOficiais = matriz?.competencias || [];
+  const isEnem = (matriz?.nome || '').toUpperCase().includes('ENEM');
 
-  // Normaliza competências
+  // Normaliza competências com calibração estrita
   const competenciasNormalizadas = (Array.isArray(parsed.competencias) ? parsed.competencias : []).map((comp, idx) => {
     const oficial = competenciasOficiais[idx] || {};
     const pesoMax = Number(oficial.peso) || Number(comp.nota_maxima) || 200;
     const notaBruta = Number(comp.nota) || 0;
-    const notaClamped = Math.max(0, Math.min(pesoMax, Math.round(notaBruta)));
+    let notaClamped = Math.max(0, Math.min(pesoMax, Math.round(notaBruta)));
+
+    // Para o ENEM, a nota oficial de cada competência é estritamente múltipla de 40 (0, 40, 80, 120, 160, 200)
+    if (isEnem && pesoMax === 200) {
+      notaClamped = Math.round(notaClamped / 40) * 40;
+      notaClamped = Math.max(0, Math.min(200, notaClamped));
+    }
 
     return {
       numero: Number(comp.numero) || oficial.numero || (idx + 1),
       nome: String(comp.nome || oficial.nome || `Competência ${idx + 1}`),
       nota: notaClamped,
       nota_maxima: pesoMax,
-      justificativa: String(comp.justificativa || 'Avaliação pedagógica realizada com base nos critérios da banca.')
+      justificativa: String(comp.justificativa || 'Avaliação pedagógica fundamentada nos critérios oficiais da banca.')
     };
   });
 
-  // Calcula soma das competências se houver lista
+  // Calcula SEMPRE a nota total pela soma real das competências calibradas no backend
   let notaCalculada = competenciasNormalizadas.reduce((acc, c) => acc + c.nota, 0);
   if (competenciasNormalizadas.length === 0) {
     notaCalculada = Math.max(0, Math.min(pontuacaoMaximaOficial, Number(parsed.nota_total) || 0));

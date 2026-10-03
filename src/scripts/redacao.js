@@ -184,31 +184,41 @@ async function carregarHistoricoSupabase() {
         );
       } else if (avaliacoes && avaliacoes.length > 0) {
         const historicoAtual = lerHistoricoLocal(sessionUserId);
-        const mapaAvaliacoes = new Map();
+        
+        // Agrupa todas as avaliações por redacao_id ordenadas por criado_em desc
+        const mapaTodasAvaliacoes = new Map();
         avaliacoes.forEach(av => {
-          if (!mapaAvaliacoes.has(av.redacao_id)) {
-            mapaAvaliacoes.set(av.redacao_id, av);
+          if (!mapaTodasAvaliacoes.has(av.redacao_id)) {
+            mapaTodasAvaliacoes.set(av.redacao_id, []);
           }
+          mapaTodasAvaliacoes.get(av.redacao_id).push(av);
         });
+
+        function formatarItemAvaliacao(av) {
+          return {
+            nota_total: Number(av.nota_total),
+            nota_maxima: Number(av.nota_maxima) || 1000,
+            competencias: av.competencias || av.criterios_detalhe || [],
+            pontos_fortes: av.pontos_fortes || [],
+            pontos_melhoria: av.pontos_melhoria || [],
+            exemplos_trechos: av.exemplos_trechos || [],
+            sugestoes: av.sugestoes || [],
+            prioridades_estudo: av.prioridades_estudo || [],
+            feedback_geral: av.feedback_geral || '',
+            modelo_utilizado: av.modelo_ia || 'ia',
+            corrigido_em: av.criado_em,
+            persistido_no_banco: true
+          };
+        }
 
         let houveAtualizacao = false;
         historicoAtual.forEach(r => {
-          if (mapaAvaliacoes.has(r.id)) {
-            const av = mapaAvaliacoes.get(r.id);
-            r.avaliacao_ia = {
-              nota_total: Number(av.nota_total),
-              nota_maxima: Number(av.nota_maxima) || 1000,
-              competencias: av.competencias || av.criterios_detalhe || [],
-              pontos_fortes: av.pontos_fortes || [],
-              pontos_melhoria: av.pontos_melhoria || [],
-              exemplos_trechos: av.exemplos_trechos || [],
-              sugestoes: av.sugestoes || [],
-              prioridades_estudo: av.prioridades_estudo || [],
-              feedback_geral: av.feedback_geral || '',
-              modelo_utilizado: av.modelo_ia || 'ia',
-              corrigido_em: av.criado_em,
-              persistido_no_banco: true
-            };
+          if (mapaTodasAvaliacoes.has(r.id)) {
+            const lista = mapaTodasAvaliacoes.get(r.id);
+            // A mais recente é a avaliação ativa
+            r.avaliacao_ia = formatarItemAvaliacao(lista[0]);
+            // As demais são o histórico de avaliações passadas
+            r.historico_avaliacoes = lista.slice(1).map(formatarItemAvaliacao);
             r.status = 'corrigida_por_ia';
             houveAtualizacao = true;
           }
@@ -862,6 +872,52 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         `}
       </div>
 
+      <!-- Comparativo com Avaliação Anterior (Reavaliação) -->
+      ${(() => {
+        const hist = Array.isArray(r.historico_avaliacoes) ? r.historico_avaliacoes : [];
+        if (hist.length === 0) return '';
+        const anterior = hist[0];
+        const diffNota = av.nota_total - anterior.nota_total;
+        const diffSinal = diffNota > 0 ? `+${diffNota}` : `${diffNota}`;
+        const corDiff = diffNota > 0 ? '#22c55e' : diffNota < 0 ? '#ef4444' : '#38bdf8';
+
+        return `
+          <div style="margin-bottom:20px; padding:14px 16px; border-radius:var(--radius-md); background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+              <strong style="font-size:0.88rem; color:#38bdf8; display:flex; align-items:center; gap:6px;">
+                <span>⚖️</span> Comparativo com a Avaliação Anterior
+              </strong>
+              <span style="font-size:0.8rem; font-weight:800; color:${corDiff};">
+                Variação: ${diffSinal} pontos (${anterior.nota_total} → ${av.nota_total})
+              </span>
+            </div>
+            ${Math.abs(diffNota) >= 80 ? `
+              <div style="margin-bottom:10px; padding:8px 12px; border-radius:var(--radius-sm); font-size:0.78rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); color:#f59e0b;">
+                ⚠️ <strong>Aviso de discrepância:</strong> Houve variação significativa entre as avaliações (${Math.abs(diffNota)} pts). Ambas as análises estão preservadas abaixo para seu acompanhamento pedagógico.
+              </div>
+            ` : ''}
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px; font-size:0.78rem;">
+              ${(av.competencias || []).map((c, i) => {
+                const compAntiga = (anterior.competencias || [])[i];
+                const notaAnt = compAntiga ? compAntiga.nota : '-';
+                const deltaC = compAntiga ? c.nota - compAntiga.nota : 0;
+                const deltaStr = deltaC > 0 ? `+${deltaC}` : `${deltaC}`;
+                return `
+                  <div style="background:var(--bg-elevated); padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--border-color); text-align:center;">
+                    <div style="font-weight:700; color:var(--text-secondary); margin-bottom:2px;">C${c.numero}</div>
+                    <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary);">${c.nota} <span style="font-size:0.75rem; color:var(--text-secondary);">(${notaAnt})</span></div>
+                    <div style="font-size:0.7rem; font-weight:700; color:${deltaC > 0 ? '#22c55e' : deltaC < 0 ? '#ef4444' : 'var(--text-secondary)'};">${deltaStr}</div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+            <div style="margin-top:10px; font-size:0.74rem; color:var(--text-secondary); text-align:right;">
+              Avaliação anterior realizada em ${new Date(anterior.corrigido_em || Date.now()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+            </div>
+          </div>
+        `;
+      })()}
+
       <!-- Competências Avaliadas -->
       <div style="margin-bottom:20px;">
         <h5 style="font-size:0.92rem; font-weight:800; margin-bottom:12px; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em;">
@@ -1054,22 +1110,33 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
     // Atualiza histórico local com o retorno autêntico do servidor
     const historico = lerHistoricoLocal(sessionUserId);
     const itemIndex = historico.findIndex(item => item.id === redacaoId);
+    
+    const novaAvaliacao = {
+      ...data.avaliacao,
+      persistido_no_banco: Boolean(data.persistido_no_banco)
+    };
+
     if (itemIndex !== -1) {
-      historico[itemIndex].avaliacao_ia = {
-        ...data.avaliacao,
-        persistido_no_banco: Boolean(data.persistido_no_banco)
-      };
-      historico[itemIndex].status = 'corrigida_por_ia';
+      const redacaoAtual = historico[itemIndex];
+      // Se já existia uma avaliação anterior, preserva no histórico de avaliações
+      if (redacaoAtual.avaliacao_ia) {
+        if (!Array.isArray(redacaoAtual.historico_avaliacoes)) {
+          redacaoAtual.historico_avaliacoes = [];
+        }
+        // Armazena cópia da avaliação anterior
+        redacaoAtual.historico_avaliacoes.unshift({ ...redacaoAtual.avaliacao_ia });
+      }
+
+      redacaoAtual.avaliacao_ia = novaAvaliacao;
+      redacaoAtual.status = 'corrigida_por_ia';
     } else {
       // Redação não estava no histórico local (ex: localStorage limpo) — cria entrada mínima
       historico.unshift({
         id: redacaoId,
         status: 'corrigida_por_ia',
         data_envio: new Date().toISOString(),
-        avaliacao_ia: {
-          ...data.avaliacao,
-          persistido_no_banco: Boolean(data.persistido_no_banco)
-        }
+        avaliacao_ia: novaAvaliacao,
+        historico_avaliacoes: []
       });
     }
     localStorage.setItem(getHistoricoKey(sessionUserId), JSON.stringify(historico));
