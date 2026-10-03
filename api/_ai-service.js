@@ -3,6 +3,8 @@
  * 
  * Suporta múltiplos provedores através de variáveis de ambiente:
  * 1. Groq (GROQ_API_KEY) — Provedor de alta velocidade e modelo principal
+ *    Modelo padrão: openai/gpt-oss-120b (substituto oficial do llama-3.3-70b-versatile, depreciado em ago/2026)
+ *    Sobrescreva com: GROQ_MODEL=<model-id>
  * 2. Google Gemini (GEMINI_API_KEY) — Fallback / Alternativa
  * 3. OpenAI (OPENAI_API_KEY) — Fallback / Alternativa
  * 
@@ -93,7 +95,7 @@ RESPONDA OBRIGATORIAMENTE EM JSON VÁLIDO no seguinte formato exato (sem markdow
  * Chama a API oficial do Groq (compatível com OpenAI API v1/chat/completions)
  */
 async function chamarGroq(apiKey, prompt) {
-  const modelo = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const modelo = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
   const url = 'https://api.groq.com/openai/v1/chat/completions';
 
   const controller = new AbortController();
@@ -110,6 +112,7 @@ async function chamarGroq(apiKey, prompt) {
       body: JSON.stringify({
         model: modelo,
         temperature: 0.2,
+        reasoning_effort: 'default',
         response_format: { type: 'json_object' },
         messages: [
           {

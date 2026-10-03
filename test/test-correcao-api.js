@@ -197,7 +197,7 @@ async function runTests() {
       ]
     };
 
-    const normalizada = validarENormalizarResposta(rawMockGroq, matrizEnem, 'groq/llama-3.3-70b-versatile');
+    const normalizada = validarENormalizarResposta(rawMockGroq, matrizEnem, 'groq/openai/gpt-oss-120b');
     assert.equal(normalizada.nota_total, 920, 'Nota total deve ser calculada corretamente');
     assert.equal(normalizada.competencias.length, 5, 'Deve ter 5 competências');
     assert.equal(normalizada.pontos_fortes.length, 2, 'Deve ter 2 pontos fortes');
