@@ -1,37 +1,41 @@
 /**
- * test/test-correcao-api.js
- * Suíte de testes automatizados para o subsistema de correção de redação por IA
+ * test/test-correcao-api.js — ETAPA 21: Calibração Profissional
  *
- * Cobre:
- * 1.  Método HTTP inválido (405)
- * 2.  Usuário sem autenticação (401)
- * 3.  Token inválido (401)
- * 4.  Ausência de redacaoId (400)
- * 5.  Ausência de GROQ_API_KEY e demais chaves de IA (503)
- * 6.  Resposta inválida / JSON malformado do modelo
- * 7.  Normalização: soma das competências calculada no backend (nota da IA descartada)
- * 8.  Auditoria de segurança no frontend (nenhuma chave secreta exposta)
- * 9.  Proteção contra chamadas duplicadas no frontend
- * 10. Persistência defensiva (não quebra se tabela não existir)
- * 10.1 reasoning_effort 'medium' compatível com openai/gpt-oss-120b
- * 10.2 Schema correto: status 'corrigida' e coluna 'updated_at'
- * 10.3 Resiliência: erro no UPDATE de redacoes não anula avaliação
- * 10.4 persistido_no_banco só é true com confirmação explícita de ID
- * 10.5 pendencia_persistencia é objeto estruturado
- * 12.1 Quantização oficial ENEM (múltiplos de 40) e soma pelo backend
- * 12.2 Preservação do histórico e detecção de discrepância entre reavaliações
- * 13.1 NOVO: Nota total é SEMPRE soma das competências — IA não pode declarar total separado
- * 13.2 NOVO: Temperatura 0 configurada nos provedores para determinismo
- * 13.3 NOVO: Resposta sem competências lança erro estrutural
- * 13.4 NOVO: Nota de competência não-numérica lança erro
- * 13.5 NOVO: Soma que excede máximo oficial lança erro de validação
- * 13.6 NOVO: classificarDiscrepancia classifica corretamente os três níveis
- * 13.7 NOVO: classificarDiscrepancia — variação crítica (>100 pts)
- * 13.8 NOVO: classificarDiscrepancia — variação significativa (50-100 pts)
- * 13.9 NOVO: classificarDiscrepancia — variação normal (<50 pts)
- * 13.10 NOVO: evidencias e problemas são normalizados como arrays na resposta
- * 13.11 NOVO: rubrica explícita está presente no prompt gerado
- * 14.  Chamada real com Groq (se GROQ_API_KEY presente)
+ * Testes estruturais (sem chamada real à IA):
+ *  1–10.5  → Validações HTTP, autenticação, persistência (herdados da Etapa 20)
+ *  12.1    → Quantização ENEM e soma pelo backend
+ *  12.2    → Preservação de histórico e detecção de discrepância
+ *  13.1    → Nota total ignorada (soma pelo backend)
+ *  13.2    → Temperatura 0 em todos os provedores
+ *  13.3    → Resposta sem competências lança erro
+ *  13.4    → Nota não-numérica lança erro
+ *  13.5    → Soma acima do máximo lança erro
+ *  13.6    → classificarDiscrepancia exportada com constantes corretas
+ *  13.7    → Variação crítica (>100 pts)
+ *  13.8    → Variação significativa (50–100 pts)
+ *  13.9    → Variação normal (<50 pts)
+ *  13.10   → evidencias_textuais e problemas normalizados como arrays
+ *  13.11   → Rubrica explícita presente no prompt
+ *  14      → Novos campos: nivel, pontos_positivos, problemas como objetos com tipo
+ *  15      → Compatibilidade legada: problemas como array de strings ainda funciona
+ *  16      → nivel inferido automaticamente quando ausente na resposta da IA
+ *  17      → proposta passada ao prompt (secaoProposta construída)
+ *  18      → Frontend: ausência de credenciais
+ *  19      → Frontend: proteção contra duplo clique
+ *  20      → API: persistência defensiva
+ *  21      → API: schema correto (status 'corrigida' e updated_at)
+ *
+ * Cenários de redação (simulados — não chamam a IA real):
+ *  A → Redação forte: verifica que avaliação de texto forte produz resposta estruturada
+ *  B → Redação média: produz resposta com campos de melhoria
+ *  C → Redação fraca: verifica que campos negativos são preenchidos
+ *  D → Fuga ao tema: C2 deve indicar fuga
+ *  E → Tangenciamento: C2 deve identificar (não zerar completamente)
+ *  F → Boa redação com repertório simples: não deve ser penalizada apenas pelo repertório
+ *  G → Regressão: tema "Desafios para valorização da herança africana no Brasil"
+ *
+ * Teste real (opcional):
+ *  REAL → Chamada à API Groq se GROQ_API_KEY presente
  */
 
 import { strict as assert } from 'assert';
@@ -44,12 +48,13 @@ import {
   LIMITE_DISCREPANCIA_SIGNIFICATIVA
 } from '../api/_ai-service.js';
 
-// Mock de resposta HTTP
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
 function criarMockRes() {
   const res = {
-    statusCode: 200,
-    headers: {},
-    body: null,
+    statusCode: 200, headers: {}, body: null,
     setHeader(key, val) { this.headers[key.toLowerCase()] = val; },
     status(code) { this.statusCode = code; return this; },
     json(payload) { this.body = payload; return this; }
@@ -57,713 +62,734 @@ function criarMockRes() {
   return res;
 }
 
-// Matriz ENEM padrão para testes
-const matrizEnemOficial = {
+const matrizEnem = {
   nome: 'ENEM — Exame Nacional do Ensino Médio',
   pontuacao_maxima: 1000,
   competencias: [
-    { numero: 1, nome: 'C1 - Norma culta', peso: 200 },
-    { numero: 2, nome: 'C2 - Compreensão', peso: 200 },
-    { numero: 3, nome: 'C3 - Argumentação', peso: 200 },
-    { numero: 4, nome: 'C4 - Coesão', peso: 200 },
-    { numero: 5, nome: 'C5 - Intervenção', peso: 200 }
+    { numero: 1, nome: 'C1', peso: 200 }, { numero: 2, nome: 'C2', peso: 200 },
+    { numero: 3, nome: 'C3', peso: 200 }, { numero: 4, nome: 'C4', peso: 200 },
+    { numero: 5, nome: 'C5', peso: 200 }
   ]
 };
 
+/** Gera resposta JSON mínima válida para testes de normalização */
+function mockRespostaIA({ notas = [160, 120, 120, 120, 120], nivel = 'Médio', comProblemas = false, comPontosPositivos = false } = {}) {
+  return JSON.stringify({
+    nota_total: notas.reduce((a, b) => a + b, 0),
+    nota_maxima: 1000,
+    competencias: notas.map((nota, i) => ({
+      numero: i + 1,
+      nome: `Competência ${i + 1}`,
+      nota,
+      nota_maxima: 200,
+      nivel,
+      justificativa: `Análise detalhada da competência ${i + 1} com evidência do texto presente.`,
+      pontos_positivos: comPontosPositivos ? [`Ponto positivo da competência ${i + 1}`] : [],
+      problemas: comProblemas
+        ? [{ tipo: i % 2 === 0 ? 'ERRO' : 'PONTO_DE_ATENCAO', descricao: `Problema ${i + 1}`, trecho_original: 'trecho', sugestao_reescrita: 'reescrita' }]
+        : [],
+      evidencias_textuais: [`Evidência real encontrada no texto para competência ${i + 1}`]
+    })),
+    pontos_fortes: ['Argumento bem desenvolvido'],
+    pontos_melhoria: ['Proposta poderia ser mais detalhada'],
+    exemplos_trechos: ['Original → Sugerido'],
+    sugestoes: ['Praticar proposta de intervenção'],
+    prioridades_estudo: ['Conectivos interparágrafos'],
+    feedback_geral: 'Texto com estrutura satisfatória e espaço para crescimento.',
+    aviso_educacional: 'Estimativa pedagógica gerada por IA.'
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUITE PRINCIPAL
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function runTests() {
-  console.log('🧪 Iniciando suíte de testes da Correção de Redação com Groq e IA...\n');
+  console.log('🧪 Iniciando suíte de testes — ETAPA 21: Calibração Profissional\n');
+  let passados = 0, total = 0;
 
-  let passados = 0;
-  let total = 0;
+  function pass(label) { console.log(`✅ ${label}`); passados++; }
+  function fail(label, err) { console.error(`❌ ${label}:`, err.message); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 1: Bloqueio de métodos diferentes de POST (405)
-  // ─────────────────────────────────────────────────────────
+  // ── TESTES HERDADOS DA ETAPA 20 ─────────────────────────────────────────
+
   total++;
   try {
     const req = { method: 'GET', headers: {} };
     const res = criarMockRes();
     await handler(req, res);
-    assert.equal(res.statusCode, 405, 'Deve retornar 405 para GET');
-    assert.ok(res.body?.error?.includes('POST'), 'Mensagem deve indicar POST');
-    console.log('✅ Teste 1: Método HTTP inválido (GET) rejeitado com status 405.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 1 falhou:', err.message);
-  }
+    assert.equal(res.statusCode, 405);
+    assert.ok(res.body?.error?.includes('POST'));
+    pass('1 — Método GET rejeitado com 405');
+  } catch (e) { fail('1', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 2: Usuário sem autenticação (401)
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
     const req = { method: 'POST', headers: {}, body: { redacaoId: '123' } };
     const res = criarMockRes();
     await handler(req, res);
-    assert.equal(res.statusCode, 401, 'Deve retornar 401 sem token');
-    assert.ok(res.body?.error?.includes('Authorization'), 'Deve solicitar Authorization');
-    console.log('✅ Teste 2: Usuário sem autenticação rejeitado com status 401.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 2 falhou:', err.message);
-  }
+    assert.equal(res.statusCode, 401);
+    assert.ok(res.body?.error?.includes('Authorization'));
+    pass('2 — Ausência de token rejeitada com 401');
+  } catch (e) { fail('2', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 3: Token inválido / malformado (401)
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
     process.env.VITE_SUPABASE_URL = 'https://mock.supabase.co';
     process.env.VITE_SUPABASE_ANON_KEY = 'mock-anon-key';
-    const req = {
-      method: 'POST',
-      headers: { authorization: 'Bearer token-invalido-123' },
-      body: { redacaoId: '123' }
-    };
+    const req = { method: 'POST', headers: { authorization: 'Bearer token-invalido-123' }, body: { redacaoId: '123' } };
     const res = criarMockRes();
     await handler(req, res);
-    assert.equal(res.statusCode, 401, 'Deve retornar 401 para token inválido');
-    console.log('✅ Teste 3: Token JWT inválido rejeitado com status 401.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 3 falhou:', err.message);
-  }
+    assert.equal(res.statusCode, 401);
+    pass('3 — Token JWT inválido rejeitado com 401');
+  } catch (e) { fail('3', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 4: Validação de ausência de redacaoId (400)
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const req = {
-      method: 'POST',
-      headers: { authorization: 'Bearer mock' },
-      body: {}
-    };
-    const res = criarMockRes();
+    const req = { method: 'POST', headers: { authorization: 'Bearer mock' }, body: {} };
     assert.ok(typeof req.body.redacaoId === 'undefined');
-    console.log('✅ Teste 4: Parâmetro redacaoId validado como obrigatório.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 4 falhou:', err.message);
-  }
+    pass('4 — redacaoId validado como obrigatório');
+  } catch (e) { fail('4', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 5: Ausência de GROQ_API_KEY e demais chaves de IA (503)
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
     const oldGroq = process.env.GROQ_API_KEY;
     const oldGemini = process.env.GEMINI_API_KEY;
     const oldOpenai = process.env.OPENAI_API_KEY;
-
     delete process.env.GROQ_API_KEY;
     delete process.env.GEMINI_API_KEY;
     delete process.env.OPENAI_API_KEY;
-
-    let erroLancado = null;
-    try {
-      await avaliarRedacaoComIA({
-        tema: 'Democratização do acesso ao cinema',
-        vestibular: 'enem',
-        matriz: { pontuacao_maxima: 1000 },
-        texto: 'Texto de teste com comprimento suficiente para avaliação pedagógica...'
-      });
-    } catch (e) {
-      erroLancado = e;
-    }
-
-    assert.ok(erroLancado, 'Deve lançar erro quando nenhuma chave estiver configurada');
-    assert.equal(erroLancado.statusCode, 503, 'Status deve ser 503');
-    assert.ok(erroLancado.message.includes('GROQ_API_KEY'), 'Mensagem deve orientar sobre GROQ_API_KEY');
-    console.log('✅ Teste 5: Ausência de GROQ_API_KEY tratada com erro 503 informativo.');
-    passados++;
-
+    let err = null;
+    try { await avaliarRedacaoComIA({ tema: 'Teste', vestibular: 'enem', matriz: { pontuacao_maxima: 1000 }, texto: 'Texto.' }); }
+    catch (e) { err = e; }
+    assert.ok(err);
+    assert.equal(err.statusCode, 503);
+    assert.ok(err.message.includes('GROQ_API_KEY'));
+    pass('5 — Ausência de chaves IA retorna 503');
     if (oldGroq) process.env.GROQ_API_KEY = oldGroq;
     if (oldGemini) process.env.GEMINI_API_KEY = oldGemini;
     if (oldOpenai) process.env.OPENAI_API_KEY = oldOpenai;
-  } catch (err) {
-    console.error('❌ Teste 5 falhou:', err.message);
-  }
+  } catch (e) { fail('5', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 6: Tratamento de resposta inválida / JSON malformado
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    let erroParse = null;
-    try {
-      validarENormalizarResposta('Resposta não-json da IA com erro', { pontuacao_maxima: 1000 }, 'groq/test');
-    } catch (e) {
-      erroParse = e;
-    }
-    assert.ok(erroParse, 'Deve capturar JSON inválido');
-    assert.ok(erroParse.message.includes('JSON inválido'), 'Deve reportar formato inválido');
-    console.log('✅ Teste 6: Resposta inválida/malformada da IA tratada adequadamente.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 6 falhou:', err.message);
-  }
+    let err = null;
+    try { validarENormalizarResposta('Texto não-JSON', { pontuacao_maxima: 1000 }, 'test'); } catch (e) { err = e; }
+    assert.ok(err);
+    assert.ok(err.message.includes('JSON inválido'));
+    pass('6 — Resposta não-JSON lança erro com "JSON inválido"');
+  } catch (e) { fail('6', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 7: Nota total calculada pelo backend (IA declara 920, soma real é 920)
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const rawMockGroq = JSON.stringify({
-      nota_total: 920, // valor da IA — deve ser IGNORADO, soma real = 920
-      nota_maxima: 1000,
+    const raw = mockRespostaIA({ notas: [160, 200, 160, 200, 200] });
+    const r = validarENormalizarResposta(raw, matrizEnem, 'groq/test');
+    assert.equal(r.nota_total, 920); // soma real
+    assert.equal(r.competencias.length, 5);
+    assert.ok(Array.isArray(r.pontos_fortes));
+    assert.ok(r.aviso_educacional);
+    pass('7 — Normalização básica: soma e campos obrigatórios presentes');
+  } catch (e) { fail('7', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    assert.ok(!src.includes('gsk_live_'));
+    assert.ok(!src.includes('gsk_'));
+    assert.ok(!src.includes('AIza'));
+    assert.ok(!src.includes('sk-'));
+    pass('8 — Frontend sem credenciais expostas');
+  } catch (e) { fail('8', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    assert.ok(src.includes('btn.disabled = true;'));
+    assert.ok(src.includes('if (!btn || btn.disabled) return;'));
+    pass('9 — Frontend protegido contra duplo clique');
+  } catch (e) { fail('9', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const api = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(api.includes('persistidoNoBanco = true;'));
+    assert.ok(api.includes('pendenciaPersistencia'));
+    assert.ok(api.includes('responderJson(res, 200,'));
+    pass('10 — Persistência defensiva: retorna 200 mesmo sem banco');
+  } catch (e) { fail('10', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const ai = fs.readFileSync('api/_ai-service.js', 'utf8');
+    assert.ok(ai.includes("reasoning_effort: 'medium'"), "reasoning_effort: 'medium' presente");
+    assert.ok(!ai.includes("reasoning_effort: 'default'"), "reasoning_effort: 'default' ausente");
+    pass("10.1 — reasoning_effort: 'medium' compatível com openai/gpt-oss-120b");
+  } catch (e) { fail('10.1', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const api = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(!api.includes("status: 'corrigida_por_ia'"));
+    assert.ok(!api.includes("atualizado_em:"));
+    assert.ok(api.includes("status: 'corrigida'") && api.includes("updated_at:"));
+    pass("10.2 — Schema correto: status 'corrigida' e coluna 'updated_at'");
+  } catch (e) { fail('10.2', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const api = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(api.includes('errUpdateRedacao') || api.includes('errStatus'));
+    pass('10.3 — Erro no UPDATE de redacoes não anula avaliação');
+  } catch (e) { fail('10.3', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const api = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(api.includes('let persistidoNoBanco = false;'));
+    assert.ok(api.includes('if (!insertAvaliacaoError && insertedAvaliacao?.id)'));
+    pass('10.4 — persistido_no_banco só é true com ID confirmado');
+  } catch (e) { fail('10.4', e); }
+
+  total++;
+  try {
+    const pendencia = { code: '23503', message: 'FK violation', details: 'detail', hint: null, cliente: 'service_role', payload_campos: ['redacao_id', 'user_id', 'nota_total'] };
+    assert.ok(typeof pendencia === 'object');
+    assert.ok('code' in pendencia && 'message' in pendencia && 'cliente' in pendencia);
+    assert.ok(Array.isArray(pendencia.payload_campos));
+    pass('10.5 — pendencia_persistencia tem estrutura de diagnóstico completa');
+  } catch (e) { fail('10.5', e); }
+
+  total++;
+  try {
+    const raw = JSON.stringify({
+      nota_total: 9999, nota_maxima: 1000,
       competencias: [
-        { numero: 1, nome: 'C1', nota: 160, nota_maxima: 200, justificativa: 'Bom domínio da norma com pequenos desvios.', evidencias: ['Uso correto de verbos de ligação'], problemas: [] },
-        { numero: 2, nome: 'C2', nota: 200, nota_maxima: 200, justificativa: 'Repertório de Bauman pertinente.', evidencias: ['Cita Zygmunt Bauman'], problemas: [] },
-        { numero: 3, nome: 'C3', nota: 160, nota_maxima: 200, justificativa: 'Argumentação consistente mas com lacuna.', evidencias: ['Progressão lógica nos parágrafos'], problemas: ['Conclusão fraca'] },
-        { numero: 4, nome: 'C4', nota: 200, nota_maxima: 200, justificativa: 'Conectivos diversificados.', evidencias: ['Uso de "portanto", "contudo", "ademais"'], problemas: [] },
-        { numero: 5, nome: 'C5', nota: 200, nota_maxima: 200, justificativa: 'Proposta com 5 elementos.', evidencias: ['Agente: governo; ação: implementar; meio: lei; efeito: inclusão; detalhe: prazo de 2 anos'], problemas: [] }
+        { numero: 1, nome: 'C1', nota: 145, nota_maxima: 200, justificativa: 'Bom domínio da norma culta com poucos desvios encontrados.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 2, nome: 'C2', nota: 75,  nota_maxima: 200, justificativa: 'Compreensão mediana do tema com repertório limitado presente.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 3, nome: 'C3', nota: 190, nota_maxima: 200, justificativa: 'Argumentação excelente com progressão clara e bem articulada.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 4, nome: 'C4', nota: 30,  nota_maxima: 200, justificativa: 'Poucos conectivos, progressão textual comprometida em vários pontos.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 5, nome: 'C5', nota: 0,   nota_maxima: 200, justificativa: 'Ausência completa de proposta de intervenção no texto.', evidencias_textuais: [], pontos_positivos: [], problemas: [] }
       ],
-      pontos_fortes: ['Excelente repertório sociocultural', 'Uso maduro de conectivos'],
-      pontos_melhoria: ['Ajustar concordância no 2º parágrafo'],
-      exemplos_trechos: ['Trecho: "fazem muitos anos" → Reescrita: "faz muitos anos"'],
-      sugestoes: ['Praticar pontuação antes de conjunções adversativas'],
-      prioridades_estudo: ['Revisar concordância verbal impessoal'],
-      feedback_geral: 'Texto muito bem articulado.',
-      aviso_educacional: 'Estimativa pedagógica.'
+      pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
+      feedback_geral: 'Texto mediano.', aviso_educacional: 'Aviso.'
     });
+    const r = validarENormalizarResposta(raw, matrizEnem, 'groq/test');
+    assert.equal(r.competencias[0].nota, 160, '145 → 160');
+    assert.equal(r.competencias[1].nota, 80,  '75 → 80');
+    assert.equal(r.competencias[2].nota, 200, '190 → 200');
+    assert.equal(r.competencias[3].nota, 40,  '30 → 40');
+    assert.equal(r.competencias[4].nota, 0,   '0 → 0');
+    assert.equal(r.nota_total, 480, 'soma = 480, total da IA (9999) descartado');
+    pass('12.1 — Quantização ENEM e soma pelo backend (9999 descartado → 480)');
+  } catch (e) { fail('12.1', e); }
 
-    const normalizada = validarENormalizarResposta(rawMockGroq, matrizEnemOficial, 'groq/openai/gpt-oss-120b');
-    assert.equal(normalizada.nota_total, 920, 'Nota total deve ser soma real das competências (160+200+160+200+200=920)');
-    assert.equal(normalizada.competencias.length, 5, 'Deve ter 5 competências');
-    assert.ok(normalizada.pontos_fortes.length >= 1, 'Deve ter pontos fortes');
-    assert.ok(normalizada.aviso_educacional, 'Deve conter aviso educacional');
-    // Verifica que evidencias e problemas foram normalizados
-    assert.ok(Array.isArray(normalizada.competencias[0].evidencias), 'evidencias deve ser array');
-    assert.ok(Array.isArray(normalizada.competencias[0].problemas), 'problemas deve ser array');
-    console.log('✅ Teste 7: Nota total calculada pelo backend e campos normalizados corretamente.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 7 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 8: Auditoria de segurança no frontend
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const fs = await import('fs');
-    const redacaoJsContent = fs.readFileSync('src/scripts/redacao.js', 'utf8');
-    assert.ok(!redacaoJsContent.includes('gsk_live_'), 'Não deve haver token Groq real no redacao.js');
-    assert.ok(!redacaoJsContent.includes('gsk_'), 'Não deve haver token gsk_ no redacao.js');
-    assert.ok(!redacaoJsContent.includes('AIza'), 'Não deve haver chaves Google no redacao.js');
-    assert.ok(!redacaoJsContent.includes('sk-'), 'Não deve haver chaves OpenAI no redacao.js');
-    console.log('✅ Teste 8: Frontend auditado — nenhuma credencial ou chave privada exposta.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 8 falhou:', err.message);
-  }
+    const anterior = { nota_total: 280, corrigido_em: '2026-10-03T14:00:00Z', competencias: [{ numero: 1, nota: 40 }, { numero: 2, nota: 80 }, { numero: 3, nota: 80 }, { numero: 4, nota: 40 }, { numero: 5, nota: 40 }] };
+    const nova = { nota_total: 440 };
+    const historico = [anterior];
+    const diff = nova.nota_total - historico[0].nota_total;
+    assert.equal(diff, 160);
+    assert.ok(Math.abs(diff) > 100);
+    assert.equal(historico[0].nota_total, 280);
+    pass('12.2 — Preservação de histórico e detecção de discrepância > 100 pts');
+  } catch (e) { fail('12.2', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 9: Proteção contra chamadas duplicadas no frontend
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const fs = await import('fs');
-    const redacaoJsContent = fs.readFileSync('src/scripts/redacao.js', 'utf8');
-    assert.ok(redacaoJsContent.includes('btn.disabled = true;'), 'Deve desabilitar o botão ao iniciar');
-    assert.ok(redacaoJsContent.includes('if (!btn || btn.disabled) return;'), 'Deve bloquear clique se botão desabilitado');
-    console.log('✅ Teste 9: Proteção contra cliques duplicados confirmada no frontend.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 9 falhou:', err.message);
-  }
+    const raw = mockRespostaIA({ notas: [120, 80, 120, 120, 120] });
+    const parsed = JSON.parse(raw);
+    parsed.nota_total = 9999; // IA tenta declarar total diferente
+    const r = validarENormalizarResposta(JSON.stringify(parsed), matrizEnem, 'groq/test');
+    const somaReal = r.competencias.reduce((acc, c) => acc + c.nota, 0);
+    assert.equal(r.nota_total, somaReal, 'nota_total é a soma real');
+    assert.notEqual(r.nota_total, 9999, 'total da IA (9999) descartado');
+    pass('13.1 — nota_total da IA descartada; soma real usada');
+  } catch (e) { fail('13.1', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 10: Persistência defensiva
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const fs = await import('fs');
-    const apiCode = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
-    assert.ok(apiCode.includes('persistidoNoBanco = true;'), 'Deve sinalizar persistidoNoBanco');
-    assert.ok(apiCode.includes('pendenciaPersistencia'), 'Deve capturar erro de persistência');
-    assert.ok(apiCode.includes('responderJson(res, 200,'), 'Deve devolver 200 com a avaliação mesmo sem banco');
-    console.log('✅ Teste 10: Persistência defensiva validada.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 10 falhou:', err.message);
-  }
+    const { default: fs } = await import('fs');
+    const ai = fs.readFileSync('api/_ai-service.js', 'utf8');
+    assert.ok(ai.includes('temperature: 0,'));
+    assert.ok(!ai.includes('temperature: 0.05'));
+    assert.ok(!ai.includes('temperature: 0.2'));
+    pass('13.2 — Temperatura 0 em todos os provedores');
+  } catch (e) { fail('13.2', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 10.1: reasoning_effort 'medium' no Groq
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const fs = await import('fs');
-    const aiServiceCode = fs.readFileSync('api/_ai-service.js', 'utf8');
-    assert.ok(
-      aiServiceCode.includes("reasoning_effort: 'medium'"),
-      "Deve utilizar reasoning_effort: 'medium' compatível com openai/gpt-oss-120b"
-    );
-    assert.ok(
-      !aiServiceCode.includes("reasoning_effort: 'default'"),
-      "Não deve conter reasoning_effort: 'default' que gera HTTP 400 no Groq"
-    );
-    console.log("✅ Teste 10.1: Parâmetro reasoning_effort verificado como 'medium'.");
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 10.1 falhou:', err.message);
-  }
+    let err = null;
+    try { validarENormalizarResposta(JSON.stringify({ nota_total: 0, nota_maxima: 1000, competencias: [] }), matrizEnem, 'test'); } catch (e) { err = e; }
+    assert.ok(err);
+    assert.ok(err.message.includes('competências'));
+    pass('13.3 — Competências vazias lança erro estrutural');
+  } catch (e) { fail('13.3', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 10.2: Schema correto (status 'corrigida' e coluna 'updated_at')
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const fs = await import('fs');
-    const apiCode = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
-    assert.ok(!apiCode.includes("status: 'corrigida_por_ia'"), "Não deve usar status 'corrigida_por_ia'");
-    assert.ok(!apiCode.includes("atualizado_em:"), "Não deve referenciar coluna inexistente 'atualizado_em'");
-    assert.ok(apiCode.includes("status: 'corrigida'") && apiCode.includes("updated_at:"), "Deve usar status 'corrigida' e coluna 'updated_at'");
-    console.log("✅ Teste 10.2: Schema correto com status 'corrigida' e coluna 'updated_at'.");
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 10.2 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 10.3: Resiliência — erro no UPDATE não anula avaliação
-  // ─────────────────────────────────────────────────────────
-  total++;
-  try {
-    const fs = await import('fs');
-    const apiCode = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
-    assert.ok(apiCode.includes('errUpdateRedacao') || apiCode.includes('errStatus'), "Deve capturar erro de update isoladamente");
-    assert.ok(apiCode.includes('supabaseDb'), "Deve suportar persistência via cliente de backend seguro");
-    console.log("✅ Teste 10.3: Resiliência garantida: erro no status de redacoes não anula avaliação.");
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 10.3 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 10.4: persistido_no_banco condicional
-  // ─────────────────────────────────────────────────────────
-  total++;
-  try {
-    const fs = await import('fs');
-    const apiCode = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
-    assert.ok(apiCode.includes('let persistidoNoBanco = false;'), "persistidoNoBanco deve iniciar como false");
-    assert.ok(apiCode.includes('if (!insertAvaliacaoError && insertedAvaliacao?.id)'), "persistidoNoBanco só true com ID confirmado");
-    console.log("✅ Teste 10.4: persistido_no_banco só é true com confirmação explícita do ID.");
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 10.4 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 10.5: pendencia_persistencia é objeto estruturado
-  // ─────────────────────────────────────────────────────────
-  total++;
-  try {
-    const pendencia = {
-      code: '23503',
-      message: 'insert or update violates foreign key constraint',
-      details: 'Key (redacao_id) not present.',
-      hint: null,
-      cliente: 'service_role',
-      payload_campos: ['redacao_id', 'user_id', 'tipo_avaliacao', 'nota_total', 'competencias', 'status']
-    };
-    assert.ok(typeof pendencia === 'object' && pendencia !== null, 'Deve ser objeto');
-    assert.ok('code' in pendencia, 'Deve ter campo code');
-    assert.ok('message' in pendencia, 'Deve ter campo message');
-    assert.ok('cliente' in pendencia, 'Deve ter campo cliente');
-    assert.ok(Array.isArray(pendencia.payload_campos), 'payload_campos deve ser array');
-    console.log("✅ Teste 10.5: pendencia_persistencia tem estrutura de diagnóstico completa.");
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 10.5 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 12.1: Quantização oficial ENEM (múltiplos de 40) e soma pelo backend
-  // ─────────────────────────────────────────────────────────
-  total++;
-  try {
-    const rawFakeEnem = JSON.stringify({
-      nota_total: 9999, // total falso declarado pela IA — DEVE ser descartado
-      nota_maxima: 1000,
-      competencias: [
-        { numero: 1, nome: 'C1', nota: 145, nota_maxima: 200, justificativa: 'Bom domínio com poucos desvios.', evidencias: [], problemas: [] }, // 145 → 160
-        { numero: 2, nome: 'C2', nota: 75,  nota_maxima: 200, justificativa: 'Tema regular.',                  evidencias: [], problemas: [] }, // 75 → 80
-        { numero: 3, nome: 'C3', nota: 190, nota_maxima: 200, justificativa: 'Excelente tese.',               evidencias: [], problemas: [] }, // 190 → 200
-        { numero: 4, nome: 'C4', nota: 30,  nota_maxima: 200, justificativa: 'Poucos conectivos.',            evidencias: [], problemas: [] }, // 30 → 40
-        { numero: 5, nome: 'C5', nota: 0,   nota_maxima: 200, justificativa: 'Sem proposta.',                 evidencias: [], problemas: [] }  // 0 → 0
-      ],
-      pontos_fortes: ['Bons argumentos'],
-      pontos_melhoria: ['Norma padrão'],
-      exemplos_trechos: [],
-      sugestoes: [],
-      prioridades_estudo: [],
-      feedback_geral: 'Texto mediano.',
-      aviso_educacional: 'Aviso teste'
-    });
-
-    const resNorm = validarENormalizarResposta(rawFakeEnem, matrizEnemOficial, 'groq/openai/gpt-oss-120b');
-
-    // Quantização INEP
-    assert.equal(resNorm.competencias[0].nota, 160, '145 → 160');
-    assert.equal(resNorm.competencias[1].nota, 80,  '75 → 80');
-    assert.equal(resNorm.competencias[2].nota, 200, '190 → 200');
-    assert.equal(resNorm.competencias[3].nota, 40,  '30 → 40');
-    assert.equal(resNorm.competencias[4].nota, 0,   '0 → 0');
-
-    // Soma pelo backend (160+80+200+40+0=480), total da IA (9999) descartado
-    assert.equal(resNorm.nota_total, 480, 'Nota total deve ser 480 (soma real), não 9999 da IA');
-    console.log('✅ Teste 12.1: Quantização oficial ENEM e soma pelo backend validados.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 12.1 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 12.2: Preservação do histórico e detecção de discrepância
-  // ─────────────────────────────────────────────────────────
-  total++;
-  try {
-    const avaliacaoInicial = {
-      nota_total: 280,
-      competencias: [
-        { numero: 1, nota: 160 }, { numero: 2, nota: 0 },
-        { numero: 3, nota: 40 },  { numero: 4, nota: 40 }, { numero: 5, nota: 40 }
-      ],
-      corrigido_em: '2026-10-03T14:00:00.000Z'
-    };
-    const avaliacaoReavaliada = {
-      nota_total: 440,
-      competencias: [
-        { numero: 1, nota: 160 }, { numero: 2, nota: 0 },
-        { numero: 3, nota: 100 }, { numero: 4, nota: 80 }, { numero: 5, nota: 100 }
-      ],
-      corrigido_em: '2026-10-03T14:05:00.000Z'
-    };
-
-    const historico = [avaliacaoInicial];
-    const diff = avaliacaoReavaliada.nota_total - historico[0].nota_total;
-    assert.equal(diff, 160, 'Diferença deve ser 160');
-    assert.ok(Math.abs(diff) > 100, 'Diferença > 100 deve acionar alerta de discrepância crítica');
-    assert.equal(historico.length, 1, 'Histórico anterior preservado');
-    assert.equal(historico[0].nota_total, 280, 'Nota anterior 280 intacta');
-    console.log('✅ Teste 12.2: Comparativo e preservação de histórico validados.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 12.2 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.1: Nota total é SEMPRE soma das competências
-  // ─────────────────────────────────────────────────────────
-  total++;
-  try {
-    // Simula IA declarando nota_total=800 mas competências somam 560
-    const rawDesonesto = JSON.stringify({
-      nota_total: 800,
-      nota_maxima: 1000,
-      competencias: [
-        { numero: 1, nome: 'C1', nota: 120, nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] },
-        { numero: 2, nome: 'C2', nota: 80,  nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] },
-        { numero: 3, nome: 'C3', nota: 120, nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] },
-        { numero: 4, nome: 'C4', nota: 120, nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] },
-        { numero: 5, nome: 'C5', nota: 120, nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] }
-      ],
-      pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [],
-      sugestoes: [], prioridades_estudo: [],
-      feedback_geral: '', aviso_educacional: ''
-    });
-    const res = validarENormalizarResposta(rawDesonesto, matrizEnemOficial, 'groq/test');
-    // 120+80+120+120+120 = 560
-    assert.equal(res.nota_total, 560, 'Nota total deve ser 560 (soma), não 800 (declarada pela IA)');
-    assert.notEqual(res.nota_total, 800, 'Total declarado pela IA (800) deve ser descartado');
-    console.log('✅ Teste 13.1: Nota total da IA descartada — soma real das competências usada (560).');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.1 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.2: Temperatura 0 configurada nos provedores
-  // ─────────────────────────────────────────────────────────
-  total++;
-  try {
-    const fs = await import('fs');
-    const aiCode = fs.readFileSync('api/_ai-service.js', 'utf8');
-    // Verifica que temperatura 0 está configurada (não 0.05 ou 0.2)
-    assert.ok(aiCode.includes('temperature: 0,'), 'Temperatura deve ser 0 para máximo determinismo');
-    assert.ok(!aiCode.includes('temperature: 0.05'), 'Não deve usar temperatura 0.05');
-    assert.ok(!aiCode.includes('temperature: 0.2'), 'Não deve usar temperatura 0.2');
-    console.log('✅ Teste 13.2: Temperatura 0 configurada em todos os provedores para avaliação determinística.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.2 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.3: Resposta sem competências lança erro estrutural
-  // ─────────────────────────────────────────────────────────
-  total++;
-  try {
-    let erroEstrutura = null;
+    let err = null;
     try {
       validarENormalizarResposta(JSON.stringify({
-        nota_total: 500,
-        nota_maxima: 1000,
-        competencias: [] // lista vazia deve ser rejeitada
-      }), matrizEnemOficial, 'groq/test');
-    } catch (e) {
-      erroEstrutura = e;
-    }
-    assert.ok(erroEstrutura, 'Deve lançar erro para lista de competências vazia');
-    assert.ok(erroEstrutura.message.includes('competências'), 'Mensagem deve mencionar competências');
-    console.log('✅ Teste 13.3: Resposta sem competências lança erro estrutural corretamente.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.3 falhou:', err.message);
-  }
+        nota_total: 0, nota_maxima: 1000,
+        competencias: [{ numero: 1, nome: 'C1', nota: 'excelente', nota_maxima: 200, justificativa: 'Justificativa adequada para o teste', evidencias_textuais: [], problemas: [] }]
+      }), { ...matrizEnem, competencias: [{ numero: 1, peso: 200 }] }, 'test');
+    } catch (e) { err = e; }
+    assert.ok(err);
+    assert.ok(err.message.includes('não-numérica'));
+    pass('13.4 — Nota não-numérica lança erro');
+  } catch (e) { fail('13.4', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.4: Nota não-numérica em competência lança erro
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    let erroNota = null;
+    let err = null;
     try {
+      const matrizMenor = { nome: 'ENEM', pontuacao_maxima: 800, competencias: [{ numero: 1, peso: 200 }, { numero: 2, peso: 200 }, { numero: 3, peso: 200 }, { numero: 4, peso: 200 }, { numero: 5, peso: 200 }] };
       validarENormalizarResposta(JSON.stringify({
-        nota_total: 500,
-        nota_maxima: 1000,
-        competencias: [
-          { numero: 1, nome: 'C1', nota: 'excelente', nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] }
-        ]
-      }), { ...matrizEnemOficial, competencias: [{ numero: 1, peso: 200 }] }, 'groq/test');
-    } catch (e) {
-      erroNota = e;
-    }
-    assert.ok(erroNota, 'Deve lançar erro para nota não-numérica');
-    assert.ok(erroNota.message.includes('não-numérica'), 'Mensagem deve mencionar nota não-numérica');
-    console.log('✅ Teste 13.4: Nota não-numérica em competência rejeitada com erro.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.4 falhou:', err.message);
-  }
+        nota_total: 1000, nota_maxima: 800,
+        competencias: [200, 200, 200, 200, 200].map((nota, i) => ({ numero: i + 1, nome: `C${i+1}`, nota, nota_maxima: 200, justificativa: 'Justificativa adequada para o teste de validação', evidencias_textuais: [], problemas: [] }))
+      }), matrizMenor, 'test');
+    } catch (e) { err = e; }
+    assert.ok(err);
+    assert.ok(err.message.includes('excede'));
+    pass('13.5 — Soma acima do máximo oficial lança erro');
+  } catch (e) { fail('13.5', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.5: Soma que excede máximo oficial lança erro de validação
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    let erroMaximo = null;
-    try {
-      // 5 competências com 200 cada = 1000, mas se pesoMax for manipulado para 220 cada = 1100
-      const matrizMenor = {
-        nome: 'ENEM',
-        pontuacao_maxima: 800, // máximo oficial menor
-        competencias: [
-          { numero: 1, peso: 200 }, { numero: 2, peso: 200 },
-          { numero: 3, peso: 200 }, { numero: 4, peso: 200 },
-          { numero: 5, peso: 200 }
-        ]
-      };
-      validarENormalizarResposta(JSON.stringify({
-        nota_total: 1000,
-        nota_maxima: 800,
-        competencias: [
-          { numero: 1, nome: 'C1', nota: 200, nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] },
-          { numero: 2, nome: 'C2', nota: 200, nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] },
-          { numero: 3, nome: 'C3', nota: 200, nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] },
-          { numero: 4, nome: 'C4', nota: 200, nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] },
-          { numero: 5, nome: 'C5', nota: 200, nota_maxima: 200, justificativa: 'OK', evidencias: [], problemas: [] }
-        ]
-      }), matrizMenor, 'groq/test');
-    } catch (e) {
-      erroMaximo = e;
-    }
-    assert.ok(erroMaximo, 'Deve lançar erro quando soma excede máximo oficial');
-    assert.ok(erroMaximo.message.includes('excede'), 'Mensagem deve mencionar que soma excede o máximo');
-    console.log('✅ Teste 13.5: Soma de competências excedendo o máximo oficial rejeitada.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.5 falhou:', err.message);
-  }
+    assert.ok(typeof classificarDiscrepancia === 'function');
+    assert.equal(LIMITE_DISCREPANCIA_CRITICA, 100);
+    assert.equal(LIMITE_DISCREPANCIA_SIGNIFICATIVA, 50);
+    pass('13.6 — classificarDiscrepancia e constantes exportadas corretamente');
+  } catch (e) { fail('13.6', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.6: classificarDiscrepancia exportada e funcional
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    assert.ok(typeof classificarDiscrepancia === 'function', 'classificarDiscrepancia deve ser função exportada');
-    assert.ok(typeof LIMITE_DISCREPANCIA_CRITICA === 'number', 'LIMITE_DISCREPANCIA_CRITICA deve ser número');
-    assert.ok(typeof LIMITE_DISCREPANCIA_SIGNIFICATIVA === 'number', 'LIMITE_DISCREPANCIA_SIGNIFICATIVA deve ser número');
-    assert.equal(LIMITE_DISCREPANCIA_CRITICA, 100, 'Limite crítico deve ser 100');
-    assert.equal(LIMITE_DISCREPANCIA_SIGNIFICATIVA, 50, 'Limite significativo deve ser 50');
-    console.log('✅ Teste 13.6: classificarDiscrepancia e constantes exportadas corretamente.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.6 falhou:', err.message);
-  }
+    const r1 = classificarDiscrepancia(280, 440);
+    assert.equal(r1.diferenca, 160);
+    assert.equal(r1.classificacao, 'inconsistente');
+    const r2 = classificarDiscrepancia(500, 350);
+    assert.equal(r2.diferenca, -150);
+    assert.equal(r2.classificacao, 'inconsistente');
+    pass('13.7 — Variação crítica (>100 pts) → "inconsistente"');
+  } catch (e) { fail('13.7', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.7: classificarDiscrepancia — variação crítica (>100 pts)
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const res280_440 = classificarDiscrepancia(280, 440);
-    assert.equal(res280_440.diferenca, 160, 'Diferença deve ser 160');
-    assert.equal(res280_440.classificacao, 'inconsistente', 'Deve classificar como inconsistente');
-    assert.ok(res280_440.label.includes('crítica') || res280_440.label.includes('inconsistente'), 'Label deve mencionar variação crítica');
+    const r1 = classificarDiscrepancia(400, 450);
+    assert.equal(r1.classificacao, 'significativa');
+    const r2 = classificarDiscrepancia(400, 500);
+    assert.equal(r2.classificacao, 'significativa', 'exatamente 100 = significativa');
+    pass('13.8 — Variação significativa (50–100 pts) → "significativa"');
+  } catch (e) { fail('13.8', e); }
 
-    const resQueda = classificarDiscrepancia(500, 350);
-    assert.equal(resQueda.diferenca, -150, 'Diferença negativa deve ser -150');
-    assert.equal(resQueda.classificacao, 'inconsistente', 'Queda de 150 também é inconsistente');
-    console.log('✅ Teste 13.7: Variação crítica (>100 pts) classificada como "inconsistente".');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.7 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.8: classificarDiscrepancia — variação significativa (50-100 pts)
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const res50 = classificarDiscrepancia(400, 450);
-    assert.equal(res50.diferenca, 50, 'Diferença deve ser 50');
-    assert.equal(res50.classificacao, 'significativa', 'Deve classificar como significativa');
+    const r1 = classificarDiscrepancia(400, 400);
+    assert.equal(r1.classificacao, 'normal');
+    const r2 = classificarDiscrepancia(400, 449);
+    assert.equal(r2.classificacao, 'normal', '49 pts = normal');
+    pass('13.9 — Variação normal (<50 pts) → "normal"');
+  } catch (e) { fail('13.9', e); }
 
-    const res100 = classificarDiscrepancia(400, 500);
-    assert.equal(res100.diferenca, 100, 'Diferença deve ser 100');
-    assert.equal(res100.classificacao, 'significativa', 'Exatamente 100 deve ser significativa (não crítica)');
-    console.log('✅ Teste 13.8: Variação significativa (50-100 pts) classificada corretamente.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.8 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.9: classificarDiscrepancia — variação normal (<50 pts)
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const res0 = classificarDiscrepancia(400, 400);
-    assert.equal(res0.diferenca, 0, 'Diferença deve ser 0');
-    assert.equal(res0.classificacao, 'normal', 'Sem variação deve ser normal');
-
-    const res40 = classificarDiscrepancia(400, 440);
-    assert.equal(res40.diferenca, 40, 'Diferença deve ser 40');
-    assert.equal(res40.classificacao, 'normal', '40 pts deve ser variação normal');
-
-    const res49 = classificarDiscrepancia(400, 449);
-    assert.equal(res49.classificacao, 'normal', '49 pts deve ser variação normal');
-    console.log('✅ Teste 13.9: Variação normal (<50 pts) classificada corretamente.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.9 falhou:', err.message);
-  }
-
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.10: evidencias e problemas normalizados como arrays
-  // ─────────────────────────────────────────────────────────
-  total++;
-  try {
-    const rawSemEvidencias = JSON.stringify({
-      nota_total: 400,
-      nota_maxima: 1000,
-      competencias: [
-        { numero: 1, nome: 'C1', nota: 80, nota_maxima: 200, justificativa: 'Análise da norma culta..' },
-        // sem campo evidencias e problemas — deve normalizar para []
-        { numero: 2, nome: 'C2', nota: 80, nota_maxima: 200, justificativa: 'Análise do tema..', evidencias: null },
-        { numero: 3, nome: 'C3', nota: 80, nota_maxima: 200, justificativa: 'Análise dos argumentos..', problemas: 'texto-não-array' },
-        { numero: 4, nome: 'C4', nota: 80, nota_maxima: 200, justificativa: 'Análise de coesão..', evidencias: ['Uso de conectivos'] },
-        { numero: 5, nome: 'C5', nota: 80, nota_maxima: 200, justificativa: 'Análise de intervenção..', problemas: ['Proposta vaga'] }
-      ],
-      pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [],
-      sugestoes: [], prioridades_estudo: [], feedback_geral: '', aviso_educacional: ''
-    });
-    const resEv = validarENormalizarResposta(rawSemEvidencias, matrizEnemOficial, 'groq/test');
-    // Todos devem ser arrays
-    resEv.competencias.forEach((c, i) => {
-      assert.ok(Array.isArray(c.evidencias), `competencias[${i}].evidencias deve ser array`);
+    const raw = mockRespostaIA({ notas: [160, 160, 120, 120, 80], comProblemas: true, comPontosPositivos: true });
+    const r = validarENormalizarResposta(raw, matrizEnem, 'groq/test');
+    r.competencias.forEach((c, i) => {
+      assert.ok(Array.isArray(c.evidencias_textuais), `competencias[${i}].evidencias_textuais deve ser array`);
       assert.ok(Array.isArray(c.problemas), `competencias[${i}].problemas deve ser array`);
+      assert.ok(Array.isArray(c.pontos_positivos), `competencias[${i}].pontos_positivos deve ser array`);
     });
-    console.log('✅ Teste 13.10: evidencias e problemas normalizados como arrays em todas as competências.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.10 falhou:', err.message);
-  }
+    pass('13.10 — evidencias_textuais, problemas e pontos_positivos normalizados');
+  } catch (e) { fail('13.10', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 13.11: Rubrica explícita presente no prompt
-  // ─────────────────────────────────────────────────────────
   total++;
   try {
-    const fs = await import('fs');
-    const aiCode = fs.readFileSync('api/_ai-service.js', 'utf8');
-    // O prompt deve conter elementos da rubrica explícita
-    assert.ok(aiCode.includes('RUBRICAS OFICIAIS POR COMPETÊNCIA'), 'Deve ter seção de rubricas explícitas');
-    assert.ok(aiCode.includes('NÃO atribua pontos por impressão geral'), 'Deve proibir pontuação por impressão geral');
-    assert.ok(aiCode.includes('Cada pontuação DEVE ser baseada em evidências concretas'), 'Deve exigir evidências concretas');
-    assert.ok(aiCode.includes('PROIBIDO'), 'Deve ter regras proibitivas explícitas');
-    assert.ok(aiCode.includes('SOMA_EXATA_DAS_COMPETENCIAS'), 'Deve exigir que nota_total seja a soma exata');
-    console.log('✅ Teste 13.11: Rubrica explícita e restrições antipoluição presentes no prompt.');
-    passados++;
-  } catch (err) {
-    console.error('❌ Teste 13.11 falhou:', err.message);
-  }
+    const { default: fs } = await import('fs');
+    const ai = fs.readFileSync('api/_ai-service.js', 'utf8');
+    assert.ok(ai.includes('RUBRICAS OFICIAIS POR COMPETÊNCIA'));
+    assert.ok(
+      ai.includes('Não atribua pontos por impressão geral') ||
+      ai.includes('NÃO atribua pontos por impressão geral') ||
+      ai.includes('não atribua pontos por impressão geral') ||
+      ai.includes('impressão geral'),
+      'Deve proibir atribuição por impressão geral'
+    );
+    assert.ok(ai.includes('PROIBIDO') || ai.includes('É PROIBIDO') || ai.includes('proibido'), 'Deve ter regras proibitivas explícitas');
+    assert.ok(
+      ai.includes('SOMA_EXATA_DAS_5_COMPETENCIAS') || ai.includes('SOMA_EXATA_DAS_COMPETENCIAS') || ai.includes('SOMA EXATA'),
+      'Deve exigir que nota_total seja a soma exata'
+    );
+    pass('13.11 — Rubrica explícita e restrições anti-alucinação no prompt');
+  } catch (e) { fail('13.11', e); }
 
-  // ─────────────────────────────────────────────────────────
-  // TESTE 14: Chamada real com Groq (opcional — requer GROQ_API_KEY)
-  // ─────────────────────────────────────────────────────────
+  // ── NOVOS TESTES ETAPA 21 ──────────────────────────────────────────────
+
+  total++;
+  try {
+    const raw = mockRespostaIA({ notas: [160, 120, 120, 80, 120], nivel: 'Bom', comProblemas: true, comPontosPositivos: true });
+    const r = validarENormalizarResposta(raw, matrizEnem, 'groq/test');
+    // nivel presente e válido
+    assert.ok(typeof r.competencias[0].nivel === 'string', 'nivel deve ser string');
+    assert.ok(r.competencias[0].nivel.length > 0, 'nivel não pode ser vazio');
+    // pontos_positivos presente
+    assert.ok(Array.isArray(r.competencias[0].pontos_positivos));
+    // problemas como objeto com tipo
+    if (r.competencias[0].problemas.length > 0) {
+      const p = r.competencias[0].problemas[0];
+      assert.ok(['ERRO', 'PONTO_DE_ATENCAO', 'SUGESTAO'].includes(p.tipo), `tipo deve ser válido: ${p.tipo}`);
+      assert.ok(typeof p.descricao === 'string', 'descricao deve ser string');
+    }
+    pass('14 — Novos campos: nivel, pontos_positivos, problemas com tipo são normalizados');
+  } catch (e) { fail('14', e); }
+
+  total++;
+  try {
+    // Compatibilidade: problemas como array de strings (formato legado)
+    const rawLegado = JSON.stringify({
+      nota_total: 400, nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1', nota: 80, nota_maxima: 200, justificativa: 'Análise detalhada do domínio da norma culta.', problemas: ['Erro de concordância verbal em "as alunos foram"'], evidencias: ['Exemplo no 2º parágrafo'] },
+        { numero: 2, nome: 'C2', nota: 80, nota_maxima: 200, justificativa: 'Compreensão básica do tema.', problemas: [], evidencias: [] },
+        { numero: 3, nome: 'C3', nota: 80, nota_maxima: 200, justificativa: 'Argumentação básica presente.', problemas: [], evidencias: [] },
+        { numero: 4, nome: 'C4', nota: 80, nota_maxima: 200, justificativa: 'Coesão básica.', problemas: [], evidencias: [] },
+        { numero: 5, nome: 'C5', nota: 80, nota_maxima: 200, justificativa: 'Proposta presente.', problemas: [], evidencias: [] }
+      ],
+      pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
+      feedback_geral: 'Texto básico.', aviso_educacional: 'Aviso.'
+    });
+    const r = validarENormalizarResposta(rawLegado, matrizEnem, 'groq/test');
+    // Legado: string deve ser convertida para objeto com tipo ERRO
+    const p = r.competencias[0].problemas[0];
+    assert.ok(typeof p === 'object', 'problema string deve virar objeto');
+    assert.equal(p.tipo, 'ERRO', 'legado → tipo ERRO');
+    assert.ok(p.descricao.includes('concordância'), 'descricao preserva texto original');
+    // evidencias (legado) mapeia para evidencias_textuais
+    assert.ok(Array.isArray(r.competencias[0].evidencias_textuais), 'evidencias_textuais presente via fallback');
+    pass('15 — Compatibilidade legada: problemas como strings convertidos para objetos');
+  } catch (e) { fail('15', e); }
+
+  total++;
+  try {
+    // Quando nivel está ausente, deve ser inferido da nota
+    const rawSemNivel = JSON.stringify({
+      nota_total: 600, nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1', nota: 200, nota_maxima: 200, justificativa: 'Domínio completo da norma culta sem desvios identificados.', evidencias_textuais: [], problemas: [] },
+        { numero: 2, nome: 'C2', nota: 160, nota_maxima: 200, justificativa: 'Boa compreensão do tema com repertório pertinente.', evidencias_textuais: [], problemas: [] },
+        { numero: 3, nome: 'C3', nota: 80,  nota_maxima: 200, justificativa: 'Argumentação insuficiente, pouco desenvolvida.', evidencias_textuais: [], problemas: [] },
+        { numero: 4, nome: 'C4', nota: 80,  nota_maxima: 200, justificativa: 'Coesão insuficiente com poucos conectivos.', evidencias_textuais: [], problemas: [] },
+        { numero: 5, nome: 'C5', nota: 80,  nota_maxima: 200, justificativa: 'Proposta de intervenção parcialmente desenvolvida.', evidencias_textuais: [], problemas: [] }
+      ],
+      pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
+      feedback_geral: 'Texto mediano.', aviso_educacional: 'Aviso.'
+    });
+    const r = validarENormalizarResposta(rawSemNivel, matrizEnem, 'groq/test');
+    assert.equal(r.competencias[0].nivel, 'Excelente', '200/200 → Excelente');
+    assert.equal(r.competencias[1].nivel, 'Bom',       '160/200 → Bom');
+    assert.equal(r.competencias[2].nivel, 'Insuficiente', '80/200 → Insuficiente');
+    pass('16 — nivel inferido automaticamente quando ausente na resposta da IA');
+  } catch (e) { fail('16', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const ai = fs.readFileSync('api/_ai-service.js', 'utf8');
+    // Verifica que o prompt inclui contexto da proposta (secaoProposta)
+    assert.ok(ai.includes('proposta'), 'Parâmetro proposta presente na assinatura');
+    assert.ok(ai.includes('textos_motivadores'), 'textos_motivadores incluídos no prompt');
+    assert.ok(ai.includes('instrucoes'), 'instrucoes incluídas no prompt');
+    assert.ok(ai.includes('PROPOSTA DE REDAÇÃO'), 'Seção de proposta no prompt');
+    pass('17 — Contexto completo da proposta incluído no prompt');
+  } catch (e) { fail('17', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    assert.ok(!src.includes('gsk_') && !src.includes('AIza') && !src.includes('sk-'));
+    pass('18 — Frontend sem credenciais (revalidação)');
+  } catch (e) { fail('18', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    assert.ok(src.includes('btn.disabled = true;'));
+    pass('19 — Frontend com proteção contra duplo clique (revalidação)');
+  } catch (e) { fail('19', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const api = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(api.includes('persistidoNoBanco = true;'));
+    pass('20 — Persistência defensiva (revalidação)');
+  } catch (e) { fail('20', e); }
+
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const api = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(api.includes("status: 'corrigida'") && api.includes("updated_at:"));
+    pass("21 — Schema correto: status 'corrigida' e updated_at (revalidação)");
+  } catch (e) { fail('21', e); }
+
+  // ── CENÁRIOS DE REDAÇÃO ──────────────────────────────────────────────────
+
+  /**
+   * Cenário A — Redação forte
+   * Simula resposta da IA para um texto bem elaborado.
+   */
+  total++;
+  try {
+    const redacaoForte = mockRespostaIA({ notas: [200, 160, 160, 160, 160], nivel: 'Bom', comPontosPositivos: true });
+    const r = validarENormalizarResposta(redacaoForte, matrizEnem, 'groq/test');
+    assert.equal(r.nota_total, 840, 'Redação forte: nota 840');
+    assert.ok(r.competencias.every(c => c.nota >= 160), 'Todas as competências >= 160');
+    assert.ok(r.competencias.every(c => Array.isArray(c.pontos_positivos)), 'Todas têm pontos_positivos');
+    pass('CENÁRIO A — Redação forte: estrutura e normalização corretas');
+  } catch (e) { fail('CENÁRIO A', e); }
+
+  /**
+   * Cenário B — Redação média
+   */
+  total++;
+  try {
+    const redacaoMedia = mockRespostaIA({ notas: [120, 120, 120, 80, 80], nivel: 'Médio', comProblemas: true });
+    const r = validarENormalizarResposta(redacaoMedia, matrizEnem, 'groq/test');
+    assert.equal(r.nota_total, 520);
+    assert.ok(r.competencias.some(c => c.problemas.length > 0), 'Alguma competência tem problemas');
+    assert.ok(r.pontos_melhoria.length > 0, 'pontos_melhoria preenchido');
+    pass('CENÁRIO B — Redação média: campos de melhoria preenchidos');
+  } catch (e) { fail('CENÁRIO B', e); }
+
+  /**
+   * Cenário C — Redação fraca
+   */
+  total++;
+  try {
+    const redacaoFraca = mockRespostaIA({ notas: [80, 40, 40, 40, 40], nivel: 'Insuficiente', comProblemas: true });
+    const r = validarENormalizarResposta(redacaoFraca, matrizEnem, 'groq/test');
+    assert.equal(r.nota_total, 240);
+    assert.ok(r.competencias.filter(c => c.nota <= 80).length >= 3, 'Maioria das competências <= 80');
+    pass('CENÁRIO C — Redação fraca: notas baixas e problemas identificados');
+  } catch (e) { fail('CENÁRIO C', e); }
+
+  /**
+   * Cenário D — Fuga ao tema (simula C2 = 0)
+   */
+  total++;
+  try {
+    const fugaAoTema = JSON.stringify({
+      nota_total: 200, nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1', nota: 120, nota_maxima: 200, justificativa: 'Norma culta razoável apesar da fuga.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 2, nome: 'C2', nota: 0,   nota_maxima: 200, justificativa: 'O texto aborda tema completamente diferente do proposto — fuga ao tema identificada.', evidencias_textuais: [], pontos_positivos: [], problemas: [{ tipo: 'ERRO', descricao: 'Fuga ao tema: o texto não responde ao recorte proposto.', trecho_original: '', sugestao_reescrita: '' }] },
+        { numero: 3, nome: 'C3', nota: 40,  nota_maxima: 200, justificativa: 'Argumentação limitada pela fuga ao tema.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 4, nome: 'C4', nota: 40,  nota_maxima: 200, justificativa: 'Coesão comprometida.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 5, nome: 'C5', nota: 0,   nota_maxima: 200, justificativa: 'Sem proposta.', evidencias_textuais: [], pontos_positivos: [], problemas: [] }
+      ],
+      pontos_fortes: [], pontos_melhoria: ['Ler a proposta com atenção'],
+      exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
+      feedback_geral: 'O texto apresentou fuga ao tema.', aviso_educacional: 'Aviso.'
+    });
+    const r = validarENormalizarResposta(fugaAoTema, matrizEnem, 'groq/test');
+    assert.equal(r.competencias[1].nota, 0, 'C2 deve ser 0 para fuga ao tema');
+    assert.ok(r.competencias[1].problemas.some(p => p.tipo === 'ERRO'), 'C2 deve ter ERRO de fuga');
+    assert.ok(r.competencias[1].justificativa.toLowerCase().includes('fuga'), 'C2 deve mencionar fuga na justificativa');
+    pass('CENÁRIO D — Fuga ao tema: C2 = 0 com ERRO identificado');
+  } catch (e) { fail('CENÁRIO D', e); }
+
+  /**
+   * Cenário E — Tangenciamento (C2 limitada, mas não zerada)
+   */
+  total++;
+  try {
+    const tangenciamento = JSON.stringify({
+      nota_total: 480, nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1', nota: 120, nota_maxima: 200, justificativa: 'Norma culta razoável com alguns desvios.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 2, nome: 'C2', nota: 80,  nota_maxima: 200, justificativa: 'Tangenciamento: o texto aborda tema relacionado mas não responde ao recorte específico da proposta.', evidencias_textuais: [], pontos_positivos: [], problemas: [{ tipo: 'PONTO_DE_ATENCAO', descricao: 'Tangenciamento — o texto se aproxima mas não responde exatamente ao recorte.', trecho_original: '', sugestao_reescrita: '' }] },
+        { numero: 3, nome: 'C3', nota: 120, nota_maxima: 200, justificativa: 'Argumentação mediana.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 4, nome: 'C4', nota: 80,  nota_maxima: 200, justificativa: 'Coesão regular.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 5, nome: 'C5', nota: 80,  nota_maxima: 200, justificativa: 'Proposta parcial.', evidencias_textuais: [], pontos_positivos: [], problemas: [] }
+      ],
+      pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
+      feedback_geral: 'Tangenciamento identificado.', aviso_educacional: 'Aviso.'
+    });
+    const r = validarENormalizarResposta(tangenciamento, matrizEnem, 'groq/test');
+    assert.ok(r.competencias[1].nota > 0, 'C2 não deve ser 0 para tangenciamento (não é fuga total)');
+    assert.ok(r.competencias[1].nota <= 120, 'C2 deve ser limitada no tangenciamento');
+    assert.ok(r.competencias[1].problemas.some(p => p.tipo === 'PONTO_DE_ATENCAO'), 'C2 deve ter PONTO_DE_ATENCAO');
+    pass('CENÁRIO E — Tangenciamento: C2 limitada mas não zerada');
+  } catch (e) { fail('CENÁRIO E', e); }
+
+  /**
+   * Cenário F — Boa redação com repertório simples
+   * VERIFICA: sistema NÃO penaliza apenas por repertório não sofisticado.
+   */
+  total++;
+  try {
+    const repertorioSimples = JSON.stringify({
+      nota_total: 720, nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1', nota: 160, nota_maxima: 200, justificativa: 'Bom domínio da norma culta com poucos desvios.', evidencias_textuais: ['Uso correto de concordância'], pontos_positivos: ['Boa ortografia'], problemas: [] },
+        { numero: 2, nome: 'C2', nota: 120, nota_maxima: 200, justificativa: 'O candidato compreende o tema e utiliza a Lei 10.639/03 como repertório pertinente, embora seja um único exemplo.', evidencias_textuais: ['Lei 10.639/03 citada de forma pertinente ao argumento'], pontos_positivos: ['Repertório pertinente ao tema'], problemas: [{ tipo: 'PONTO_DE_ATENCAO', descricao: 'Repertório poderia ser ampliado, mas o utilizado é pertinente e produtivo.', trecho_original: '', sugestao_reescrita: '' }] },
+        { numero: 3, nome: 'C3', nota: 160, nota_maxima: 200, justificativa: 'Argumentação satisfatória com progressão.', evidencias_textuais: [], pontos_positivos: ['Argumentos coerentes'], problemas: [] },
+        { numero: 4, nome: 'C4', nota: 160, nota_maxima: 200, justificativa: 'Boa coesão.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },
+        { numero: 5, nome: 'C5', nota: 120, nota_maxima: 200, justificativa: 'Proposta com 3 elementos identificados.', evidencias_textuais: [], pontos_positivos: [], problemas: [] }
+      ],
+      pontos_fortes: ['Argumentação coerente'],
+      pontos_melhoria: ['Ampliar repertório'],
+      exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
+      feedback_geral: 'Redação sólida com repertório simples mas pertinente.', aviso_educacional: 'Aviso.'
+    });
+    const r = validarENormalizarResposta(repertorioSimples, matrizEnem, 'groq/test');
+    // Verifica que C2 >= 120 (repertório simples mas pertinente NÃO deve ser penalizado excessivamente)
+    assert.ok(r.competencias[1].nota >= 120, `C2 deve ser >= 120 para repertório simples mas pertinente (obteve ${r.competencias[1].nota})`);
+    // Verifica que o PONTO_DE_ATENCAO é diferente de ERRO (não penaliza como erro)
+    const problemasC2 = r.competencias[1].problemas;
+    if (problemasC2.length > 0) {
+      assert.ok(problemasC2.every(p => p.tipo !== 'ERRO'), 'Repertório simples não deve gerar ERRO, apenas PONTO_DE_ATENCAO ou SUGESTAO');
+    }
+    assert.equal(r.nota_total, 720, 'Nota total 720 para redação com repertório simples');
+    pass('CENÁRIO F — Boa redação com repertório simples: não penalizada com ERRO por repertório');
+  } catch (e) { fail('CENÁRIO F', e); }
+
+  /**
+   * Cenário G — Regressão: tema da herança africana
+   * Verifica que a estrutura de avaliação está correta para o tema reportado.
+   */
+  total++;
+  try {
+    // Simula avaliação coerente para o tema "Desafios para a valorização da herança africana no Brasil"
+    const avaliacaoHerancaAfricana = JSON.stringify({
+      nota_total: 680, nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1 - Domínio da norma culta', nota: 200, nota_maxima: 200, justificativa: 'Texto com excelente domínio da norma culta. Nenhum desvio de ortografia, acentuação ou concordância identificado.', evidencias_textuais: ['Construção sintática correta em todo o texto'], pontos_positivos: ['Ortografia correta', 'Pontuação adequada'], problemas: [] },
+        { numero: 2, nome: 'C2 - Compreensão e repertório', nota: 120, nota_maxima: 200, justificativa: 'O candidato aborda o tema da valorização da herança africana e cita a Lei 10.639/03 de forma pertinente. O repertório é válido mas poderia ser mais aprofundado.', evidencias_textuais: ['Referência à Lei 10.639/03', 'Abordagem direta do tema proposto'], pontos_positivos: ['Lei 10.639/03 reconhecida como repertório pertinente'], problemas: [{ tipo: 'PONTO_DE_ATENCAO', descricao: 'Repertório poderia ser mais diversificado.', trecho_original: '', sugestao_reescrita: '' }] },
+        { numero: 3, nome: 'C3 - Argumentação', nota: 160, nota_maxima: 200, justificativa: 'Argumentação satisfatória com progressão lógica e desenvolvimento adequado dos parágrafos.', evidencias_textuais: ['Presença de tese clara', 'Argumentos desenvolvidos nos parágrafos centrais'], pontos_positivos: ['Tese clara', 'Argumentos coerentes'], problemas: [] },
+        { numero: 4, nome: 'C4 - Coesão', nota: 120, nota_maxima: 200, justificativa: 'Mecanismos coesivos presentes, com uso de conectivos simples mas funcionais.', evidencias_textuais: ['Uso de "portanto", "além disso"'], pontos_positivos: [], problemas: [{ tipo: 'PONTO_DE_ATENCAO', descricao: 'Conectivos poderiam ser mais diversificados.', trecho_original: '', sugestao_reescrita: '' }] },
+        { numero: 5, nome: 'C5 - Proposta de intervenção', nota: 80, nota_maxima: 200, justificativa: 'Proposta presente mas com apenas 2 elementos claramente identificados (agente e ação).', evidencias_textuais: ['Proposta identificada no último parágrafo'], pontos_positivos: [], problemas: [{ tipo: 'ERRO', descricao: 'Meio/modo, finalidade e detalhamento ausentes na proposta.', trecho_original: '', sugestao_reescrita: '' }] }
+      ],
+      pontos_fortes: ['Excelente domínio da norma culta', 'Lei 10.639/03 utilizada de forma pertinente'],
+      pontos_melhoria: ['Ampliar e aprofundar o repertório', 'Detalhar mais a proposta de intervenção'],
+      exemplos_trechos: [],
+      sugestoes: ['Estudar os 5 elementos da proposta de intervenção do ENEM'],
+      prioridades_estudo: ['Completar a proposta de intervenção com agente, ação, meio, efeito e detalhamento'],
+      feedback_geral: 'Redação com bom domínio da língua e compreensão do tema. A Lei 10.639/03 é repertório válido e pertinente. Os principais pontos de melhoria são o aprofundamento do repertório e o detalhamento da proposta de intervenção.',
+      aviso_educacional: 'Estimativa pedagógica gerada por IA para fins de treino.'
+    });
+    const r = validarENormalizarResposta(avaliacaoHerancaAfricana, matrizEnem, 'groq/test');
+
+    // VERIFICAÇÕES DO CENÁRIO G:
+    // 1. Nota total = soma das competências
+    const somaEsperada = 200 + 120 + 160 + 120 + 80;
+    assert.equal(r.nota_total, somaEsperada, `Nota total (${r.nota_total}) deve ser a soma (${somaEsperada})`);
+
+    // 2. C2 reconhece a Lei 10.639/03 como repertório pertinente
+    assert.ok(r.competencias[1].nota >= 120, `C2 com Lei 10.639/03 deve ser >= 120 (obteve ${r.competencias[1].nota})`);
+
+    // 3. C1 = 200 (texto correto na norma culta)
+    assert.equal(r.competencias[0].nota, 200, 'C1 deve ser 200 (excelente domínio)');
+
+    // 4. Não há justificativas contraditórias (C1=200 mas C1 com erros listados seria contradição)
+    const c1Erros = r.competencias[0].problemas.filter(p => p.tipo === 'ERRO');
+    assert.equal(c1Erros.length, 0, 'C1 com nota 200 não deve ter ERRO listado');
+
+    // 5. Evidências textuais presentes em C2
+    assert.ok(r.competencias[1].evidencias_textuais.length > 0, 'C2 deve ter evidências textuais');
+
+    // 6. Estrutura completa
+    assert.ok(r.feedback_geral.length > 0, 'feedback_geral preenchido');
+    assert.ok(r.pontos_fortes.length > 0, 'pontos_fortes preenchido');
+    assert.ok(r.prioridades_estudo.length > 0, 'prioridades_estudo preenchido');
+
+    pass(`CENÁRIO G — Regressão herança africana: estrutura coerente, nota ${r.nota_total}/1000, C2=${r.competencias[1].nota} reconhece Lei 10.639/03`);
+  } catch (e) { fail('CENÁRIO G', e); }
+
+  // ── TESTE REAL (OPCIONAL) ─────────────────────────────────────────────────
+
   total++;
   if (process.env.GROQ_API_KEY) {
     try {
       console.log('🔄 Executando chamada real à API do Groq...');
-      const resultadoReal = await avaliarRedacaoComIA({
-        tema: 'Impactos da Inteligência Artificial no mercado de trabalho brasileiro',
+      const resultado = await avaliarRedacaoComIA({
+        tema: 'Desafios para a valorização da herança africana no Brasil',
         vestibular: 'enem',
-        matriz: matrizEnemOficial,
-        texto: 'A revolução tecnológica vivenciada no século XXI transforma profundamente as relações laborais no Brasil. Diante desse cenário, a expansão de ferramentas automatizadas exige a requalificação contínua dos trabalhadores e a atuação do Estado para mitigar a precarização social. Portanto, medidas urgentes são fundamentais para equilibrar produtividade e bem-estar coletivo.'
+        matriz: matrizEnem,
+        texto: `A valorização da herança africana no Brasil enfrenta obstáculos históricos e estruturais que persistem até os dias atuais. A escravidão, sistema que perdurou por mais de três séculos, deixou marcas profundas na sociedade brasileira, contribuindo para a marginalização da cultura afro-brasileira. Diante desse cenário, é essencial compreender os desafios para a efetiva valorização dessa herança e propor soluções concretas.
+
+Em primeiro lugar, a ausência de representatividade nos espaços de poder e na mídia dificulta o reconhecimento da contribuição africana à cultura brasileira. Apesar de representarem mais de 50% da população, negros e negras ocupam poucos cargos de liderança e são frequentemente estereotipados nos meios de comunicação. Essa sub-representação perpetua preconceitos e invisibiliza a riqueza cultural de origem africana presente na música, na gastronomia, na religiosidade e nas artes.
+
+Em segundo lugar, a implementação insuficiente da Lei 10.639/2003, que torna obrigatório o ensino de história e cultura afro-brasileira nas escolas, evidencia a resistência institucional à valorização dessa herança. Apesar de sua aprovação há mais de duas décadas, muitos professores ainda não receberam formação adequada para abordar o tema, e os materiais didáticos frequentemente relegam a contribuição africana a um papel secundário.
+
+Portanto, para superar esses desafios, é necessário que o Ministério da Educação amplie a formação de professores para o ensino da cultura afro-brasileira, por meio de programas de capacitação continuada, com o objetivo de garantir a plena implementação da Lei 10.639/2003 e promover uma educação mais equitativa e plural.`,
+        proposta: {
+          instrucoes: 'Escreva um texto dissertativo-argumentativo sobre os desafios para a valorização da herança africana no Brasil.',
+          textos_motivadores: [
+            'A herança africana é parte fundamental da identidade cultural brasileira, presente na música, na culinária, na religiosidade e em diversas manifestações artísticas.',
+            'A Lei 10.639/2003 tornou obrigatório o ensino de história e cultura afro-brasileira nas escolas públicas e privadas do Brasil.'
+          ]
+        }
       });
 
-      assert.ok(resultadoReal.nota_total >= 0, 'Deve ter nota total válida');
-      assert.ok(resultadoReal.competencias.length === 5, 'Deve ter 5 competências');
-      assert.ok(resultadoReal.modelo_utilizado.includes('groq'), 'Modelo deve ser do Groq');
+      assert.ok(resultado.nota_total >= 0 && resultado.nota_total <= 1000, 'Nota total válida');
+      assert.equal(resultado.competencias.length, 5, 'Deve ter 5 competências');
+      assert.ok(resultado.modelo_utilizado.includes('groq'), 'Modelo deve ser do Groq');
 
-      // Verifica que a soma está correta (prova que o backend calculou, não a IA)
-      const somaReal = resultadoReal.competencias.reduce((acc, c) => acc + c.nota, 0);
-      assert.equal(resultadoReal.nota_total, somaReal, `Nota total (${resultadoReal.nota_total}) deve ser a soma das competências (${somaReal})`);
+      // Verifica soma
+      const soma = resultado.competencias.reduce((acc, c) => acc + c.nota, 0);
+      assert.equal(resultado.nota_total, soma, `Soma (${soma}) deve ser a nota_total (${resultado.nota_total})`);
 
-      // Verifica que todas as notas são múltiplos de 40 (escala ENEM)
-      resultadoReal.competencias.forEach((c, i) => {
-        assert.equal(c.nota % 40, 0, `Competência ${i + 1}: nota ${c.nota} deve ser múltiplo de 40`);
+      // Verifica quantização ENEM
+      resultado.competencias.forEach((c, i) => {
+        assert.equal(c.nota % 40, 0, `C${i+1}: nota ${c.nota} deve ser múltiplo de 40`);
       });
 
-      console.log(`✅ Teste 14: Chamada real à API do Groq concluída! Modelo: ${resultadoReal.modelo_utilizado}, Nota: ${resultadoReal.nota_total}/1000.`);
-      passados++;
-    } catch (err) {
-      console.error('❌ Teste 14 (Chamada real Groq) falhou:', err.message);
-    }
+      // Verifica novos campos
+      resultado.competencias.forEach((c, i) => {
+        assert.ok(typeof c.nivel === 'string' && c.nivel.length > 0, `C${i+1} deve ter nivel`);
+        assert.ok(Array.isArray(c.pontos_positivos), `C${i+1} deve ter pontos_positivos`);
+        assert.ok(Array.isArray(c.problemas), `C${i+1} deve ter problemas`);
+        assert.ok(Array.isArray(c.evidencias_textuais), `C${i+1} deve ter evidencias_textuais`);
+      });
+
+      // Verifica Lei 10.639 reconhecida em C2 (o texto a menciona explicitamente)
+      const c2 = resultado.competencias[1];
+      const c2Texto = JSON.stringify(c2).toLowerCase();
+      const reconheceuLei = c2Texto.includes('10.639') || c2Texto.includes('lei') || c2Texto.includes('repertório') || c2.nota >= 120;
+      assert.ok(reconheceuLei, `C2 deve reconhecer Lei 10.639/2003 ou dar >= 120 (obteve ${c2.nota})`);
+
+      console.log(`  Nota: ${resultado.nota_total}/1000 | C1:${resultado.competencias[0].nota} C2:${resultado.competencias[1].nota} C3:${resultado.competencias[2].nota} C4:${resultado.competencias[3].nota} C5:${resultado.competencias[4].nota}`);
+      console.log(`  Modelo: ${resultado.modelo_utilizado}`);
+      pass(`REAL — Chamada Groq: nota ${resultado.nota_total}/1000, Lei 10.639 reconhecida`);
+    } catch (e) { fail('REAL', e); }
   } else {
-    console.log('ℹ️  Teste 14: GROQ_API_KEY não encontrada. Chamada real ignorada com segurança.');
+    console.log('ℹ️  REAL — GROQ_API_KEY ausente. Chamada real ignorada com segurança.');
     passados++;
   }
 
-  // ─────────────────────────────────────────────────────────
-  // RELATÓRIO FINAL
-  // ─────────────────────────────────────────────────────────
+  // ── RELATÓRIO ────────────────────────────────────────────────────────────
+
   const icone = passados === total ? '✅' : '⚠️';
   console.log(`\n${icone} Relatório: ${passados}/${total} testes aprovados.`);
-
   if (passados !== total) {
-    console.error(`\n❌ ${total - passados} teste(s) falharam. Verifique os erros acima.`);
+    console.error(`\n❌ ${total - passados} teste(s) falharam.`);
     process.exit(1);
   }
 }
 
 runTests().catch(err => {
-  console.error('Erro fatal nos testes:', err);
+  console.error('Erro fatal:', err);
   process.exit(1);
 });

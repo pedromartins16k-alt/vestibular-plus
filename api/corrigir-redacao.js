@@ -185,6 +185,23 @@ export default async function handler(req, res) {
     const matriz = CRITERIOS_BANCAS[bancaId] || CRITERIOS_BANCAS.enem;
     const tema = redacao.titulo || redacao.titulo_proposta || 'Tema de vestibular';
 
+    // Contexto da proposta — inclui textos motivadores e instruções se presentes na linha da redação
+    // Campos opcionais: instrucoes, enunciado, textos_motivadores (JSON array), exigencias, limite_palavras, genero
+    const proposta = {
+      instrucoes: redacao.instrucoes || redacao.instrucoes_proposta || null,
+      enunciado: redacao.enunciado || redacao.enunciado_proposta || null,
+      textos_motivadores: Array.isArray(redacao.textos_motivadores)
+        ? redacao.textos_motivadores
+        : (redacao.textos_motivadores ? [String(redacao.textos_motivadores)] : []),
+      exigencias: redacao.exigencias || null,
+      limite_palavras: redacao.limite_palavras || redacao.limite_linhas || null,
+      genero: redacao.genero || redacao.tipo_genero || null
+    };
+    // Se todos os campos opcionais são nulos, passa proposta como null para economizar tokens no prompt
+    const propostaCompleta = Object.values(proposta).some(v => v !== null && !(Array.isArray(v) && v.length === 0))
+      ? proposta
+      : null;
+
     // 7. Chamada ao provedor de IA desacoplado no servidor
     let avaliacaoIA;
     try {
@@ -192,7 +209,8 @@ export default async function handler(req, res) {
         tema,
         vestibular: bancaId,
         matriz,
-        texto: textoRedacao
+        texto: textoRedacao,
+        proposta: propostaCompleta
       });
     } catch (errIA) {
       console.error('[corrigir-redacao] Erro na chamada de IA:', errIA.message);

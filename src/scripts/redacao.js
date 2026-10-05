@@ -950,27 +950,78 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         <h5 style="font-size:0.92rem; font-weight:800; margin-bottom:12px; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em;">
           Detalhamento por Competência
         </h5>
-        <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="display:flex; flex-direction:column; gap:14px;">
           ${(av.competencias || []).map(c => {
             const peso = Number(c.nota_maxima) || 200;
             const pct = Math.min(100, Math.round((c.nota / peso) * 100));
+            const corBarra = pct >= 80 ? '#22c55e' : pct >= 60 ? '#38bdf8' : pct >= 40 ? '#f59e0b' : '#ef4444';
+            const nivel = c.nivel || '';
+            const nivelCor = nivel === 'Excelente' ? '#22c55e' : nivel === 'Bom' ? '#38bdf8' : nivel === 'Médio' ? '#f59e0b' : '#ef4444';
+
+            // Problemas estruturados (novo formato) ou legado (array de strings)
+            const problemasHtml = (() => {
+              if (!Array.isArray(c.problemas) || c.problemas.length === 0) return '';
+              const items = c.problemas.map(p => {
+                const isObj = typeof p === 'object' && p !== null;
+                const tipo = isObj ? (p.tipo || 'PONTO_DE_ATENCAO') : 'ERRO';
+                const descricao = isObj ? (p.descricao || '') : String(p);
+                const trecho = isObj && p.trecho_original ? p.trecho_original : '';
+                const sugestao = isObj && p.sugestao_reescrita ? p.sugestao_reescrita : '';
+                const tipoCor = tipo === 'ERRO' ? '#ef4444' : tipo === 'PONTO_DE_ATENCAO' ? '#f59e0b' : '#38bdf8';
+                const tipoBg = tipo === 'ERRO' ? 'rgba(239,68,68,0.08)' : tipo === 'PONTO_DE_ATENCAO' ? 'rgba(245,158,11,0.08)' : 'rgba(56,189,248,0.08)';
+                const tipoLabel = tipo === 'ERRO' ? '❌ Erro' : tipo === 'PONTO_DE_ATENCAO' ? '⚠️ Atenção' : '💡 Sugestão';
+                return `<div style="padding:6px 10px; border-radius:var(--radius-sm); background:${tipoBg}; border-left:3px solid ${tipoCor}; margin-bottom:4px;">
+                  <span style="font-size:0.72rem; font-weight:800; color:${tipoCor};">${tipoLabel}</span>
+                  <span style="font-size:0.78rem; color:var(--text-secondary); margin-left:6px;">${escapeHtml(descricao)}</span>
+                  ${trecho ? `<div style="font-size:0.74rem; font-style:italic; color:var(--text-secondary); margin-top:2px;">Trecho: "${escapeHtml(trecho)}"${sugestao ? ` → ${escapeHtml(sugestao)}` : ''}</div>` : ''}
+                </div>`;
+              }).join('');
+              return `<div style="margin-top:8px;">${items}</div>`;
+            })();
+
+            // Pontos positivos
+            const pontosPositivosHtml = (() => {
+              const lista = Array.isArray(c.pontos_positivos) ? c.pontos_positivos : [];
+              if (lista.length === 0) return '';
+              return `<div style="margin-top:6px; display:flex; flex-wrap:wrap; gap:4px;">
+                ${lista.map(p => `<span style="font-size:0.72rem; background:rgba(34,197,94,0.1); color:#22c55e; border:1px solid rgba(34,197,94,0.3); border-radius:var(--radius-sm); padding:2px 8px;">✓ ${escapeHtml(String(p))}</span>`).join('')}
+              </div>`;
+            })();
+
+            // Evidências textuais
+            const evidenciasHtml = (() => {
+              const lista = Array.isArray(c.evidencias_textuais) && c.evidencias_textuais.length > 0
+                ? c.evidencias_textuais
+                : Array.isArray(c.evidencias) ? c.evidencias : [];
+              if (lista.length === 0) return '';
+              return `<div style="margin-top:6px; font-size:0.75rem; color:var(--text-secondary);">
+                <span style="font-weight:700; color:var(--text-primary);">📝 Evidências:</span>
+                <ul style="margin:2px 0 0; padding-left:16px; line-height:1.4;">
+                  ${lista.map(e => `<li style="font-style:italic;">${escapeHtml(String(e))}</li>`).join('')}
+                </ul>
+              </div>`;
+            })();
+
             return `
-              <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px 16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
                   <span style="font-weight:700; font-size:0.88rem; color:var(--text-primary);">
                     Competência ${c.numero}: ${escapeHtml(c.nome)}
                   </span>
-                  <span style="font-weight:800; font-size:0.9rem; color:var(--color-primary-400);">
-                    ${c.nota} / ${peso} pts
-                  </span>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    ${nivel ? `<span style="font-size:0.72rem; font-weight:800; color:${nivelCor}; background:${nivelCor}18; border:1px solid ${nivelCor}40; border-radius:var(--radius-full); padding:2px 8px;">${escapeHtml(nivel)}</span>` : ''}
+                    <span style="font-weight:800; font-size:0.9rem; color:var(--color-primary-400);">${c.nota} / ${peso} pts</span>
+                  </div>
                 </div>
-                <!-- Barra de progresso da competência -->
-                <div style="background:rgba(255,255,255,0.06); height:6px; border-radius:var(--radius-full); overflow:hidden; margin-bottom:8px;">
-                  <div style="background:var(--gradient-primary); height:100%; width:${pct}%; transition:width 0.4s ease;"></div>
+                <div style="background:rgba(255,255,255,0.06); height:6px; border-radius:var(--radius-full); overflow:hidden; margin-bottom:10px;">
+                  <div style="background:${corBarra}; height:100%; width:${pct}%; transition:width 0.4s ease;"></div>
                 </div>
-                <p style="margin:0; font-size:0.82rem; color:var(--text-secondary); line-height:1.45;">
+                <p style="margin:0 0 4px; font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">
                   ${escapeHtml(c.justificativa)}
                 </p>
+                ${pontosPositivosHtml}
+                ${problemasHtml}
+                ${evidenciasHtml}
               </div>
             `;
           }).join('')}
