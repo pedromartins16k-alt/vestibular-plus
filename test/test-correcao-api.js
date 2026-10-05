@@ -570,6 +570,18 @@ async function runTests() {
     pass('33 — Fingerprint igual para o mesmo texto (normalizado)');
   } catch (e) { fail('33', e); }
 
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    assert.ok(src.includes('SUA NOTA ESTIMADA'), 'Card com "SUA NOTA ESTIMADA" presente');
+    assert.ok(src.includes('Estimativa pedagógica baseada nos critérios do ENEM'), 'Aviso pedagógico oficial presente');
+    assert.ok(src.includes('Como Subir Sua Nota na Próxima Redação'), 'Seção de evolução pedagógica "Como Subir Sua Nota" presente');
+    assert.ok(src.includes('Minha Evolução Nesta Redação'), 'Evolução histórica real presente');
+    assert.ok(src.includes('Evidência encontrada'), 'Evidência em formato diferenciado presente');
+    pass('34 — ETAPA 23: Elementos visuais e pedagógicos da experiência completa validados');
+  } catch (e) { fail('34', e); }
+
   // ── CENÁRIOS DE REDAÇÃO A–L ───────────────────────────────────────────────
 
   // CENÁRIO A — Redação excelente

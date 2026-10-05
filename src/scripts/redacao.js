@@ -790,6 +790,15 @@ function renderizarHistorico() {
               <span style="color:#f59e0b; font-weight:600;">Aguardando correção</span>
             `}
           </div>
+          ${temAvaliacao && Array.isArray(r.avaliacao_ia?.competencias) && r.avaliacao_ia.competencias.length > 0 ? `
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:6px;">
+              ${r.avaliacao_ia.competencias.map(c => `
+                <span style="font-size:0.67rem; font-weight:700; background:rgba(255,255,255,0.05); color:var(--text-secondary); border:1px solid var(--border-color); border-radius:var(--radius-full); padding:1px 6px;">
+                  C${c.numero}: ${c.nota}
+                </span>
+              `).join('')}
+            </div>
+          ` : ''}
         </div>
 
         <div style="display:flex; align-items:center; gap:10px;">
@@ -839,19 +848,28 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
 
   // Banner de aviso para avaliação inconsistente
   const bannerInconsistente = av.avaliacao_inconsistente
-    ? `<div style="margin-bottom:16px; padding:12px 16px; border-radius:var(--radius-md); background:rgba(239,68,68,0.1); border:2px solid rgba(239,68,68,0.5); color:#ef4444; font-size:0.84rem;">
-        ⚠️ <strong>Esta avaliação foi marcada como inconsistente.</strong> A diferença em relação à avaliação anterior supera 100 pontos. Ambas as avaliações estão preservadas abaixo para diagnóstico. Considere reavaliar novamente ou consultar um professor para interpretação dos resultados.
+    ? `<div style="margin-bottom:16px; padding:12px 16px; border-radius:var(--radius-md); background:rgba(239,68,68,0.08); border:2px solid rgba(239,68,68,0.4); color:#ef4444; font-size:0.84rem;">
+        ⚠️ <strong>Análise requer atenção:</strong> Identificamos uma variação relevante entre os elementos analisados nesta correção e a anterior. A avaliação foi sinalizada para maior transparência e ambas estão preservadas.
       </div>`
+    : '';
+
+  // Banner para nota_suspeita / sinalização de consistência
+  const compSuspeitas = (av.competencias || []).filter(c => c.nota_suspeita);
+  const bannerSuspeita = compSuspeitas.length > 0
+    ? `<div style="margin-bottom:16px; padding:10px 14px; border-radius:var(--radius-md); background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.3); color:#c084fc; font-size:0.82rem;">
+        🔍 <strong>Sinalização pedagógica:</strong> Esta avaliação possui uma sinalização de consistência em ${compSuspeitas.map(c => `C${c.numero}`).join(', ')}. Isso não significa que sua redação esteja errada — confira as observações detalhadas.
+       </div>`
     : '';
 
   return `
     <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:22px; margin-bottom:24px; box-shadow:var(--shadow-soft);">
+      ${bannerSuspeita}
       ${bannerInconsistente}
       <!-- Topo da Avaliação -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; border-bottom:1px solid var(--border-color); padding-bottom:16px; margin-bottom:18px;">
         <div>
           <span style="font-size:0.74rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--color-primary-400); background:rgba(124,58,237,0.12); padding:3px 10px; border-radius:var(--radius-full);">
-            Parecer Oficial da IA (${escapeHtml(av.modelo_utilizado || 'IA')})
+            Estimativa Pedagógica (${escapeHtml(av.modelo_utilizado || 'IA')})
           </span>
           <h4 style="font-size:1.15rem; font-weight:800; font-family:var(--font-display); margin:8px 0 2px;">
             Resultado da Avaliação
@@ -860,13 +878,54 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
             Avaliado em ${new Date(av.corrigido_em || Date.now()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>
+      </div>
 
-        <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:12px 20px; text-align:center;">
-          <div style="font-size:1.75rem; font-weight:900; font-family:var(--font-display); color:${corNota};">
-            ${av.nota_total} <span style="font-size:0.95rem; font-weight:600; color:var(--text-secondary);">/ ${av.nota_maxima}</span>
+      <!-- Card Principal da Nota e Resumo -->
+      <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:stretch; margin-bottom:20px;">
+        <!-- Card Destaque da Nota -->
+        <div style="flex:1 1 200px; background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:20px 24px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-secondary); margin-bottom:6px;">
+            SUA NOTA ESTIMADA
           </div>
-          <div style="font-size:0.72rem; text-transform:uppercase; color:var(--text-secondary); margin-top:2px;">
-            Aproveitamento (${percentual}%)
+          <div style="font-size:3.2rem; font-weight:900; font-family:var(--font-display); color:${corNota}; line-height:1;">
+            ${av.nota_total}
+          </div>
+          <div style="font-size:0.95rem; color:var(--text-secondary); font-weight:600; margin-bottom:8px;">
+            / ${av.nota_maxima}
+          </div>
+          <div style="font-size:0.72rem; color:var(--text-secondary); line-height:1.4;">
+            Estimativa pedagógica baseada nos critérios do ENEM
+          </div>
+        </div>
+
+        <!-- Resumo da Correção C1-C5 -->
+        <div style="flex:2 1 300px; background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 20px; display:flex; flex-direction:column; justify-content:center;">
+          <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-secondary); margin-bottom:12px;">
+            📊 Resumo da Correção
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(85px, 1fr)); gap:10px;">
+            ${(av.competencias || []).map(c => {
+              const p = Number(c.nota_maxima) || 200;
+              const pctC = Math.min(100, Math.round((c.nota / p) * 100));
+              const corC = pctC >= 80 ? '#22c55e' : pctC >= 60 ? '#38bdf8' : pctC >= 40 ? '#f59e0b' : '#ef4444';
+              const prioEmoji = c.prioridade === 'alta' ? '🔴' : c.prioridade === 'media' ? '🟡' : '🟢';
+              return `
+                <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:8px; text-align:center;">
+                  <div style="font-size:0.7rem; font-weight:800; color:var(--text-secondary); margin-bottom:2px;" title="${escapeHtml(c.nome || '')}">
+                    C${c.numero} ${prioEmoji}
+                  </div>
+                  <div style="font-size:1.05rem; font-weight:900; color:${corC};">
+                    ${c.nota}
+                  </div>
+                  <div style="font-size:0.62rem; color:var(--text-secondary);">
+                    / ${p}
+                  </div>
+                  <div style="background:rgba(255,255,255,0.07); height:3px; border-radius:2px; margin-top:4px; overflow:hidden;">
+                    <div style="background:${corC}; width:${pctC}%; height:100%;"></div>
+                  </div>
+                </div>
+              `;
+            }).join('')}
           </div>
         </div>
       </div>
@@ -951,6 +1010,37 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         `;
       })()}
 
+      <!-- Evolução do Aluno (somente dados reais do histórico desta redação) -->
+      ${(() => {
+        const hist = Array.isArray(r.historico_avaliacoes) ? r.historico_avaliacoes : [];
+        if (hist.length < 1) return '';
+        const timeline = [...hist].reverse().map(h => ({ nota: h.nota_total, atual: false }));
+        timeline.push({ nota: av.nota_total, atual: true });
+        const max = av.nota_maxima || 1000;
+
+        return `
+          <div style="margin-bottom:20px; padding:14px 18px; border-radius:var(--radius-md); background:rgba(124,58,237,0.05); border:1px solid rgba(124,58,237,0.2);">
+            <div style="font-size:0.86rem; font-weight:800; color:var(--color-primary-400); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+              <span>📈</span> Minha Evolução Nesta Redação
+            </div>
+            <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; padding:6px 0;">
+              ${timeline.map((item, idx) => {
+                const h = Math.max(14, Math.round((item.nota / max) * 75));
+                const cor = item.atual ? 'var(--color-primary-400)' : '#38bdf8';
+                const label = item.atual ? 'Atual' : `Versão ${idx + 1}`;
+                return `
+                  <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:54px;">
+                    <span style="font-size:0.75rem; font-weight:800; color:${cor};">${item.nota}</span>
+                    <div style="width:36px; height:${h}px; background:${cor}${item.atual ? '' : '80'}; border-radius:4px 4px 0 0; transition:height 0.3s ease;"></div>
+                    <span style="font-size:0.65rem; color:var(--text-secondary); text-align:center;">${label}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      })()}
+
       <!-- Competências Avaliadas -->
       <div style="margin-bottom:20px;">
         <h5 style="font-size:0.92rem; font-weight:800; margin-bottom:12px; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em;">
@@ -976,14 +1066,58 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
                 const tipoCor = tipo === 'ERRO' ? '#ef4444' : tipo === 'PONTO_DE_ATENCAO' ? '#f59e0b' : '#38bdf8';
                 const tipoBg = tipo === 'ERRO' ? 'rgba(239,68,68,0.08)' : tipo === 'PONTO_DE_ATENCAO' ? 'rgba(245,158,11,0.08)' : 'rgba(56,189,248,0.08)';
                 const tipoLabel = tipo === 'ERRO' ? '❌ Erro' : tipo === 'PONTO_DE_ATENCAO' ? '⚠️ Atenção' : '💡 Sugestão';
-                return `<div style="padding:6px 10px; border-radius:var(--radius-sm); background:${tipoBg}; border-left:3px solid ${tipoCor}; margin-bottom:4px;">
+                return `<div style="padding:8px 12px; border-radius:var(--radius-sm); background:${tipoBg}; border-left:3px solid ${tipoCor}; margin-bottom:6px;">
                   <span style="font-size:0.72rem; font-weight:800; color:${tipoCor};">${tipoLabel}</span>
-                  <span style="font-size:0.78rem; color:var(--text-secondary); margin-left:6px;">${escapeHtml(descricao)}</span>
-                  ${trecho ? `<div style="font-size:0.74rem; font-style:italic; color:var(--text-secondary); margin-top:2px;">Trecho: "${escapeHtml(trecho)}"${sugestao ? ` → ${escapeHtml(sugestao)}` : ''}</div>` : ''}
+                  <span style="font-size:0.79rem; color:var(--text-primary); margin-left:6px; line-height:1.45;">${escapeHtml(descricao)}</span>
+                  ${trecho ? `
+                    <div style="margin-top:6px; padding:6px 10px; background:rgba(255,255,255,0.04); border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.08);">
+                      <div style="font-size:0.67rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:2px;">
+                        Evidência encontrada
+                      </div>
+                      <blockquote style="margin:0; font-size:0.78rem; font-style:italic; color:var(--text-primary); border-left:2px solid ${tipoCor}; padding-left:8px;">
+                        "${escapeHtml(trecho)}"
+                      </blockquote>
+                      ${sugestao ? `
+                        <div style="margin-top:4px; font-size:0.75rem; color:#38bdf8;">
+                          <strong>Sugestão prática:</strong> ${escapeHtml(sugestao)}
+                        </div>
+                      ` : ''}
+                    </div>
+                  ` : ''}
                 </div>`;
               }).join('');
               return `<div style="margin-top:8px;">${items}</div>`;
             })();
+
+            // Elementos estruturados C5 (caso presentes no analise)
+            const elementosC5Html = (c.numero === 5 && c.analise?.elementos_proposta) ? (() => {
+              const ep = c.analise.elementos_proposta;
+              const itens = [
+                { nome: 'Agente', status: ep.agente },
+                { nome: 'Ação', status: ep.acao },
+                { nome: 'Meio/Modo', status: ep.meio },
+                { nome: 'Finalidade', status: ep.finalidade },
+                { nome: 'Detalhamento', status: ep.detalhamento }
+              ];
+              return `
+                <div style="margin-top:8px; padding:8px 10px; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:var(--radius-sm);">
+                  <div style="font-size:0.69rem; font-weight:800; color:var(--text-secondary); text-transform:uppercase; margin-bottom:5px;">
+                    Estrutura da Proposta de Intervenção (5 Elementos INEP):
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:5px;">
+                    ${itens.map(it => {
+                      const st = String(it.status || '').toLowerCase();
+                      const corBadge = st.includes('presente') ? '#22c55e' : st.includes('insuficiente') ? '#f59e0b' : '#ef4444';
+                      return `
+                        <span style="font-size:0.69rem; padding:2px 7px; border-radius:var(--radius-full); background:${corBadge}15; border:1px solid ${corBadge}40; color:${corBadge}; font-weight:700;">
+                          ${it.nome}: ${escapeHtml(it.status || 'não informado')}
+                        </span>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              `;
+            })() : '';
 
             // Pontos positivos
             const pontosPositivosHtml = (() => {
@@ -1032,6 +1166,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
                 <p style="margin:0 0 4px; font-size:0.82rem; color:var(--text-secondary); line-height:1.5;">
                   ${escapeHtml(c.justificativa)}
                 </p>
+                ${elementosC5Html}
                 ${pontosPositivosHtml}
                 ${problemasHtml}
                 ${evidenciasHtml}
@@ -1088,38 +1223,67 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         </div>
       ` : ''}
 
-      <!-- Sugestões de Estudo e Prioridades -->
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:18px;">
-        ${(av.sugestoes && av.sugestoes.length > 0) ? `
-          <div style="background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.2); border-radius:var(--radius-md); padding:14px;">
-            <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#38bdf8; display:flex; align-items:center; gap:6px;">
-              <span>💡</span> Sugestões Práticas de Treino
-            </h5>
-            <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
-              ${av.sugestoes.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
-            </ul>
-          </div>
-        ` : ''}
+      <!-- Seção: Como Subir Sua Nota -->
+      ${(() => {
+        const prioridadesEstudo = Array.isArray(av.prioridades_estudo) ? av.prioridades_estudo : [];
+        const sugestoesGerais = Array.isArray(av.sugestoes) ? av.sugestoes : [];
+        const compsComMargem = [...(av.competencias || [])].filter(c => c.nota < (Number(c.nota_maxima) || 200)).sort((a, b) => a.nota - b.nota);
 
-        ${(av.prioridades_estudo && av.prioridades_estudo.length > 0) ? `
-          <div style="background:rgba(168,85,247,0.06); border:1px solid rgba(168,85,247,0.2); border-radius:var(--radius-md); padding:14px;">
-            <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#c084fc; display:flex; align-items:center; gap:6px;">
-              <span>📌</span> Prioridades para o Próximo Texto
-            </h5>
-            <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
-              ${av.prioridades_estudo.map(pe => `<li>${escapeHtml(pe)}</li>`).join('')}
-            </ul>
-          </div>
-        ` : ''}
-      </div>
+        if (prioridadesEstudo.length === 0 && sugestoesGerais.length === 0 && compsComMargem.length === 0) {
+          return '';
+        }
 
-      <!-- Reavaliar Button & Aviso -->
+        return `
+          <div style="margin-bottom:20px; background:rgba(124,58,237,0.05); border:1px solid rgba(124,58,237,0.22); border-radius:var(--radius-md); padding:16px 18px;">
+            <h5 style="font-size:0.92rem; font-weight:800; margin:0 0 10px; color:var(--color-primary-400); display:flex; align-items:center; gap:8px;">
+              <span>🚀</span> Como Subir Sua Nota na Próxima Redação
+            </h5>
+
+            ${compsComMargem.length > 0 ? `
+              <div style="margin-bottom:12px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
+                Suas maiores oportunidades de ganho de pontos identificadas na avaliação:
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px;">
+                  ${compsComMargem.slice(0, 3).map(c => `
+                    <span style="font-size:0.75rem; font-weight:700; background:rgba(124,58,237,0.12); color:var(--color-primary-400); border:1px solid rgba(124,58,237,0.25); border-radius:var(--radius-full); padding:2px 10px;">
+                      C${c.numero} (+${(Number(c.nota_maxima) || 200) - c.nota} pts possíveis)
+                    </span>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            ${prioridadesEstudo.length > 0 ? `
+              <div style="margin-top:10px;">
+                <div style="font-size:0.76rem; font-weight:800; color:var(--text-primary); text-transform:uppercase; margin-bottom:4px;">
+                  📌 Ações Práticas Recomendadas:
+                </div>
+                <ul style="margin:0; padding-left:18px; font-size:0.82rem; color:var(--text-secondary); line-height:1.55;">
+                  ${prioridadesEstudo.map(pe => `<li>${escapeHtml(pe)}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+
+            ${sugestoesGerais.length > 0 ? `
+              <div style="margin-top:10px;">
+                <div style="font-size:0.76rem; font-weight:800; color:var(--text-primary); text-transform:uppercase; margin-bottom:4px;">
+                  💡 Orientações Práticas:
+                </div>
+                <ul style="margin:0; padding-left:18px; font-size:0.82rem; color:var(--text-secondary); line-height:1.55;">
+                  ${sugestoesGerais.slice(0, 3).map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      })()}
+
+      <!-- Reavaliar Button & Aviso Educacional -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; padding-top:14px; border-top:1px solid var(--border-color);">
         <button id="btn-reavaliar-ia" class="btn btn-secondary" data-id="${r.id}" style="font-size:0.8rem; padding:6px 14px;">
           Reavaliar com IA 🔄
         </button>
         <span style="font-size:0.74rem; color:var(--text-secondary); max-width:440px;">
-          ${escapeHtml(av.aviso_educacional || 'Estimativa pedagógica de treino gerada por IA.')}
+          ${escapeHtml(av.aviso_educacional || 'Estimativa pedagógica baseada nos critérios do ENEM.')}
         </span>
       </div>
       <div id="correcao-ia-feedback" style="margin-top:10px; font-size:0.82rem; display:none;"></div>
