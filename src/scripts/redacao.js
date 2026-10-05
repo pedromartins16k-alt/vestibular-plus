@@ -837,8 +837,16 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
   const percentual = Math.round((av.nota_total / (av.nota_maxima || 1000)) * 100);
   const corNota = percentual >= 80 ? '#22c55e' : percentual >= 60 ? '#38bdf8' : '#f59e0b';
 
+  // Banner de aviso para avaliação inconsistente
+  const bannerInconsistente = av.avaliacao_inconsistente
+    ? `<div style="margin-bottom:16px; padding:12px 16px; border-radius:var(--radius-md); background:rgba(239,68,68,0.1); border:2px solid rgba(239,68,68,0.5); color:#ef4444; font-size:0.84rem;">
+        ⚠️ <strong>Esta avaliação foi marcada como inconsistente.</strong> A diferença em relação à avaliação anterior supera 100 pontos. Ambas as avaliações estão preservadas abaixo para diagnóstico. Considere reavaliar novamente ou consultar um professor para interpretação dos resultados.
+      </div>`
+    : '';
+
   return `
     <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:22px; margin-bottom:24px; box-shadow:var(--shadow-soft);">
+      ${bannerInconsistente}
       <!-- Topo da Avaliação -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; border-bottom:1px solid var(--border-color); padding-bottom:16px; margin-bottom:18px;">
         <div>
@@ -881,6 +889,29 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         const diffSinal = diffNota > 0 ? `+${diffNota}` : `${diffNota}`;
         const corDiff = diffNota > 0 ? '#22c55e' : diffNota < 0 ? '#ef4444' : '#38bdf8';
 
+        // Usa a classificação de discrepância já calculada e salva na avaliação
+        const disc = av.discrepancia || null;
+        const classificacao = disc?.classificacao || (Math.abs(diffNota) > 100 ? 'inconsistente' : Math.abs(diffNota) >= 50 ? 'significativa' : 'normal');
+        const labelDisc = disc?.label || '';
+
+        const alerteDiscrepancia = (() => {
+          if (classificacao === 'inconsistente') {
+            return `
+              <div style="margin-bottom:10px; padding:10px 14px; border-radius:var(--radius-sm); font-size:0.8rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.4); color:#ef4444;">
+                ⚠️ <strong>Variação crítica detectada (${Math.abs(diffNota)} pts).</strong>
+                A avaliação automática apresentou uma diferença acima do limite de consistência (&gt;100 pts).
+                A avaliação anterior (<strong>${anterior.nota_total} pts</strong>) e a nova (<strong>${av.nota_total} pts</strong>) foram preservadas para diagnóstico.
+                ${labelDisc ? `<div style="margin-top:4px; font-size:0.75rem; opacity:0.85;">${escapeHtml(labelDisc)}</div>` : ''}
+              </div>`;
+          } else if (classificacao === 'significativa') {
+            return `
+              <div style="margin-bottom:10px; padding:8px 12px; border-radius:var(--radius-sm); font-size:0.78rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); color:#f59e0b;">
+                ⚠️ <strong>Variação significativa (${Math.abs(diffNota)} pts).</strong> Diferença entre 50 e 100 pontos. Ambas as avaliações estão preservadas.
+              </div>`;
+          }
+          return '';
+        })();
+
         return `
           <div style="margin-bottom:20px; padding:14px 16px; border-radius:var(--radius-md); background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
@@ -888,31 +919,27 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
                 <span>⚖️</span> Comparativo com a Avaliação Anterior
               </strong>
               <span style="font-size:0.8rem; font-weight:800; color:${corDiff};">
-                Variação: ${diffSinal} pontos (${anterior.nota_total} → ${av.nota_total})
+                Nota anterior: ${anterior.nota_total} → Nova: ${av.nota_total} (${diffSinal} pts)
               </span>
             </div>
-            ${Math.abs(diffNota) >= 80 ? `
-              <div style="margin-bottom:10px; padding:8px 12px; border-radius:var(--radius-sm); font-size:0.78rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); color:#f59e0b;">
-                ⚠️ <strong>Aviso de discrepância:</strong> Houve variação significativa entre as avaliações (${Math.abs(diffNota)} pts). Ambas as análises estão preservadas abaixo para seu acompanhamento pedagógico.
-              </div>
-            ` : ''}
+            ${alerteDiscrepancia}
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px; font-size:0.78rem;">
               ${(av.competencias || []).map((c, i) => {
                 const compAntiga = (anterior.competencias || [])[i];
                 const notaAnt = compAntiga ? compAntiga.nota : '-';
                 const deltaC = compAntiga ? c.nota - compAntiga.nota : 0;
-                const deltaStr = deltaC > 0 ? `+${deltaC}` : `${deltaC}`;
+                const deltaStr = compAntiga ? (deltaC > 0 ? `+${deltaC}` : `${deltaC}`) : '-';
                 return `
                   <div style="background:var(--bg-elevated); padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--border-color); text-align:center;">
                     <div style="font-weight:700; color:var(--text-secondary); margin-bottom:2px;">C${c.numero}</div>
-                    <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary);">${c.nota} <span style="font-size:0.75rem; color:var(--text-secondary);">(${notaAnt})</span></div>
+                    <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary);">${c.nota} <span style="font-size:0.75rem; color:var(--text-secondary);">(ant: ${notaAnt})</span></div>
                     <div style="font-size:0.7rem; font-weight:700; color:${deltaC > 0 ? '#22c55e' : deltaC < 0 ? '#ef4444' : 'var(--text-secondary)'};">${deltaStr}</div>
                   </div>
                 `;
               }).join('')}
             </div>
             <div style="margin-top:10px; font-size:0.74rem; color:var(--text-secondary); text-align:right;">
-              Avaliação anterior realizada em ${new Date(anterior.corrigido_em || Date.now()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              Avaliação anterior realizada em ${new Date(anterior.corrigido_em || Date.now()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
         `;
@@ -1110,21 +1137,60 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
     // Atualiza histórico local com o retorno autêntico do servidor
     const historico = lerHistoricoLocal(sessionUserId);
     const itemIndex = historico.findIndex(item => item.id === redacaoId);
-    
+
     const novaAvaliacao = {
       ...data.avaliacao,
       persistido_no_banco: Boolean(data.persistido_no_banco)
     };
 
+    // Informação de discrepância retornada pelo servidor (comparação com BD)
+    // ou calculada localmente se o servidor não pôde comparar (ex: persistência pendente)
+    let discrepanciaLocal = data.discrepancia || null;
+
     if (itemIndex !== -1) {
       const redacaoAtual = historico[itemIndex];
-      // Se já existia uma avaliação anterior, preserva no histórico de avaliações
+
+      // Se já existia avaliação anterior e servidor não trouxe discrepância, calcula localmente
+      if (redacaoAtual.avaliacao_ia && !discrepanciaLocal) {
+        const notaAnterior = Number(redacaoAtual.avaliacao_ia.nota_total);
+        const notaNova = Number(novaAvaliacao.nota_total);
+        const diferenca = notaNova - notaAnterior;
+        const abs = Math.abs(diferenca);
+        let classificacao, label;
+        if (abs > 100) {
+          classificacao = 'inconsistente';
+          label = `⚠️ Variação crítica (${diferenca > 0 ? '+' : ''}${diferenca} pts): A avaliação automática apresentou uma diferença acima do limite de consistência (>100 pts). Ambas as avaliações foram preservadas para diagnóstico.`;
+        } else if (abs >= 50) {
+          classificacao = 'significativa';
+          label = `⚠️ Variação significativa (${diferenca > 0 ? '+' : ''}${diferenca} pts).`;
+        } else {
+          classificacao = 'normal';
+          label = `Variação normal (${diferenca > 0 ? '+' : ''}${diferenca} pts).`;
+        }
+        discrepanciaLocal = {
+          diferenca,
+          classificacao,
+          label,
+          nota_anterior: notaAnterior,
+          nota_nova: notaNova
+        };
+      }
+
+      // Preserva avaliação anterior no histórico
       if (redacaoAtual.avaliacao_ia) {
         if (!Array.isArray(redacaoAtual.historico_avaliacoes)) {
           redacaoAtual.historico_avaliacoes = [];
         }
-        // Armazena cópia da avaliação anterior
         redacaoAtual.historico_avaliacoes.unshift({ ...redacaoAtual.avaliacao_ia });
+      }
+
+      // Se discrepância crítica: marca a nova avaliação como inconsistente
+      // mas NÃO descarta — preserva ambas para o aluno consultar
+      if (discrepanciaLocal?.classificacao === 'inconsistente') {
+        novaAvaliacao.avaliacao_inconsistente = true;
+        novaAvaliacao.discrepancia = discrepanciaLocal;
+      } else if (discrepanciaLocal) {
+        novaAvaliacao.discrepancia = discrepanciaLocal;
       }
 
       redacaoAtual.avaliacao_ia = novaAvaliacao;

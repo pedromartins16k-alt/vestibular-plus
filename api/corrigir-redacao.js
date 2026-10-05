@@ -13,7 +13,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { avaliarRedacaoComIA } from './_ai-service.js';
+import { avaliarRedacaoComIA, classificarDiscrepancia } from './_ai-service.js';
 
 // Matrizes de bancas oficiais para servir de referência no servidor
 const CRITERIOS_BANCAS = {
@@ -330,13 +330,62 @@ export default async function handler(req, res) {
       console.warn('[corrigir-redacao] Exceção ao persistir avaliação:', errPersist?.message);
     }
 
-    // 9. Resposta de sucesso estruturada
+    // 9. Comparação com avaliação anterior para detectar discrepância
+    let discrepanciaInfo = null;
+    try {
+      const supabaseDb2 = supabaseServiceKey
+        ? createClient(supabaseUrl, supabaseServiceKey, { auth: { persistSession: false } })
+        : supabaseUser;
+
+      // Busca a avaliação mais recente ANTERIOR à que acabamos de inserir
+      const queryAnt = supabaseDb2
+        .from('redacao_avaliacoes')
+        .select('nota_total, nota_maxima, criado_em, competencias')
+        .eq('redacao_id', redacao.id)
+        .eq('user_id', authenticatedUserId)
+        .order('criado_em', { ascending: false })
+        .limit(2); // pega até 2: [nova, anterior]
+
+      const { data: listaAv } = await queryAnt;
+
+      if (listaAv && listaAv.length >= 2) {
+        // listaAv[0] é a nova (recém-inserida), listaAv[1] é a anterior
+        const anterior = listaAv[1];
+        discrepanciaInfo = classificarDiscrepancia(
+          Number(anterior.nota_total),
+          avaliacaoIA.nota_total
+        );
+        discrepanciaInfo.nota_anterior = Number(anterior.nota_total);
+        discrepanciaInfo.nota_nova = avaliacaoIA.nota_total;
+        discrepanciaInfo.data_anterior = anterior.criado_em;
+
+        // Calcula variação por competência
+        const compAnterior = Array.isArray(anterior.competencias) ? anterior.competencias : [];
+        discrepanciaInfo.variacao_competencias = (avaliacaoIA.competencias || []).map((c, i) => {
+          const ca = compAnterior[i];
+          const delta = ca ? c.nota - Number(ca.nota) : null;
+          return {
+            numero: c.numero,
+            nome: c.nome,
+            nota_anterior: ca ? Number(ca.nota) : null,
+            nota_nova: c.nota,
+            delta
+          };
+        });
+      }
+    } catch (errDisc) {
+      // Não-crítico: falha na comparação não deve impedir a resposta
+      console.info('[corrigir-redacao] Comparação de discrepância não executada:', errDisc?.message);
+    }
+
+    // 10. Resposta de sucesso estruturada com transparência
     return responderJson(res, 200, {
       sucesso: true,
       redacao_id: redacao.id,
       avaliacao_id: avaliacaoIdBanco,
       persistido_no_banco: persistidoNoBanco,
       pendencia_persistencia: pendenciaPersistencia,
+      discrepancia: discrepanciaInfo,
       banca: {
         id: bancaId,
         nome: matriz.nome,
