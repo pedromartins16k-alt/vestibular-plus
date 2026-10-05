@@ -543,6 +543,56 @@ async function runTests() {
     pass("21 — Schema correto: status 'corrigida' e updated_at (revalidação)");
   } catch (e) { fail('21', e); }
 
+  total++;
+  try {
+    // prioridade inferida pela nota: alta < 60%, media = 60%, baixa > 60%
+    const rawPrio = JSON.stringify({
+      nota_total: 0, nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1', nota: 200, nota_maxima: 200, justificativa: 'Excelente domínio da norma culta, sem desvios identificados.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },  // 100% → baixa
+        { numero: 2, nome: 'C2', nota: 120, nota_maxima: 200, justificativa: 'Compreensão básica do tema com repertório limitado.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },  // 60% → media
+        { numero: 3, nome: 'C3', nota: 80,  nota_maxima: 200, justificativa: 'Argumentação insuficiente com poucos argumentos desenvolvidos.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },   // 40% → alta
+        { numero: 4, nome: 'C4', nota: 40,  nota_maxima: 200, justificativa: 'Coesão precária com poucos conectivos.', evidencias_textuais: [], pontos_positivos: [], problemas: [] },  // 20% → alta
+        { numero: 5, nome: 'C5', nota: 0,   nota_maxima: 200, justificativa: 'Ausência completa de proposta de intervenção.', evidencias_textuais: [], pontos_positivos: [], problemas: [] }   // 0% → alta
+      ],
+      pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
+      feedback_geral: 'Texto com grande variação entre competências.', aviso_educacional: 'Aviso.'
+    });
+    const r = validarENormalizarResposta(rawPrio, matrizEnem, 'groq/test');
+    assert.ok(['alta', 'media', 'baixa'].includes(r.competencias[0].prioridade), 'prioridade deve ser alta/media/baixa');
+    assert.equal(r.competencias[0].prioridade, 'baixa',  'C1 200/200 = prioridade baixa');
+    assert.equal(r.competencias[1].prioridade, 'media',  'C2 120/200 = prioridade media');
+    assert.equal(r.competencias[2].prioridade, 'alta',   'C3 80/200 = prioridade alta');
+    assert.equal(r.competencias[3].prioridade, 'alta',   'C4 40/200 = prioridade alta');
+    assert.equal(r.competencias[4].prioridade, 'alta',   'C5 0/200 = prioridade alta');
+    pass('22 — prioridade inferida corretamente (baixa/media/alta) por nota percentual');
+  } catch (e) { fail('22', e); }
+
+  total++;
+  try {
+    // tipo_apontamento derivado do pior tipo de problema na competência
+    const rawTipo = JSON.stringify({
+      nota_total: 0, nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nome: 'C1', nota: 160, nota_maxima: 200, justificativa: 'Bom domínio, com pequena sugestão de melhoria.', evidencias_textuais: [], pontos_positivos: [], problemas: [{ tipo: 'SUGESTAO', descricao: 'Poderia usar maior variedade lexical', trecho_original: '', sugestao_reescrita: '' }] },  // → SUGESTAO
+        { numero: 2, nome: 'C2', nota: 120, nota_maxima: 200, justificativa: 'Repertório presente, mas ponto de atenção identificado.', evidencias_textuais: [], pontos_positivos: [], problemas: [{ tipo: 'PONTO_DE_ATENCAO', descricao: 'Repertório poderia ser mais diversificado', trecho_original: '', sugestao_reescrita: '' }] }, // → PONTO_DE_ATENCAO
+        { numero: 3, nome: 'C3', nota: 80,  nota_maxima: 200, justificativa: 'Erro de falta de progressão argumentativa identificado.', evidencias_textuais: [], pontos_positivos: [], problemas: [{ tipo: 'PONTO_DE_ATENCAO', descricao: 'Atenção', trecho_original: '', sugestao_reescrita: '' }, { tipo: 'ERRO', descricao: 'Ausência de progressão argumentativa', trecho_original: '', sugestao_reescrita: '' }] }, // → ERRO (pior tipo prevalece)
+        { numero: 4, nome: 'C4', nota: 120, nota_maxima: 200, justificativa: 'Sem problemas identificados, coesão satisfatória.', evidencias_textuais: [], pontos_positivos: [], problemas: [] }, // → SUGESTAO (sem problemas)
+        { numero: 5, nome: 'C5', nota: 80,  nota_maxima: 200, justificativa: 'Proposta presente com tipo_apontamento explícito da IA.', evidencias_textuais: [], pontos_positivos: [], problemas: [], tipo_apontamento: 'PONTO_DE_ATENCAO' } // IA informa explicitamente
+      ],
+      pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
+      feedback_geral: 'Teste de tipo_apontamento.', aviso_educacional: 'Aviso.'
+    });
+    const r = validarENormalizarResposta(rawTipo, matrizEnem, 'groq/test');
+    assert.ok(['ERRO', 'PONTO_DE_ATENCAO', 'SUGESTAO'].includes(r.competencias[0].tipo_apontamento), 'tipo_apontamento deve ser valor válido');
+    assert.equal(r.competencias[0].tipo_apontamento, 'SUGESTAO',       'C1 só SUGESTAO → SUGESTAO');
+    assert.equal(r.competencias[1].tipo_apontamento, 'PONTO_DE_ATENCAO', 'C2 PONTO_DE_ATENCAO → PONTO_DE_ATENCAO');
+    assert.equal(r.competencias[2].tipo_apontamento, 'ERRO',           'C3 tem ERRO → ERRO (hierarquia)');
+    assert.equal(r.competencias[3].tipo_apontamento, 'SUGESTAO',       'C4 sem problemas → SUGESTAO');
+    assert.equal(r.competencias[4].tipo_apontamento, 'PONTO_DE_ATENCAO', 'C5 com tipo_apontamento explícito da IA aceito');
+    pass('23 — tipo_apontamento derivado do pior tipo de problema (ERRO > ATENÇÃO > SUGESTÃO)');
+  } catch (e) { fail('23', e); }
+
   // ── CENÁRIOS DE REDAÇÃO ──────────────────────────────────────────────────
 
   /**

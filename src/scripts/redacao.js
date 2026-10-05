@@ -1008,7 +1008,14 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
                   <span style="font-weight:700; font-size:0.88rem; color:var(--text-primary);">
                     Competência ${c.numero}: ${escapeHtml(c.nome)}
                   </span>
-                  <div style="display:flex; align-items:center; gap:8px;">
+                  <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                    ${(() => {
+                      const prio = c.prioridade || '';
+                      if (!prio) return '';
+                      const prioMap = { alta: { emoji: '🔴', label: 'Prioridade Alta', cor: '#ef4444' }, media: { emoji: '🟡', label: 'Prioridade Média', cor: '#f59e0b' }, baixa: { emoji: '🟢', label: 'Prioridade Baixa', cor: '#22c55e' } };
+                      const p = prioMap[prio];
+                      return p ? `<span title="${escapeHtml(p.label)}" style="font-size:0.7rem; font-weight:700; color:${p.cor}; background:${p.cor}15; border:1px solid ${p.cor}40; border-radius:var(--radius-full); padding:2px 7px;">${p.emoji} ${escapeHtml(p.label)}</span>` : '';
+                    })()}
                     ${nivel ? `<span style="font-size:0.72rem; font-weight:800; color:${nivelCor}; background:${nivelCor}18; border:1px solid ${nivelCor}40; border-radius:var(--radius-full); padding:2px 8px;">${escapeHtml(nivel)}</span>` : ''}
                     <span style="font-weight:800; font-size:0.9rem; color:var(--color-primary-400);">${c.nota} / ${peso} pts</span>
                   </div>

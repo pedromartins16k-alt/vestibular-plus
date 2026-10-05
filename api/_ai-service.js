@@ -293,6 +293,8 @@ FORMATO DE RESPOSTA — JSON válido (sem markdown):
       "nota": <0|40|80|120|160|200>,
       "nota_maxima": 200,
       "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO> (pior tipo encontrado nesta competência, ou SUGESTAO se não há erros)",
+      "prioridade": "<alta|media|baixa> (alta = nota abaixo de 120; media = nota 120; baixa = nota acima de 120)",
       "justificativa": "<análise clara e objetiva de 2-4 frases com referência ao texto>",
       "pontos_positivos": ["<aspecto positivo real identificado no texto>"],
       "problemas": [
@@ -543,12 +545,28 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado) {
         ? comp.evidencias.map(String)
         : [];
 
+    // tipo_apontamento: derivado do pior tipo de problema nesta competência.
+    // Prioridade: ERRO > PONTO_DE_ATENCAO > SUGESTAO.
+    // Se a IA retornar explicitamente, valida. Caso contrário, inferimos dos problemas.
+    const tipoApontamentoExplicito = String(comp.tipo_apontamento || '').trim().toUpperCase();
+    const tipoApontamento = TIPOS_APONTAMENTO_VALIDOS.includes(tipoApontamentoExplicito)
+      ? tipoApontamentoExplicito
+      : _inferirTipoApontamento(problemasNormalizados);
+
+    // prioridade: alta (nota < 120), media (= 120), baixa (> 120)
+    const prioridadeExplicita = String(comp.prioridade || '').trim().toLowerCase();
+    const prioridade = ['alta', 'media', 'baixa'].includes(prioridadeExplicita)
+      ? prioridadeExplicita
+      : _inferirPrioridade(notaClamped, pesoMax);
+
     return {
       numero: Number(comp.numero) || oficial.numero || (idx + 1),
       nome: String(comp.nome || oficial.nome || `Competência ${idx + 1}`),
       nota: notaClamped,
       nota_maxima: pesoMax,
       nivel,
+      tipo_apontamento: tipoApontamento,
+      prioridade,
       justificativa: justificativa || 'Avaliação pedagógica fundamentada nos critérios oficiais da banca.',
       pontos_positivos: pontosPositivos,
       problemas: problemasNormalizados,
@@ -597,6 +615,31 @@ function _inferirNivel(nota, pesoMax) {
   if (pct <= 0.6) return 'Médio';
   if (pct <= 0.8) return 'Bom';
   return 'Excelente';
+}
+
+/**
+ * Infere o tipo_apontamento da competência a partir dos problemas listados.
+ * Hierarquia: ERRO > PONTO_DE_ATENCAO > SUGESTAO.
+ * Se não há problemas, retorna 'SUGESTAO' (sem problemas reais).
+ */
+function _inferirTipoApontamento(problemas) {
+  if (!Array.isArray(problemas) || problemas.length === 0) return 'SUGESTAO';
+  if (problemas.some(p => p.tipo === 'ERRO')) return 'ERRO';
+  if (problemas.some(p => p.tipo === 'PONTO_DE_ATENCAO')) return 'PONTO_DE_ATENCAO';
+  return 'SUGESTAO';
+}
+
+/**
+ * Infere a prioridade de estudo da competência a partir da nota percentual.
+ * alta: nota < 60% do peso (precisa de atenção urgente)
+ * media: nota = 60% (mediano, pode melhorar)
+ * baixa: nota > 60% (satisfatório)
+ */
+function _inferirPrioridade(nota, pesoMax) {
+  const pct = nota / pesoMax;
+  if (pct < 0.6) return 'alta';
+  if (pct <= 0.6) return 'media';
+  return 'baixa';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
