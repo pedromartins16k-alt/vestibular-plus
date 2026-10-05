@@ -1,6 +1,6 @@
 /**
  * _ai-service.js — Camada desacoplada de IA para Correção de Redações
- * ETAPA 21 — Calibração Profissional
+ * ETAPA 22 — Análise em Duas Fases + Anti-Contradição + Fingerprint
  *
  * Suporta múltiplos provedores:
  * 1. Groq (GROQ_API_KEY) — modelo padrão: openai/gpt-oss-120b
@@ -16,34 +16,109 @@
  * - nota_total SEMPRE calculada no backend (soma das competências).
  * - Validação estrutural da resposta antes de retornar.
  * - Detecção de inconsistência entre avaliações da mesma redação.
+ * - Avaliação em DUAS FASES: análise por critério → nota como consequência.
+ * - Detecção de contradição nota/justificativa (nota 200 com termos negativos).
+ * - Fingerprint determinístico para identificar reavaliações da mesma redação.
  */
 
 const TIMEOUT_MS = 28000;
 
-// Limites de consistência entre reavaliações
-export const LIMITE_DISCREPANCIA_CRITICA = 100;       // > 100 pts → "avaliação inconsistente"
-export const LIMITE_DISCREPANCIA_SIGNIFICATIVA = 50;  // 50–100 pts → "variação significativa"
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTES DE DISCREPÂNCIA — Limites de consistência entre reavaliações
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const LIMITE_DISCREPANCIA_CRITICA      = 100; // >100 pts total → inconsistente
+export const LIMITE_DISCREPANCIA_SIGNIFICATIVA = 80;  // 81-100 pts → alta
+export const LIMITE_DISCREPANCIA_MODERADA      = 40;  // 41-80 pts → moderada
+export const LIMITE_DISCREPANCIA_COMPETENCIA   = 80;  // >80 pts em UMA competência → crítica
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VERSÃO DA RUBRICA — fingerprint de versão para rastreabilidade
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const VERSAO_RUBRICA = 'enem-v4-2026';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// classificarDiscrepancia — 4 níveis + verificação por competência individual
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Classifica a discrepância entre duas avaliações da mesma redação.
+ *
+ * @param {number} notaAnterior - Nota total da avaliação anterior
+ * @param {number} notaNova - Nota total da nova avaliação
+ * @param {Array}  [competenciasAnteriores] - Array de competências da avaliação anterior
+ * @param {Array}  [competenciasNovas] - Array de competências da nova avaliação
+ * @returns {{ diferenca: number, classificacao: string, label: string, discrepanciaCompetencia: object|null }}
  */
-export function classificarDiscrepancia(notaAnterior, notaNova) {
+export function classificarDiscrepancia(notaAnterior, notaNova, competenciasAnteriores, competenciasNovas) {
   const diferenca = notaNova - notaAnterior;
   const abs = Math.abs(diferenca);
   let classificacao, label;
 
   if (abs > LIMITE_DISCREPANCIA_CRITICA) {
     classificacao = 'inconsistente';
-    label = `⚠️ Variação crítica (${diferenca > 0 ? '+' : ''}${diferenca} pts): diferença acima de ${LIMITE_DISCREPANCIA_CRITICA} pts. Ambas as avaliações foram preservadas para diagnóstico.`;
-  } else if (abs >= LIMITE_DISCREPANCIA_SIGNIFICATIVA) {
-    classificacao = 'significativa';
-    label = `⚠️ Variação significativa (${diferenca > 0 ? '+' : ''}${diferenca} pts): diferença entre ${LIMITE_DISCREPANCIA_SIGNIFICATIVA} e ${LIMITE_DISCREPANCIA_CRITICA} pts.`;
+    label = `⚠️ Variação crítica (+${Math.abs(diferenca)} pts): diferença acima de ${LIMITE_DISCREPANCIA_CRITICA} pts. Ambas as avaliações preservadas para diagnóstico.`;
+  } else if (abs > LIMITE_DISCREPANCIA_SIGNIFICATIVA) {
+    classificacao = 'alta';
+    label = `⚠️ Variação alta (${diferenca > 0 ? '+' : ''}${diferenca} pts): diferença entre 81 e 100 pts.`;
+  } else if (abs > LIMITE_DISCREPANCIA_MODERADA) {
+    classificacao = 'moderada';
+    label = `Variação moderada (${diferenca > 0 ? '+' : ''}${diferenca} pts): diferença entre 41 e 80 pts.`;
   } else {
     classificacao = 'normal';
-    label = `Variação normal (${diferenca > 0 ? '+' : ''}${diferenca} pts): dentro do intervalo esperado.`;
+    label = `Variação pequena (${diferenca > 0 ? '+' : ''}${diferenca} pts): dentro do intervalo esperado.`;
   }
 
-  return { diferenca, classificacao, label };
+  // Verificar discrepância por competência individual
+  let discrepanciaCompetencia = null;
+  if (Array.isArray(competenciasAnteriores) && Array.isArray(competenciasNovas)) {
+    for (let i = 0; i < Math.min(competenciasAnteriores.length, competenciasNovas.length); i++) {
+      const diffC = Math.abs((competenciasNovas[i]?.nota || 0) - (competenciasAnteriores[i]?.nota || 0));
+      if (diffC > LIMITE_DISCREPANCIA_COMPETENCIA) {
+        discrepanciaCompetencia = {
+          competencia: i + 1,
+          nome: competenciasNovas[i]?.nome || `C${i + 1}`,
+          nota_anterior: competenciasAnteriores[i]?.nota,
+          nota_nova: competenciasNovas[i]?.nota,
+          diferenca: diffC
+        };
+        if (classificacao === 'normal' || classificacao === 'moderada') {
+          classificacao = 'alta'; // eleva a classificação
+          label += ` Atenção: C${i + 1} variou ${diffC} pts.`;
+        }
+        break;
+      }
+    }
+  }
+
+  return { diferenca, classificacao, label, discrepanciaCompetencia };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// gerarFingerprintRedacao — identificação determinística de reavaliações
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Gera um fingerprint determinístico para identificar reavaliações da mesma redação.
+ * Baseado no conteúdo normalizado + proposta_id + vestibular_id + versão da rubrica.
+ * Permite detectar se o texto já foi avaliado sem precisar de campo no banco.
+ * @param {string} texto - Conteúdo da redação
+ * @param {string} [propostaId] - ID da proposta
+ * @param {string} [vestibularId] - ID do vestibular
+ * @returns {string} fingerprint hexadecimal de 8 chars
+ */
+export function gerarFingerprintRedacao(texto, propostaId = '', vestibularId = '') {
+  // Normaliza o texto: minúsculas, remove múltiplos espaços e quebras de linha
+  const textoNorm = String(texto || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const chave = `${textoNorm}|${propostaId}|${vestibularId}|${VERSAO_RUBRICA}`;
+  // Hash djb2 simples — determinístico sem dependência de crypto
+  let hash = 5381;
+  for (let i = 0; i < chave.length; i++) {
+    hash = ((hash << 5) + hash) ^ chave.charCodeAt(i);
+    hash = hash >>> 0; // mantém unsigned 32-bit
+  }
+  return hash.toString(16).padStart(8, '0');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,6 +258,9 @@ IMPORTANTE:
 
 /**
  * Constrói o prompt completo com rubrica oficial por nível INEP.
+ * Implementa avaliação em DUAS FASES obrigatórias:
+ *   FASE A — Análise por critério (preenchimento de analise_c{N})
+ *   FASE B — Nota como consequência da análise
  *
  * @param {object} params
  * @param {string} params.tema - Título/tema da proposta
@@ -239,6 +317,21 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto, proposta }) 
 
 Sua função é avaliar a redação abaixo seguindo ESTRITAMENTE as rubricas por nível. Não atribua notas por impressão geral.
 
+ATENÇÃO: Você deve executar DUAS FASES obrigatórias antes de retornar o JSON:
+
+FASE A — ANÁLISE (obrigatória, por competência):
+  Para cada competência, ANTES de atribuir a nota:
+  1. Liste os critérios ATENDIDOS pelo texto (com evidência textual).
+  2. Liste os critérios PARCIALMENTE atendidos (com evidência textual).
+  3. Liste os critérios AUSENTES ou violados (com evidência textual ou ausência confirmada).
+  4. Para C1: identifique cada desvio real com trecho_original.
+  5. Para C5: descreva elemento a elemento (agente, ação, meio, finalidade, detalhamento).
+  Inclua essa análise no campo "analise" de cada competência.
+
+FASE B — NOTA (consequência obrigatória da análise):
+  Somente após a análise, atribua a nota que é consequência direta do que foi encontrado.
+  A nota NUNCA pode contradizer a análise. Se houver conflito, revise.
+
 ═══════════════════════════════════════════════════
 PROPOSTA DE REDAÇÃO:
 ${secaoProposta}
@@ -276,6 +369,20 @@ REGRAS FUNDAMENTAIS (obrigatórias):
 
 7. EVIDÊNCIA OBRIGATÓRIA: cada nota deve ter ao menos 1 evidência textual (trecho real ou paráfrase do texto avaliado).
    Se não encontrar problema, diga explicitamente "nenhum desvio identificado nesta competência".
+
+8. ANTI-CONTRADIÇÃO OBRIGATÓRIA:
+   - Se a nota for 200, a justificativa NÃO pode conter frases como:
+     "há problemas", "faltam elementos", "poderia ser melhor", "insuficiente",
+     "parcialmente", "limitado", "fraco", "desenvolvimento inadequado".
+   - Se encontrar conflito, revise a nota para baixo OU revise a justificativa.
+   - A nota deve ser CONSEQUÊNCIA da análise, nunca o contrário.
+
+9. NOTAS MÁXIMAS (200) EXIGEM JUSTIFICATIVA FORTE:
+   - C1=200: citar explicitamente que não foram encontrados desvios gramaticais.
+   - C2=200: citar repertório específico + demonstrar uso produtivo na argumentação.
+   - C3=200: citar tese + progressão + todos os argumentos coerentes.
+   - C4=200: citar mecanismos coesivos variados + articulação entre parágrafos.
+   - C5=200: confirmar todos os 5 elementos com detalhamento real.
 ═══════════════════════════════════════════════════
 
 RUBRICAS OFICIAIS POR COMPETÊNCIA:
@@ -296,6 +403,11 @@ FORMATO DE RESPOSTA — JSON válido (sem markdown):
       "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO> (pior tipo encontrado nesta competência, ou SUGESTAO se não há erros)",
       "prioridade": "<alta|media|baixa> (alta = nota abaixo de 120; media = nota 120; baixa = nota acima de 120)",
       "justificativa": "<análise clara e objetiva de 2-4 frases com referência ao texto>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido com evidência>"],
+        "criterios_parciais": ["<critério parcialmente atendido>"],
+        "criterios_ausentes": ["<critério ausente ou violado>"]
+      },
       "pontos_positivos": ["<aspecto positivo real identificado no texto>"],
       "problemas": [
         {
@@ -306,6 +418,32 @@ FORMATO DE RESPOSTA — JSON válido (sem markdown):
         }
       ],
       "evidencias_textuais": ["<trecho ou elemento real do texto que fundamenta a nota>"]
+    },
+    {
+      "numero": 5,
+      "nome": "Proposta de Intervenção",
+      "nota": <0|40|80|120|160|200>,
+      "nota_maxima": 200,
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise clara e objetiva de 2-4 frases>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"],
+        "elementos_proposta": {
+          "agente": "presente|ausente|insuficiente",
+          "acao": "presente|ausente|insuficiente",
+          "meio": "presente|ausente|insuficiente",
+          "finalidade": "presente|ausente|insuficiente",
+          "detalhamento": "presente|ausente|insuficiente",
+          "relacao_com_problema": "forte|media|fraca"
+        }
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho da proposta no texto>"]
     }
   ],
   "pontos_fortes": ["<ponto forte global do texto, com base em evidência>"],
@@ -315,7 +453,9 @@ FORMATO DE RESPOSTA — JSON válido (sem markdown):
   "prioridades_estudo": ["<prioridade identificada com base nos problemas reais encontrados>"],
   "feedback_geral": "<parecer pedagógico de 3-5 frases: o que o texto faz bem, o que precisa melhorar, como evoluir>",
   "aviso_educacional": "Esta avaliação é uma estimativa pedagógica gerada por inteligência artificial para fins de treino. Não substitui a correção oficial da banca examinadora."
-}`;
+}
+
+NOTA: Para competências 1 a 4, o campo "analise" NÃO precisa de "elementos_proposta". Apenas C5 inclui esse campo.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -453,6 +593,13 @@ async function chamarOpenAI(apiKey, prompt) {
 const NIVEIS_VALIDOS = ['Excelente', 'Bom', 'Médio', 'Insuficiente', 'Precário', 'Ausente'];
 const TIPOS_APONTAMENTO_VALIDOS = ['ERRO', 'PONTO_DE_ATENCAO', 'SUGESTAO'];
 
+// Frases negativas incompatíveis com nota máxima (200)
+const FRASES_NEGATIVAS = [
+  'há problemas', 'faltam elementos', 'poderia ser melhor', 'insuficiente',
+  'parcialmente', 'limitado', 'fraco', 'desenvolvimento inadequado',
+  'pouco detalhamento', 'ausência de', 'ausente', 'não atende', 'precário'
+];
+
 /**
  * Valida e normaliza a resposta da IA.
  *
@@ -460,10 +607,19 @@ const TIPOS_APONTAMENTO_VALIDOS = ['ERRO', 'PONTO_DE_ATENCAO', 'SUGESTAO'];
  * 1. JSON válido obrigatório.
  * 2. Nota de cada competência deve ser múltipla de 40 (para o ENEM).
  * 3. nota_total é SEMPRE a soma das competências calculada no backend — valor da IA descartado.
- * 4. Normaliza os novos campos: nivel, pontos_positivos, problemas (com tipo), evidencias_textuais.
- * 5. Mantém compatibilidade com campos legados (evidencias, problemas como array de strings).
+ * 4. Normaliza os campos: nivel, pontos_positivos, problemas (com tipo), evidencias_textuais, analise.
+ * 5. Mantém compatibilidade com campos legados (evidencias, problemas como strings).
+ * 6. Detecta contradição nota 200 / justificativa negativa (nota_suspeita + aviso_contradicao).
+ * 7. Normaliza o campo analise por competência, incluindo elementos_proposta para C5.
+ * 8. Adiciona rubrica_versao ao objeto final.
+ *
+ * @param {string} rawText - Texto bruto retornado pela IA
+ * @param {object} matriz - Matriz de critérios da banca
+ * @param {string} modeloUsado - Identificador do modelo utilizado
+ * @param {string} [texto] - Texto original da redação (usado para verificação de evidências)
+ * @returns {object} Resultado normalizado e validado
  */
-export function validarENormalizarResposta(rawText, matriz, modeloUsado) {
+export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) {
   let cleaned = (rawText || '').trim();
 
   // Remove markdown codeblock ```json ... ``` se presente
@@ -494,6 +650,7 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado) {
     const oficial = competenciasOficiais[idx] || {};
     const pesoMax = Number(oficial.peso) || Number(comp.nota_maxima) || 200;
     const notaBruta = Number(comp.nota);
+    const numeroComp = Number(comp.numero) || oficial.numero || (idx + 1);
 
     if (isNaN(notaBruta)) {
       throw new Error(`Competência ${idx + 1} retornou nota não-numérica: "${comp.nota}".`);
@@ -559,8 +716,44 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado) {
       ? prioridadeExplicita
       : _inferirPrioridade(notaClamped, pesoMax);
 
-    return {
-      numero: Number(comp.numero) || oficial.numero || (idx + 1),
+    // ── Normaliza campo analise por competência ──────────────────────────────
+    const analise = comp.analise && typeof comp.analise === 'object' ? {
+      criterios_atendidos: Array.isArray(comp.analise.criterios_atendidos)
+        ? comp.analise.criterios_atendidos.map(String)
+        : [],
+      criterios_parciais: Array.isArray(comp.analise.criterios_parciais)
+        ? comp.analise.criterios_parciais.map(String)
+        : [],
+      criterios_ausentes: Array.isArray(comp.analise.criterios_ausentes)
+        ? comp.analise.criterios_ausentes.map(String)
+        : [],
+      // elementos_proposta apenas para C5
+      elementos_proposta: (numeroComp === 5 && comp.analise.elementos_proposta)
+        ? comp.analise.elementos_proposta
+        : undefined
+    } : {
+      criterios_atendidos: [],
+      criterios_parciais: [],
+      criterios_ausentes: []
+    };
+
+    // ── Detecção de contradição nota/justificativa ───────────────────────────
+    // Nota 200 com justificativa contendo termos negativos indica possível superestimação.
+    let notaSuspeita = false;
+    let avisoContradicao = null;
+
+    if (notaClamped >= 160) {
+      const justLower = justificativa.toLowerCase();
+      const conflito = FRASES_NEGATIVAS.find(f => justLower.includes(f));
+      if (conflito && notaClamped === 200) {
+        notaSuspeita = true;
+        avisoContradicao = `Nota 200 com justificativa que menciona "${conflito}". Nota pode estar superestimada.`;
+        console.warn(`[_ai-service] Contradição C${numeroComp}: nota 200 mas justificativa menciona "${conflito}"`);
+      }
+    }
+
+    const resultado = {
+      numero: numeroComp,
       nome: String(comp.nome || oficial.nome || `Competência ${idx + 1}`),
       nota: notaClamped,
       nota_maxima: pesoMax,
@@ -568,12 +761,21 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado) {
       tipo_apontamento: tipoApontamento,
       prioridade,
       justificativa: justificativa || 'Avaliação pedagógica fundamentada nos critérios oficiais da banca.',
+      analise,
       pontos_positivos: pontosPositivos,
       problemas: problemasNormalizados,
       evidencias_textuais: evidenciasTextuais,
       // Campos legados mantidos para compatibilidade com frontend e testes existentes
       evidencias: evidenciasTextuais,
     };
+
+    // Adiciona campos de contradição somente quando detectados
+    if (notaSuspeita) {
+      resultado.nota_suspeita = true;
+      resultado.aviso_contradicao = avisoContradicao;
+    }
+
+    return resultado;
   });
 
   // REGRA CRÍTICA: nota_total = soma das competências normalizadas (valor da IA descartado)
@@ -600,6 +802,7 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado) {
       'Esta avaliação é uma estimativa pedagógica gerada por inteligência artificial para fins de treino. Não substitui a correção oficial da banca examinadora.'
     ),
     modelo_utilizado: modeloUsado || 'ia',
+    rubrica_versao: VERSAO_RUBRICA,
     corrigido_em: new Date().toISOString()
   };
 }
@@ -656,9 +859,11 @@ function _inferirPrioridade(nota, pesoMax) {
  * @param {object} params.matriz - Matriz de critérios
  * @param {string} params.texto - Texto da redação (sempre do banco)
  * @param {object} [params.proposta] - Dados da proposta (textos motivadores, instruções, etc.)
+ * @param {string} [params.propostaId] - ID da proposta (para fingerprint)
+ * @param {string} [params.vestibularId] - ID do vestibular (para fingerprint)
  * @returns {Promise<object>}
  */
-export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto, proposta }) {
+export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto, proposta, propostaId, vestibularId }) {
   const groqKey = process.env.GROQ_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -684,5 +889,7 @@ export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto, pro
     resultadoBruto = await chamarOpenAI(openaiKey, prompt);
   }
 
-  return validarENormalizarResposta(resultadoBruto.rawText, matriz, resultadoBruto.modelo);
+  const resultado = validarENormalizarResposta(resultadoBruto.rawText, matriz, resultadoBruto.modelo, texto);
+  resultado.fingerprint = gerarFingerprintRedacao(texto, propostaId, vestibularId);
+  return resultado;
 }

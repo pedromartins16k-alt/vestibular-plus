@@ -210,7 +210,9 @@ export default async function handler(req, res) {
         vestibular: bancaId,
         matriz,
         texto: textoRedacao,
-        proposta: propostaCompleta
+        proposta: propostaCompleta,
+        propostaId: redacao.proposta_id || null,
+        vestibularId: bancaId
       });
     } catch (errIA) {
       console.error('[corrigir-redacao] Erro na chamada de IA:', errIA.message);
@@ -369,17 +371,21 @@ export default async function handler(req, res) {
       if (listaAv && listaAv.length >= 2) {
         // listaAv[0] é a nova (recém-inserida), listaAv[1] é a anterior
         const anterior = listaAv[1];
+        const compAnterior = Array.isArray(anterior.competencias) ? anterior.competencias : [];
+        const compNova = Array.isArray(avaliacaoIA.competencias) ? avaliacaoIA.competencias : [];
+
         discrepanciaInfo = classificarDiscrepancia(
           Number(anterior.nota_total),
-          avaliacaoIA.nota_total
+          avaliacaoIA.nota_total,
+          compAnterior,
+          compNova
         );
         discrepanciaInfo.nota_anterior = Number(anterior.nota_total);
         discrepanciaInfo.nota_nova = avaliacaoIA.nota_total;
         discrepanciaInfo.data_anterior = anterior.criado_em;
 
-        // Calcula variação por competência
-        const compAnterior = Array.isArray(anterior.competencias) ? anterior.competencias : [];
-        discrepanciaInfo.variacao_competencias = (avaliacaoIA.competencias || []).map((c, i) => {
+        // Variação por competência
+        discrepanciaInfo.variacao_competencias = compNova.map((c, i) => {
           const ca = compAnterior[i];
           const delta = ca ? c.nota - Number(ca.nota) : null;
           return {
@@ -403,6 +409,8 @@ export default async function handler(req, res) {
       avaliacao_id: avaliacaoIdBanco,
       persistido_no_banco: persistidoNoBanco,
       pendencia_persistencia: pendenciaPersistencia,
+      fingerprint: avaliacaoIA.fingerprint || null,
+      rubrica_versao: avaliacaoIA.rubrica_versao || null,
       discrepancia: discrepanciaInfo,
       banca: {
         id: bancaId,

@@ -1,15 +1,15 @@
 # CLAUDE_DATABASE_PROMPT.md
 # Prompt para Alteração Segura do Banco de Dados — Vestibular+
 
-> **Para:** Claude (Anthropic)
+> **Para:** Claude (Anthropic) ou qualquer agente com acesso ao Supabase
 > **De:** Antigravity (Google DeepMind)
 > **Projeto:** Vestibular+
-> **Data:** 2026-09-29
-> **Urgência:** Executar antes de ativar as funcionalidades listadas abaixo
+> **Data:** 2026-10-05
+> **Urgência:** Executar quando houver janela segura de manutenção
 
 ---
 
-## CONTEXTO
+## CONTEXTO GERAL
 
 Você é responsável **exclusivamente** pela alteração segura e reversível do banco de dados do projeto **Vestibular+**.
 
@@ -20,428 +20,209 @@ O Vestibular+ é uma plataforma de estudos para vestibulares brasileiros, hosped
 - Região: `sa-east-1` (São Paulo)
 - Acesse via: https://supabase.com/dashboard/project/jruyyzftoplcobketrsf
 
-**Por que esta alteração é necessária:**
-O Antigravity está implementando as seguintes funcionalidades novas:
-1. **Objetivo do Aluno** — o aluno escolhe vestibular, curso, universidade e data-alvo
-2. **Diagnóstico Inicial** — teste adaptativo que avalia o conhecimento inicial do aluno
-3. **Revisão Espaçada** — sistema que agenda a revisão de questões erradas em intervalos crescentes
+---
 
-Essas funcionalidades precisam de estrutura no banco para persistir os dados.
+## PROBLEMA IDENTIFICADO NA ETAPA 22 — Fingerprint sem campo no banco
+
+### Causa
+
+O sistema de avaliação de redações foi aprimorado com um mecanismo de fingerprint/hash
+para identificar reavaliações da mesma redação. O fingerprint é gerado no backend
+(`api/_ai-service.js`) com base em:
+
+- Conteúdo normalizado da redação (texto em minúsculas, sem espaços duplos)
+- `proposta_id` da redação
+- `vestibular_id`
+- Versão da rubrica (`VERSAO_RUBRICA = 'enem-v4-2026'`)
+
+Atualmente o fingerprint é retornado na resposta da API mas **não é persistido no banco**.
+Isso significa que não é possível detectar server-side se o mesmo texto já foi avaliado anteriormente.
+
+### Problema de Persistência
+
+Em produção, a avaliação frequentemente aparece com aviso:
+
+> "A gravação definitiva no banco não pôde ser confirmada"
+
+Investigação identificou que o INSERT na tabela `redacao_avaliacoes` falha silenciosamente
+(sem erro, sem ID retornado) em alguns casos, possivelmente por:
+
+1. Coluna obrigatória ausente no payload
+2. RLS bloqueando o service_role em certos cenários
+3. Trigger ou constraint desconhecida no schema atual
 
 ---
 
-## BANCO ATUAL (Schema Identificado — NÃO ALTERAR O QUE JÁ EXISTE)
+## SCHEMA ATUAL (NÃO ALTERAR O QUE JÁ EXISTE)
 
 ```
-Tabelas existentes (NÃO modificar, apenas preservar):
+Tabelas existentes confirmadas:
 
-public.profiles
-  - id uuid (PK, referencia auth.users)
-  - nome text
-  - avatar_url text
-  - nivel int (default 1)
-  - xp int (default 0)
-  - meta_diaria_minutos int (default 60)
-  - criado_em timestamptz
-  - atualizado_em timestamptz
-
-public.materias
+public.redacoes
   - id uuid (PK)
-  - nome text
-  - cor text
-  - icone text
-  - ordem int
-
-public.resumos
-  - id uuid (PK)
-  - materia_id uuid (FK → materias)
+  - user_id uuid (FK → auth.users)
+  - proposta_id text
+  - vestibular_id text
   - titulo text
-  - conteudo text (markdown)
-  - fonte text
-  - nivel_dificuldade text ('facil'|'medio'|'dificil')
-  - criado_em timestamptz
+  - conteudo text (texto da redação)
+  - status text ('aguardando_correcao', 'corrigida')
+  - total_palavras integer
+  - total_caracteres integer
+  - total_linhas integer
+  - tempo_segundos integer
+  - finalizada_em timestamptz
+  - created_at timestamptz
+  - updated_at timestamptz
 
-public.questoes
-  - id uuid (PK)
-  - materia_id uuid (FK → materias)
-  - enunciado text
-  - alternativas jsonb (array [{letra, texto}])
-  - resposta_correta text
-  - comentario text
-  - fonte text
-  - ano int
-  - dificuldade text ('facil'|'medio'|'dificil')
-
-public.simulados
-  - id uuid (PK)
-  - titulo text
-  - descricao text
-  - tempo_limite_minutos int
-  - criado_em timestamptz
-
-+ patches aplicados:
-  - schema_patch_limites.sql (sistema de planos/cotas)
-  - schema_patch_planos_v2.sql (planos detalhados)
+public.redacao_avaliacoes
+  - id uuid (PK, default gen_random_uuid())
+  - redacao_id uuid (FK → redacoes.id)
+  - user_id uuid (FK → auth.users)
+  - tipo_avaliacao text
+  - modelo_ia text
+  - nota_total integer
+  - nota_maxima integer
+  - competencias jsonb
+  - pontos_fortes text[]
+  - pontos_melhoria text[]
+  - exemplos_trechos text[]
+  - sugestoes text[]
+  - prioridades_estudo text[]
+  - feedback_geral text
+  - status text
+  - criado_em timestamptz (default now())
 ```
 
 ---
 
-## ALTERAÇÕES NECESSÁRIAS
+## ALTERAÇÕES SUGERIDAS
 
-### 1. Adicionar campo `objetivo_json` na tabela `profiles`
+### ALTERAÇÃO 1 — Adicionar coluna `fingerprint` em `redacao_avaliacoes`
 
-**Por quê:** Armazenar o objetivo do aluno (vestibular escolhido, curso, data-alvo) diretamente no perfil, sem criar tabela separada.
+**Problema:** Sem esse campo, o sistema não pode detectar server-side se o mesmo texto já foi avaliado.
 
-**Estrutura do JSON salvo:**
-```json
-{
-  "vestibular_id": "fuvest",
-  "vestibular_nome": "FUVEST 2027",
-  "universidade": "USP",
-  "curso": "Engenharia de Computação",
-  "data_prova": "2026-11-01",
-  "modalidade": null,
-  "configurado_em": "2026-09-29T10:00:00Z"
-}
-```
-
-### 2. Criar tabela `diagnostico_resultados`
-
-**Por quê:** Armazenar o resultado do diagnóstico inicial por matéria, para gerar plano de estudos personalizado.
-
-### 3. Criar tabela `revisao_agendada`
-
-**Por quê:** Sistema de revisão espaçada (spaced repetition) que agenda quando o aluno deve revisar cada questão que errou.
-
----
-
-## SQL DE ALTERAÇÃO
-
-**Execute as instruções abaixo no SQL Editor do Supabase:**
-`https://supabase.com/dashboard/project/jruyyzftoplcobketrsf/sql`
-
+**SQL sugerido:**
 ```sql
--- ============================================================
--- VESTIBULAR+ — MIGRATION SEGURA
--- Data: 2026-09-29
--- Executar no SQL Editor do Supabase
--- ============================================================
+ALTER TABLE public.redacao_avaliacoes
+ADD COLUMN IF NOT EXISTS fingerprint text;
 
--- PASSO 1: Verificar estado atual antes de alterar
-SELECT column_name, data_type 
-FROM information_schema.columns 
-WHERE table_schema = 'public' AND table_name = 'profiles'
-ORDER BY ordinal_position;
+COMMENT ON COLUMN public.redacao_avaliacoes.fingerprint IS
+  'Hash djb2 do conteúdo normalizado da redação + proposta_id + vestibular_id + versão da rubrica. Permite detectar reavaliações do mesmo texto sem alterar schema da tabela redacoes.';
 
--- ============================================================
--- ALTERAÇÃO 1: Campo objetivo_json em profiles
--- Usa IF NOT EXISTS via DO block para ser idempotente
--- ============================================================
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_schema = 'public' 
-    AND table_name = 'profiles' 
-    AND column_name = 'objetivo_json'
-  ) THEN
-    ALTER TABLE public.profiles
-    ADD COLUMN objetivo_json jsonb DEFAULT NULL;
-
-    COMMENT ON COLUMN public.profiles.objetivo_json IS 
-    'Objetivo do aluno: {vestibular_id, vestibular_nome, universidade, curso, data_prova, modalidade, configurado_em}';
-    
-    RAISE NOTICE 'Coluna objetivo_json adicionada com sucesso.';
-  ELSE
-    RAISE NOTICE 'Coluna objetivo_json já existe. Nenhuma alteração necessária.';
-  END IF;
-END $$;
-
--- ============================================================
--- ALTERAÇÃO 2: Tabela de diagnóstico inicial
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.diagnostico_resultados (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  realizado_em timestamptz DEFAULT now() NOT NULL,
-  
-  -- Resultados por matéria: {"Matematica": {"acertos": 3, "total": 5, "percentual": 60}, ...}
-  resultados_por_materia jsonb NOT NULL DEFAULT '{}',
-  
-  -- Totais gerais
-  total_questoes int NOT NULL DEFAULT 0,
-  total_acertos int NOT NULL DEFAULT 0,
-  
-  -- Status
-  concluido boolean NOT NULL DEFAULT false,
-  
-  -- Metadados
-  criado_em timestamptz DEFAULT now() NOT NULL
-);
-
--- Índice para buscar diagnósticos por usuário
-CREATE INDEX IF NOT EXISTS idx_diagnostico_user_id 
-ON public.diagnostico_resultados(user_id);
-
--- RLS (Row Level Security)
-ALTER TABLE public.diagnostico_resultados ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "usuarios_veem_proprio_diagnostico" ON public.diagnostico_resultados;
-CREATE POLICY "usuarios_veem_proprio_diagnostico"
-  ON public.diagnostico_resultados
-  FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
-COMMENT ON TABLE public.diagnostico_resultados IS
-'Resultados do diagnóstico inicial de cada aluno. Usado para gerar plano de estudos personalizado.';
-
--- ============================================================
--- ALTERAÇÃO 3: Tabela de revisão espaçada
--- ============================================================
-CREATE TABLE IF NOT EXISTS public.revisao_agendada (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  questao_id uuid NOT NULL REFERENCES public.questoes(id) ON DELETE CASCADE,
-  
-  -- Agendamento
-  proxima_revisao date NOT NULL,
-  intervalo_dias int NOT NULL DEFAULT 1,
-  
-  -- Histórico
-  total_revisoes int NOT NULL DEFAULT 0,
-  ultimo_resultado text CHECK (
-    ultimo_resultado IN ('acerto_facil', 'acerto', 'dificuldade', 'erro')
-  ),
-  
-  -- Timestamps
-  criado_em timestamptz DEFAULT now() NOT NULL,
-  atualizado_em timestamptz DEFAULT now() NOT NULL,
-  
-  -- Garante um registro por questão por usuário
-  UNIQUE(user_id, questao_id)
-);
-
--- Índice principal: buscar revisões do dia para um usuário
-CREATE INDEX IF NOT EXISTS idx_revisao_user_data 
-ON public.revisao_agendada(user_id, proxima_revisao);
-
--- RLS
-ALTER TABLE public.revisao_agendada ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "usuarios_veem_propria_revisao" ON public.revisao_agendada;
-CREATE POLICY "usuarios_veem_propria_revisao"
-  ON public.revisao_agendada
-  FOR ALL
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
-COMMENT ON TABLE public.revisao_agendada IS
-'Sistema de revisão espaçada. Registra quando cada questão deve ser revisada por cada aluno.';
-
--- ============================================================
--- VERIFICAÇÃO FINAL
--- ============================================================
-
--- Confirmar que o campo foi adicionado
-SELECT column_name, data_type, column_default 
-FROM information_schema.columns 
-WHERE table_schema = 'public' AND table_name = 'profiles'
-ORDER BY ordinal_position;
-
--- Confirmar tabelas criadas
-SELECT table_name, 
-       (SELECT COUNT(*) FROM information_schema.columns 
-        WHERE table_schema = 'public' AND c.table_name = table_name) as total_colunas
-FROM information_schema.tables c
-WHERE table_schema = 'public' 
-AND table_name IN ('diagnostico_resultados', 'revisao_agendada')
-ORDER BY table_name;
-
--- Confirmar RLS habilitado
-SELECT tablename, rowsecurity 
-FROM pg_tables 
-WHERE schemaname = 'public' 
-AND tablename IN ('diagnostico_resultados', 'revisao_agendada');
+CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_fingerprint
+  ON public.redacao_avaliacoes (fingerprint)
+  WHERE fingerprint IS NOT NULL;
 ```
 
----
+**Cuidados:**
+- A coluna é NULLABLE — avaliações antigas continuam válidas sem fingerprint
+- O índice é parcial (WHERE fingerprint IS NOT NULL) para não penalizar avaliações antigas
+- Não é PK nem UNIQUE (o mesmo texto pode ser reavaliado e ambas as avaliações preservadas)
 
-## INSTRUÇÕES DE SEGURANÇA
-
-1. **Antes de executar:** Tire um snapshot do banco via Supabase Dashboard → Settings → Backups
-2. **A migration é segura:** Usa `IF NOT EXISTS` e `DO $$ BEGIN ... END $$` — idempotente
-3. **Não apaga dados:** Nenhum `DROP TABLE`, `TRUNCATE` ou `DELETE` sem necessidade
-4. **RLS ativado:** Cada usuário só acessa seus próprios dados
-5. **Rollback possível:**
-   ```sql
-   -- Para desfazer (apenas se necessário):
-   ALTER TABLE public.profiles DROP COLUMN IF EXISTS objetivo_json;
-   DROP TABLE IF EXISTS public.diagnostico_resultados;
-   DROP TABLE IF EXISTS public.revisao_agendada;
-   ```
-
----
-
-## APÓS EXECUTAR
-
-Informe ao usuário exatamente:
-1. ✅ O que foi alterado (coluna adicionada, tabelas criadas)
-2. ✅ Resultado das consultas de verificação
-3. ✅ Confirmação de que RLS está ativado
-4. ❌ Qualquer erro encontrado e como foi resolvido
-
----
-
-## STATUS (preencher após execução)
-
-- [ ] Campo `objetivo_json` adicionado em `profiles`
-- [ ] Tabela `diagnostico_resultados` criada com RLS
-- [ ] Tabela `revisao_agendada` criada com RLS e índice
-- [ ] Verificações finais executadas e aprovadas
-
----
-
-# ETAPA 13 & 14: CORREÇÃO DE REDAÇÃO POR IA (TABELA DE AVALIAÇÕES E PERSISTÊNCIA)
-
-### STATUS ATUAL (ETAPA 14):
-- ✅ A tabela `public.redacao_avaliacoes` está criada e validada pelo Claude com todas as colunas necessárias (`competencias`, `exemplos_trechos`, `prioridades_estudo`, `pontos_fortes`, `pontos_melhoria`, etc.).
-- ✅ O endpoint `/api/corrigir-redacao.js` grava com `supabaseDb` no backend após validação estrita de identidade, token JWT e verificação de propriedade (`user_id = authenticatedUserId`).
-- ✅ O status da redação é atualizado com `status: 'corrigida'` e `updated_at: new Date().toISOString()`, compatível com o schema real da tabela `public.redacoes`.
-- ✅ A gravação é isolada: caso ocorra qualquer erro na atualização do status da redação, a avaliação persistida em `redacao_avaliacoes` é preservada integralmente e `persistido_no_banco` retorna `true`.
-- ✅ O histórico do frontend sincroniza todos os campos pedagógicos e persiste no cache local do estudante.
-
-### DIAGNÓSTICO E ESTRUTURA DO SCHEMA:
-- **Tabela:** `public.redacao_avaliacoes`
-- **Isolamento:** RLS habilitado com política restrita `auth.uid() = user_id`.
-- **Campos:** `id`, `redacao_id`, `user_id`, `tipo_avaliacao`, `modelo_ia`, `nota_total`, `nota_maxima`, `competencias`, `criterios_detalhe`, `pontos_fortes`, `pontos_melhoria`, `exemplos_trechos`, `sugestoes`, `prioridades_estudo`, `feedback_geral`, `status`, `criado_em`.
-
-> **Contexto:** O Laboratório de Redação do Vestibular+ possui agora a funcionalidade de **Correção por IA** (`/api/corrigir-redacao.js` e `src/scripts/redacao.js`).
-> A tabela `public.redacoes` já existe no banco Supabase com os campos: `id`, `user_id`, `proposta_id`, `titulo`, `vestibular_id`, `conteudo`, `total_palavras`, `total_caracteres`, `total_linhas`, `tempo_segundos`, `status`, `finalizada_em`, `created_at`, `updated_at`.
->
-> Script idempotente para referência ou novos ambientes (SQL Editor do Supabase):
-> `https://supabase.com/dashboard/project/jruyyzftoplcobketrsf/sql`
-
+**Validação após aplicar:**
 ```sql
--- ==============================================================================
--- VESTIBULAR+ — ETAPA 13: TABELA DE AVALIAÇÕES DE REDAÇÃO (IA E BANCAS)
--- Executar no SQL Editor do Supabase (Project: jruyyzftoplcobketrsf)
--- ==============================================================================
-
--- 1. CRIAÇÃO DA TABELA redacao_avaliacoes (Idempotente)
-CREATE TABLE IF NOT EXISTS public.redacao_avaliacoes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  redacao_id UUID NOT NULL REFERENCES public.redacoes(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  tipo_avaliacao TEXT NOT NULL DEFAULT 'ia', -- 'ia', 'autoavaliacao', 'monitor', 'banca_oficial'
-  modelo_ia TEXT,                            -- ex: 'google/gemini-1.5-flash', 'openai/gpt-4o-mini'
-  nota_total NUMERIC(6, 2) NOT NULL,
-  nota_maxima NUMERIC(6, 2) NOT NULL DEFAULT 1000,
-  competencias JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{ "numero": 1, "nome": "...", "nota": 160, "nota_maxima": 200, "justificativa": "..." }]
-  criterios_detalhe JSONB DEFAULT '[]'::jsonb,      -- Compatibilidade com versões prévias
-  pontos_fortes TEXT[] DEFAULT '{}',
-  pontos_melhoria TEXT[] DEFAULT '{}',
-  exemplos_trechos TEXT[] DEFAULT '{}',
-  sugestoes TEXT[] DEFAULT '{}',
-  prioridades_estudo TEXT[] DEFAULT '{}',
-  feedback_geral TEXT,
-  status TEXT NOT NULL DEFAULT 'concluida',         -- 'concluida', 'pendente', 'reavaliada'
-  criado_em TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
-);
-
--- Comentários de documentação do schema
-COMMENT ON TABLE public.redacao_avaliacoes IS 'Avaliações e correções de redações realizadas por IA ou banca avaliadora.';
-COMMENT ON COLUMN public.redacao_avaliacoes.competencias IS 'Array JSONB contendo as notas e justificativas por competência oficial da banca.';
-COMMENT ON COLUMN public.redacao_avaliacoes.exemplos_trechos IS 'Trechos da redação analisados com exemplos de reescrita.';
-COMMENT ON COLUMN public.redacao_avaliacoes.prioridades_estudo IS 'Prioridades pedagógicas de estudo recomendadas.';
-
--- 2. HABILITAR ROW LEVEL SECURITY (RLS)
-ALTER TABLE public.redacao_avaliacoes ENABLE ROW LEVEL SECURITY;
-
--- 3. POLÍTICA DE ACESSO: Isolamento estrito por usuário
-DROP POLICY IF EXISTS "Usuário acessa apenas avaliações de suas próprias redações" ON public.redacao_avaliacoes;
-CREATE POLICY "Usuário acessa apenas avaliações de suas próprias redações"
-  ON public.redacao_avaliacoes FOR ALL
-  TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
-
--- 4. ÍNDICES DE PERFORMANCE E CONSULTAS
-CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_redacao ON public.redacao_avaliacoes(redacao_id, criado_em DESC);
-CREATE INDEX IF NOT EXISTS idx_redacao_avaliacoes_user ON public.redacao_avaliacoes(user_id, criado_em DESC);
-
--- 5. GRANTS PARA A API POSTGREST DO SUPABASE
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.redacao_avaliacoes TO authenticated;
-GRANT SELECT ON public.redacao_avaliacoes TO anon;
-
--- 6. VERIFICAÇÃO FINAL APÓS EXECUÇÃO
-SELECT 
-  column_name, 
-  data_type, 
-  is_nullable 
-FROM information_schema.columns 
-WHERE table_schema = 'public' 
-  AND table_name = 'redacao_avaliacoes'
-ORDER BY ordinal_position;
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name = 'redacao_avaliacoes'
+  AND column_name = 'fingerprint';
+-- Deve retornar: fingerprint | text | YES
 ```
 
-```
+**Impacto esperado:** Permite ao backend usar `fingerprint` para alertar o aluno quando está reavaliando o mesmo texto.
 
 ---
 
-## ROLLBACK (CASO NECESSÁRIO)
+### ALTERAÇÃO 2 — Adicionar coluna `rubrica_versao` em `redacao_avaliacoes`
 
+**Problema:** Sem rastreabilidade da versão da rubrica, não é possível saber se duas avaliações usaram critérios diferentes.
+
+**SQL sugerido:**
 ```sql
-DROP TABLE IF EXISTS public.redacao_avaliacoes CASCADE;
+ALTER TABLE public.redacao_avaliacoes
+ADD COLUMN IF NOT EXISTS rubrica_versao text;
+
+COMMENT ON COLUMN public.redacao_avaliacoes.rubrica_versao IS
+  'Versão da rubrica usada na avaliação (ex: enem-v4-2026). Permite identificar mudanças de critério entre avaliações.';
 ```
+
+**Cuidados:**
+- Nullable — retrocompatível com avaliações antigas
+
+**Impacto esperado:** Permite filtrar avaliações por versão de rubrica e invalidar comparações entre rubrica antigas e novas.
 
 ---
 
-# ETAPA 15: DIAGNÓSTICO DE PERSISTÊNCIA — persistido_no_banco=false
+### ALTERAÇÃO 3 — Diagnóstico: por que o INSERT falha silenciosamente
 
-### STATUS ATUAL (ETAPA 15):
-- ✅ A tabela `public.redacao_avaliacoes` existe com o schema correto.
-- ✅ O endpoint `/api/corrigir-redacao.js` tenta INSERT via `supabaseDb` após avaliação da IA.
-- ⚠️ Em produção, `persistido_no_banco` retorna `false` apesar da tabela existir.
-
-### CAUSA PROVÁVEL:
-
-O endpoint usa `SUPABASE_SERVICE_ROLE_KEY` se disponível. Se essa variável **não estiver configurada na Vercel**, o INSERT cai para `supabaseUser` (anonKey + JWT do usuário). Neste caso, o RLS exige que `auth.uid() = user_id` — o que é enviado corretamente.
-
-**Ação necessária para o operador:**
-1. Acesse https://vercel.com/dashboard → projeto `vestibular-plus` → Settings → Environment Variables
-2. Adicione: `SUPABASE_SERVICE_ROLE_KEY` = valor da chave de serviço do Supabase
-   - Encontre em: https://supabase.com/dashboard/project/jruyyzftoplcobketrsf/settings/api → **service_role** (secret)
-   - ⚠️ Nunca expor essa chave no frontend, GitHub, ou logs públicos
-3. Após salvar, re-deploy (Vercel faz automaticamente em novo commit)
-
-**Verificação alternativa (se SUPABASE_SERVICE_ROLE_KEY não puder ser usada):**
-- Verifique nos logs da Vercel a linha `[corrigir-redacao] Persistência via: user_token (RLS)`
-- Se o INSERT via user_token falhar, examine a política RLS:
-
+**Para investigar, execute:**
 ```sql
--- Verificar políticas ativas em redacao_avaliacoes
-SELECT policyname, cmd, qual, with_check
+-- Verificar RLS da tabela redacao_avaliacoes
+SELECT polname, polroles, polcmd, polqual
 FROM pg_policies
 WHERE tablename = 'redacao_avaliacoes';
 
--- Verificar grants
-SELECT grantee, privilege_type
-FROM information_schema.role_table_grants
-WHERE table_name = 'redacao_avaliacoes';
+-- Verificar se service_role tem bypass de RLS
+SELECT rolname, rolbypassrls
+FROM pg_roles
+WHERE rolname IN ('service_role', 'anon', 'authenticated');
+
+-- Verificar constraints que possam causar falha silenciosa
+SELECT conname, contype, conkey
+FROM pg_constraint
+WHERE conrelid = 'public.redacao_avaliacoes'::regclass;
+
+-- Verificar triggers
+SELECT trigger_name, event_manipulation, action_statement
+FROM information_schema.triggers
+WHERE event_object_table = 'redacao_avaliacoes';
 ```
 
-- Se a política de INSERT não existir separadamente (apenas ALL), verifique se `authenticated` tem grant INSERT:
-
+**Se o problema for RLS bloqueando service_role:**
 ```sql
--- Re-aplicar grants se necessário (idempotente)
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.redacao_avaliacoes TO authenticated;
+-- Opção 1: Garantir que service_role tem bypass
+ALTER ROLE service_role BYPASSRLS;
+
+-- Opção 2 (mais segura): Criar policy explícita para service_role
+CREATE POLICY "service_role_full_access" ON public.redacao_avaliacoes
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
 ```
 
-### CORREÇÕES DE CÓDIGO APLICADAS NA ETAPA 15 (não requerem SQL):
-- `src/scripts/redacao.js`: Mensagem do modal corrigida (sem referência a arquivos internos)
-- `src/scripts/redacao.js`: Log de `pendencia_persistencia` adicionado para diagnóstico
-- `src/scripts/redacao.js`: Fallback quando redação não encontrada no localStorage (cria entrada mínima)
-- `src/scripts/redacao.js`: `carregarHistoricoSupabase` agora faz merge (atualiza entradas existentes com dados do banco, preservando `avaliacao_ia` local)
-- `api/corrigir-redacao.js`: Log informativo indica `service_role` ou `user_token (RLS)` para diagnóstico via Vercel logs
+**Cuidados:**
+- Execute somente em janela de manutenção
+- Verifique logs do Supabase antes e depois
+- Teste com um INSERT manual antes de aplicar em produção:
+```sql
+INSERT INTO public.redacao_avaliacoes
+  (redacao_id, user_id, tipo_avaliacao, modelo_ia, nota_total, nota_maxima, status)
+VALUES
+  (gen_random_uuid(), auth.uid(), 'ia', 'test', 500, 1000, 'calculada')
+RETURNING id;
+-- Se retornar id, o INSERT funciona para o role atual
+```
 
+---
+
+## QUANDO APLICAR
+
+1. Janela de manutenção de baixo tráfego
+2. Após backup do banco
+3. Testando em staging primeiro se disponível
+4. Verificar que a Vercel tem `SUPABASE_SERVICE_ROLE_KEY` configurada (não apenas `VITE_SUPABASE_ANON_KEY`)
+
+## QUANDO NÃO APLICAR
+
+- Nunca aplicar SQL diretamente em produção sem testar em staging
+- Nunca dropar colunas existentes
+- Nunca alterar PKs ou FKs existentes
+- Nunca alterar RLS sem entender o impacto completo
+
+---
+
+## IMPACTO ESPERADO APÓS AS ALTERAÇÕES
+
+| Funcionalidade | Antes | Depois |
+|---|---|---|
+| Detectar reavaliação do mesmo texto | ❌ (só no frontend) | ✅ (server-side via fingerprint) |
+| Rastrear versão da rubrica por avaliação | ❌ | ✅ |
+| INSERT de avaliação sempre funciona | ⚠️ (falha silenciosa ocasional) | ✅ (após fix de RLS) |
+| Comparar avaliações de diferentes versões de rubrica | ❌ | ✅ |
