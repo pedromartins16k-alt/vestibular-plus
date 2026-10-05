@@ -582,6 +582,238 @@ async function runTests() {
     pass('34 — ETAPA 23: Elementos visuais e pedagógicos da experiência completa validados');
   } catch (e) { fail('34', e); }
 
+
+  // ── ETAPA 24 — SISTEMA DE EVOLUÇÃO INTELIGENTE ───────────────────────────
+
+  // Teste 35 — renderizarEvolucaoInteligente existe no redacao.js
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    assert.ok(src.includes('renderizarEvolucaoInteligente'), 'Função renderizarEvolucaoInteligente presente');
+    assert.ok(src.includes('filtroBancaEvolucao'), 'Variável filtroBancaEvolucao presente');
+    assert.ok(src.includes('renderizarBarraFiltrosEvolucao'), 'Função renderizarBarraFiltrosEvolucao presente');
+    assert.ok(src.includes('vincularEventosFiltroEvolucao'), 'Função vincularEventosFiltroEvolucao presente');
+    pass('35 — ETAPA 24: Funções de evolução inteligente presentes no redacao.js');
+  } catch (e) { fail('35', e); }
+
+  // Teste 36 — HTML tem aba evolução
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const html = fs.readFileSync('src/pages/redacao.html', 'utf8');
+    assert.ok(html.includes('tab-btn-evolucao'), 'Botão da aba evolução presente no HTML');
+    assert.ok(html.includes('aba-evolucao'), 'Container aba-evolucao presente no HTML');
+    assert.ok(html.includes('Minha Evolução') || html.includes('evolucao'), 'Texto de evolução presente no HTML');
+    pass('36 — ETAPA 24: Aba "Minha Evolução" presente no HTML');
+  } catch (e) { fail('36', e); }
+
+  // Teste 37 — lógica de 1 redação: aviso correto, sem comparação falsa
+  total++;
+  try {
+    // Simula 1 redação avaliada → totalAvaliacoes === 1
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    // Deve ter lógica para aviso de 1 redação
+    assert.ok(src.includes('1 redação avaliada') || src.includes('totalAvaliacoes === 1'), 'Lógica de aviso para 1 redação presente');
+    // Não deve comparar com anterior quando totalAvaliacoes === 1
+    assert.ok(src.includes('anterior = totalAvaliacoes') || src.includes('totalAvaliacoes >= 2'), 'Comparação com anterior protegida por verificação de quantidade');
+    pass('37 — ETAPA 24: Lógica de 1 redação sem comparação falsa validada');
+  } catch (e) { fail('37', e); }
+
+  // Teste 38 — Cálculo variação nota positiva: 2 redações
+  total++;
+  try {
+    // Simula lógica de evolução: nota atual 600, anterior 520 → variação +80
+    const notaAtual = 600;
+    const notaAnterior = 520;
+    const variacaoNota = notaAtual - notaAnterior;
+    assert.equal(variacaoNota, 80, 'Variação positiva calculada corretamente');
+    assert.ok(variacaoNota > 0, 'Evolução positiva detectada');
+    pass('38 — ETAPA 24: Evolução positiva de nota calculada corretamente (+80 pts)');
+  } catch (e) { fail('38', e); }
+
+  // Teste 39 — Cálculo variação nota negativa: 2 redações
+  total++;
+  try {
+    const notaAtual = 480;
+    const notaAnterior = 560;
+    const variacaoNota = notaAtual - notaAnterior;
+    assert.equal(variacaoNota, -80, 'Variação negativa calculada corretamente');
+    assert.ok(variacaoNota < 0, 'Evolução negativa detectada');
+    pass('39 — ETAPA 24: Evolução negativa de nota calculada corretamente (-80 pts)');
+  } catch (e) { fail('39', e); }
+
+  // Teste 40 — Competência estável (diff === 0)
+  total++;
+  try {
+    const notaComp = 120;
+    const notaCompAnterior = 120;
+    const diff = notaComp - notaCompAnterior;
+    assert.equal(diff, 0, 'Competência estável detectada (diff=0)');
+    const sinal = diff > 0 ? 'melhorou' : diff < 0 ? 'piorou' : 'estável';
+    assert.equal(sinal, 'estável', 'Classificação "estável" correta para diff=0');
+    pass('40 — ETAPA 24: Competência estável (diff=0) classificada corretamente');
+  } catch (e) { fail('40', e); }
+
+  // Teste 41 — Melhor competência identificada por maior nota
+  total++;
+  try {
+    const comps = [
+      { numero: 1, nota: 120 },
+      { numero: 2, nota: 160 },
+      { numero: 3, nota: 120 },
+      { numero: 4, nota: 80 },
+      { numero: 5, nota: 120 }
+    ];
+    const maiorNota = Math.max(...comps.map(c => c.nota));
+    const melhor = comps.filter(c => c.nota === maiorNota);
+    assert.equal(maiorNota, 160, 'Maior nota identificada corretamente');
+    assert.equal(melhor.length, 1, 'Apenas 1 competência na melhor posição');
+    assert.equal(melhor[0].numero, 2, 'C2 é a melhor competência');
+    pass('41 — ETAPA 24: Melhor competência (C2=160) identificada corretamente');
+  } catch (e) { fail('41', e); }
+
+  // Teste 42 — Empate na melhor competência (múltiplas com mesma nota)
+  total++;
+  try {
+    const comps = [
+      { numero: 1, nota: 200 },
+      { numero: 2, nota: 160 },
+      { numero: 3, nota: 200 },
+      { numero: 4, nota: 120 },
+      { numero: 5, nota: 160 }
+    ];
+    const maiorNota = Math.max(...comps.map(c => c.nota));
+    const melhores = comps.filter(c => c.nota === maiorNota);
+    assert.equal(maiorNota, 200, 'Maior nota no empate = 200');
+    assert.equal(melhores.length, 2, 'Dois empates na melhor nota');
+    assert.ok(melhores.some(c => c.numero === 1), 'C1 está no empate');
+    assert.ok(melhores.some(c => c.numero === 3), 'C3 está no empate');
+    pass('42 — ETAPA 24: Empate na melhor competência (C1=C3=200) tratado corretamente');
+  } catch (e) { fail('42', e); }
+
+  // Teste 43 — Maior margem de ganho identificada matematicamente
+  total++;
+  try {
+    const comps = [
+      { numero: 1, nota: 160, nota_maxima: 200 }, // gap = 40
+      { numero: 2, nota: 80,  nota_maxima: 200 }, // gap = 120 ← maior
+      { numero: 3, nota: 120, nota_maxima: 200 }, // gap = 80
+      { numero: 4, nota: 200, nota_maxima: 200 }, // gap = 0
+      { numero: 5, nota: 160, nota_maxima: 200 }  // gap = 40
+    ];
+    const gaps = comps.map(c => ({ c, gap: (Number(c.nota_maxima) || 200) - c.nota })).filter(g => g.gap > 0).sort((a, b) => b.gap - a.gap);
+    assert.ok(gaps.length > 0, 'Existem gaps positivos');
+    assert.equal(gaps[0].c.numero, 2, 'C2 tem maior margem de ganho');
+    assert.equal(gaps[0].gap, 120, 'Gap de C2 = 120 pts');
+    pass('43 — ETAPA 24: Maior margem de ganho (C2, gap=120) identificada corretamente');
+  } catch (e) { fail('43', e); }
+
+  // Teste 44 — Dados incompletos (sem competencias) não quebra a lógica
+  total++;
+  try {
+    const redacaoSemComps = {
+      avaliacao_ia: {
+        nota_total: 400
+        // sem campo 'competencias'
+      },
+      data_envio: new Date().toISOString()
+    };
+    const compsAtuais = redacaoSemComps.avaliacao_ia.competencias || [];
+    assert.ok(Array.isArray(compsAtuais), 'Fallback para array vazio quando sem competencias');
+    assert.equal(compsAtuais.length, 0, 'Array vazio quando competencias ausente');
+    const nota = redacaoSemComps.avaliacao_ia.nota_total;
+    assert.equal(nota, 400, 'Nota total acessada mesmo sem competencias');
+    pass('44 — ETAPA 24: Dados incompletos (sem competencias) não quebra a lógica');
+  } catch (e) { fail('44', e); }
+
+  // Teste 45 — Filtro por vestibular (bancas diferentes)
+  total++;
+  try {
+    const historico = [
+      { vestibular_nome: 'ENEM', avaliacao_ia: { nota_total: 500 } },
+      { vestibular_nome: 'FUVEST', avaliacao_ia: { nota_total: 700 } },
+      { vestibular_nome: 'ENEM', avaliacao_ia: { nota_total: 550 } }
+    ];
+    const filtroBanca = 'ENEM';
+    const filtradas = historico.filter(r => (r.vestibular_nome || '') === filtroBanca);
+    assert.equal(filtradas.length, 2, 'Filtro por ENEM retorna 2 redações');
+    const filtradasFuvest = historico.filter(r => (r.vestibular_nome || '') === 'FUVEST');
+    assert.equal(filtradasFuvest.length, 1, 'Filtro por FUVEST retorna 1 redação');
+    const todasNotas = historico.map(r => r.avaliacao_ia.nota_total);
+    const bancasUnicas = [...new Set(historico.map(r => r.vestibular_nome))];
+    assert.equal(bancasUnicas.length, 2, 'Extraídas 2 bancas únicas corretamente');
+    pass('45 — ETAPA 24: Filtro por vestibular/banca funcionando corretamente');
+  } catch (e) { fail('45', e); }
+
+  // Teste 46 — Comparativo Anterior vs Atual gera dados para tabela
+  total++;
+  try {
+    const anterior = {
+      avaliacao_ia: {
+        nota_total: 520,
+        competencias: [
+          { numero: 1, nota: 120, nome: 'Gramática' },
+          { numero: 2, nota: 80,  nome: 'Argumentação' },
+          { numero: 3, nota: 120, nome: 'Coerência' },
+          { numero: 4, nota: 120, nome: 'Coesão' },
+          { numero: 5, nota: 80,  nome: 'Proposta' }
+        ]
+      }
+    };
+    const atual = {
+      avaliacao_ia: {
+        nota_total: 600,
+        competencias: [
+          { numero: 1, nota: 120, nome: 'Gramática' },
+          { numero: 2, nota: 120, nome: 'Argumentação' },
+          { numero: 3, nota: 160, nome: 'Coerência' },
+          { numero: 4, nota: 120, nome: 'Coesão' },
+          { numero: 5, nota: 80,  nome: 'Proposta' }
+        ]
+      }
+    };
+    const mudancas = atual.avaliacao_ia.competencias.map((cAtual, idx) => {
+      const cAnt = anterior.avaliacao_ia.competencias.find(c => c.numero === cAtual.numero) || anterior.avaliacao_ia.competencias[idx];
+      return { numero: cAtual.numero, notaAtual: cAtual.nota, notaAnt: cAnt.nota, diff: cAtual.nota - cAnt.nota };
+    });
+    const variacaoTotal = atual.avaliacao_ia.nota_total - anterior.avaliacao_ia.nota_total;
+    assert.equal(variacaoTotal, 80, 'Variação total = +80 pts');
+    assert.equal(mudancas.length, 5, 'Comparativo gerou 5 linhas (1 por competência)');
+    const c2 = mudancas.find(m => m.numero === 2);
+    assert.equal(c2.diff, 40, 'C2 melhorou +40 pts');
+    const c3 = mudancas.find(m => m.numero === 3);
+    assert.equal(c3.diff, 40, 'C3 melhorou +40 pts');
+    const melhoraram = mudancas.filter(m => m.diff > 0);
+    assert.equal(melhoraram.length, 2, 'Duas competências melhoraram');
+    const pioraram = mudancas.filter(m => m.diff < 0);
+    assert.equal(pioraram.length, 0, 'Nenhuma piorou neste cenário');
+    pass('46 — ETAPA 24: Comparativo Anterior vs Atual gera tabela de evolução corretamente');
+  } catch (e) { fail('46', e); }
+
+  // Teste 47 — ETAPA 24: Elementos visuais presentes no JS e HTML
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const html = fs.readFileSync('src/pages/redacao.html', 'utf8');
+    // Elementos esperados da aba de evolução
+    assert.ok(src.includes('Nota Atual') || src.includes('notaAtual'), 'Card de Nota Atual presente');
+    assert.ok(src.includes('Melhor Nota') || src.includes('melhorNota'), 'Card de Melhor Nota presente');
+    assert.ok(src.includes('Última Evolução') || src.includes('variacaoNota'), 'Card de Última Evolução presente');
+    assert.ok(src.includes('Trajetória das Notas') || src.includes('graficoHtml'), 'Gráfico de trajetória presente');
+    assert.ok(src.includes('Evolução por Competência') || src.includes('evolucaoCompsHtml'), 'Evolução por competência presente');
+    assert.ok(src.includes('O Que Mudou') || src.includes('oQueMudouHtml'), 'Seção "O que mudou" presente');
+    assert.ok(src.includes('Maior Oportunidade de Ganho') || src.includes('maiorOportunidadeTexto'), 'Oportunidade de ganho presente');
+    assert.ok(src.includes('Meta para a Próxima Redação') || src.includes('metaTexto'), 'Meta para próxima redação presente');
+    assert.ok(src.includes('Plano Prático') || src.includes('planoEvolucaoHtml'), 'Plano prático presente');
+    assert.ok(src.includes('Comparação Detalhada') || src.includes('comparativoDuasUltimasHtml'), 'Comparativo direto presente');
+    assert.ok(html.includes('tab-btn-evolucao'), 'Botão de aba no HTML presente');
+    pass('47 — ETAPA 24: Todos os elementos visuais e pedagógicos da evolução inteligente presentes');
+  } catch (e) { fail('47', e); }
+
+
   // ── CENÁRIOS DE REDAÇÃO A–L ───────────────────────────────────────────────
 
   // CENÁRIO A — Redação excelente

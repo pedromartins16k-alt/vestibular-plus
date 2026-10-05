@@ -760,16 +760,36 @@ function renderizarHistorico() {
     return;
   }
 
+  // Identifica variação em relação à redação avaliada imediatamente anterior
+  const avaliadas = historico.filter(r => r.avaliacao_ia && typeof r.avaliacao_ia.nota_total === 'number');
+
   container.innerHTML = historico.map(r => {
     const dataFmt = new Date(r.data_envio).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const temAvaliacao = Boolean(r.avaliacao_ia);
     const notaTotal = r.avaliacao_ia?.nota_total;
     const notaMax = r.avaliacao_ia?.nota_maxima || 1000;
 
+    // Variação em relação à anterior
+    let variacaoBadge = '';
+    if (temAvaliacao) {
+      const idx = avaliadas.findIndex(a => a.id === r.id);
+      if (idx !== -1 && idx < avaliadas.length - 1) {
+        const anterior = avaliadas[idx + 1];
+        const diff = notaTotal - anterior.avaliacao_ia.nota_total;
+        if (diff > 0) {
+          variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:#22c55e; background:rgba(34,197,94,0.12); padding:2px 8px; border-radius:var(--radius-full);">+${diff} pts ↑</span>`;
+        } else if (diff < 0) {
+          variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:#ef4444; background:rgba(239,68,68,0.12); padding:2px 8px; border-radius:var(--radius-full);">${diff} pts ↓</span>`;
+        } else {
+          variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:var(--text-secondary); background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:var(--radius-full);">= manteve</span>`;
+        }
+      }
+    }
+
     return `
       <div class="redacao-historico-card">
         <div>
-          <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px; flex-wrap:wrap;">
             <span class="banca-tag">${escapeHtml(r.vestibular_nome)}</span>
             <span style="font-size:0.78rem; color:var(--text-secondary);">Enviada em ${escapeHtml(dataFmt)}</span>
             ${temAvaliacao ? `
@@ -777,6 +797,7 @@ function renderizarHistorico() {
                 ✨ Corrigida por IA
               </span>
             ` : ''}
+            ${variacaoBadge}
           </div>
           <h3 style="font-size:1.05rem; margin:0 0 6px; font-weight:700;">${escapeHtml(r.proposta_titulo)}</h3>
           <div style="font-size:0.8rem; color:var(--text-secondary); display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
@@ -814,6 +835,445 @@ function renderizarHistorico() {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
       abrirModalDetalhesRedacao(id);
+    });
+  });
+}
+
+// ================================================================
+// ETAPA 24 — SISTEMA DE EVOLUÇÃO INTELIGENTE DA REDAÇÃO
+// ================================================================
+
+let filtroBancaEvolucao = 'todas';
+
+function renderizarEvolucaoInteligente() {
+  const container = document.getElementById('evolucao-conteudo');
+  if (!container) return;
+
+  if (!sessionUserId) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:60px 20px; color:var(--text-secondary); background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl);">
+        <span style="font-size:3rem; display:block; margin-bottom:12px;">🔒</span>
+        <h3 style="font-size:1.25rem; color:var(--text-primary); margin-bottom:6px;">Acesso restrito ao seu progresso</h3>
+        <p style="font-size:0.9rem; max-width:440px; margin:0 auto 20px;">
+          Para acompanhar sua evolução nota a nota e por competência, faça login na sua conta do Vestibular+.
+        </p>
+        <a class="btn btn-primary" href="./login.html">Fazer Login no Vestibular+ →</a>
+      </div>
+    `;
+    return;
+  }
+
+  const historicoCompleto = lerHistoricoLocal(sessionUserId);
+  const avaliadasTotal = historicoCompleto.filter(r => r.avaliacao_ia && typeof r.avaliacao_ia.nota_total === 'number');
+
+  // Estado vazio: Nenhuma redação avaliada
+  if (avaliadasTotal.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:60px 20px; color:var(--text-secondary); background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl);">
+        <span style="font-size:3rem; display:block; margin-bottom:12px;">📈</span>
+        <h3 style="font-size:1.25rem; color:var(--text-primary); margin-bottom:6px;">Você ainda não possui redações corrigidas</h3>
+        <p style="font-size:0.9rem; max-width:460px; margin:0 auto 20px; line-height:1.5;">
+          Produza seu primeiro texto e solicite a correção com IA. O sistema mapeará sua evolução e traçará suas prioridades de treino.
+        </p>
+        <button class="btn btn-primary" onclick="document.getElementById('tab-btn-propostas').click()">
+          Escolher uma Proposta 🚀
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  // Extrai lista única de bancas presentes nos dados reais
+  const bancasDisponiveis = Array.from(new Set(avaliadasTotal.map(r => r.vestibular_nome || r.vestibular_id?.toUpperCase() || 'ENEM'))).filter(Boolean);
+
+  // Aplica filtro de vestibular selecionado
+  const avaliadas = filtroBancaEvolucao === 'todas'
+    ? avaliadasTotal
+    : avaliadasTotal.filter(r => (r.vestibular_nome || r.vestibular_id?.toUpperCase()) === filtroBancaEvolucao);
+
+  // Se filtro atual não retornar redações
+  if (avaliadas.length === 0) {
+    container.innerHTML = `
+      <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:24px;">
+        ${renderizarBarraFiltrosEvolucao(bancasDisponiveis, filtroBancaEvolucao)}
+        <div style="text-align:center; padding:40px 20px; color:var(--text-secondary);">
+          <p style="font-size:0.9rem; margin:0;">Nenhuma redação avaliada encontrada para a banca <strong>${escapeHtml(filtroBancaEvolucao)}</strong>.</p>
+        </div>
+      </div>
+    `;
+    vincularEventosFiltroEvolucao();
+    return;
+  }
+
+  // Ordenação cronológica (mais antiga para mais recente para calcular evolução)
+  const cronologicas = [...avaliadas].sort((a, b) => new Date(a.data_envio || 0) - new Date(b.data_envio || 0));
+  const totalAvaliacoes = cronologicas.length;
+  const maisRecente = cronologicas[cronologicas.length - 1];
+  const anterior = totalAvaliacoes >= 2 ? cronologicas[cronologicas.length - 2] : null;
+
+  const notaAtual = maisRecente.avaliacao_ia.nota_total;
+  const notaAnterior = anterior ? anterior.avaliacao_ia.nota_total : null;
+  const variacaoNota = anterior ? notaAtual - notaAnterior : null;
+
+  const todasNotas = cronologicas.map(r => r.avaliacao_ia.nota_total);
+  const melhorNota = Math.max(...todasNotas);
+  const somaNotas = todasNotas.reduce((acc, n) => acc + n, 0);
+  const mediaNotas = Math.round(somaNotas / totalAvaliacoes);
+
+  // Análise das competências da redação mais recente
+  const compsAtuais = maisRecente.avaliacao_ia.competencias || [];
+  const compsAnteriores = anterior?.avaliacao_ia?.competencias || [];
+
+  // Melhor competência atual (maior pontuação percentual)
+  let melhorCompTexto = 'Não disponível';
+  if (compsAtuais.length > 0) {
+    const maiorNotaC = Math.max(...compsAtuais.map(c => c.nota));
+    const melhoresComps = compsAtuais.filter(c => c.nota === maiorNotaC);
+    if (melhoresComps.length === 1) {
+      melhorCompTexto = `C${melhoresComps[0].numero} (${melhoresComps[0].nota}/${melhoresComps[0].nota_maxima || 200})`;
+    } else {
+      melhorCompTexto = `${melhoresComps.map(c => `C${c.numero}`).join(', ')} (${maiorNotaC} pts)`;
+    }
+  }
+
+  // Maior oportunidade de ganho (maior margem matemática até 200)
+  let maiorOportunidadeTexto = 'Potencial máximo atingido';
+  let compMaiorOportunidade = null;
+  if (compsAtuais.length > 0) {
+    const gaps = compsAtuais.map(c => ({
+      c,
+      gap: (Number(c.nota_maxima) || 200) - c.nota
+    })).filter(g => g.gap > 0).sort((a, b) => b.gap - a.gap);
+
+    if (gaps.length > 0) {
+      compMaiorOportunidade = gaps[0].c;
+      maiorOportunidadeTexto = `C${gaps[0].c.numero} (margem de até +${gaps[0].gap} pts)`;
+    }
+  }
+
+  // Meta para a próxima redação (baseada matematicamente no histórico real)
+  let metaTexto = '';
+  if (totalAvaliacoes === 1) {
+    metaTexto = `Meta sugerida de treino: buscar consolidar a pontuação de ${Math.min(1000, notaAtual + 40)} pontos na próxima produção.`;
+  } else {
+    const metaPontos = Math.min(1000, Math.max(notaAtual + 40, melhorNota));
+    metaTexto = `Meta de treino: buscar alcançar <strong>${metaPontos} pontos</strong> (+${metaPontos - notaAtual} pts em relação à nota atual).`;
+  }
+
+  // Identificação de competências que melhoraram, pioraram ou estagnaram
+  const mudancasComps = [];
+  const compsMelhoraram = [];
+  const compsPioraram = [];
+  const compsEstaveis = [];
+
+  if (anterior && compsAtuais.length > 0 && compsAnteriores.length > 0) {
+    compsAtuais.forEach((cAtual, idx) => {
+      const cAnt = compsAnteriores.find(c => c.numero === cAtual.numero) || compsAnteriores[idx];
+      if (cAnt && typeof cAnt.nota === 'number') {
+        const diffC = cAtual.nota - cAnt.nota;
+        const item = {
+          numero: cAtual.numero,
+          nome: cAtual.nome,
+          notaAtual: cAtual.nota,
+          notaAnt: cAnt.nota,
+          diff: diffC,
+          peso: Number(cAtual.nota_maxima) || 200
+        };
+        mudancasComps.push(item);
+        if (diffC > 0) compsMelhoraram.push(item);
+        else if (diffC < 0) compsPioraram.push(item);
+        else compsEstaveis.push(item);
+      }
+    });
+  }
+
+  // Estado com exatamente 1 redação
+  const avisoUmaRedacao = totalAvaliacoes === 1 ? `
+    <div style="margin-bottom:20px; padding:14px 18px; border-radius:var(--radius-md); background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25); color:var(--text-secondary); font-size:0.84rem; line-height:1.5;">
+      💡 <strong>Você possui 1 redação avaliada.</strong> Continue praticando — com mais uma redação poderemos mapear as variações de nota e a evolução específica de cada competência.
+    </div>
+  ` : '';
+
+  // 1. Cards de Resumo da Evolução
+  const variacaoBadgeHtml = variacaoNota !== null ? (() => {
+    if (variacaoNota > 0) {
+      return `<span style="color:#22c55e; font-weight:800; font-size:0.9rem;">+${variacaoNota} pontos ↑</span>`;
+    } else if (variacaoNota < 0) {
+      return `<span style="color:#ef4444; font-weight:800; font-size:0.9rem;">${variacaoNota} pontos ↓</span>`;
+    } else {
+      return `<span style="color:var(--text-secondary); font-weight:800; font-size:0.9rem;">= estável (0 pts)</span>`;
+    }
+  })() : '<span style="color:var(--text-secondary); font-size:0.8rem;">Primeira avaliação</span>';
+
+  const cardsMetricasHtml = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Nota Atual</div>
+        <div style="font-size:2rem; font-weight:900; font-family:var(--font-display); color:var(--text-primary); line-height:1.1;">${notaAtual}</div>
+        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">Última redação avaliada</div>
+      </div>
+
+      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Melhor Nota</div>
+        <div style="font-size:2rem; font-weight:900; font-family:var(--font-display); color:#22c55e; line-height:1.1;">${melhorNota}</div>
+        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">Seu recorde no portfólio</div>
+      </div>
+
+      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Média das Redações</div>
+        <div style="font-size:2rem; font-weight:900; font-family:var(--font-display); color:#38bdf8; line-height:1.1;">${mediaNotas}</div>
+        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">Baseada em ${totalAvaliacoes} redação${totalAvaliacoes !== 1 ? 'ões' : ''}</div>
+      </div>
+
+      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Última Evolução</div>
+        <div style="margin-top:4px; line-height:1.2;">${variacaoBadgeHtml}</div>
+        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:6px;">${anterior ? `Anterior: ${notaAnterior} pts` : 'Sem anterior para comparar'}</div>
+      </div>
+    </div>
+  `;
+
+  // 2. Gráfico Visual de Evolução (Eixo X = Redações, Eixo Y = Nota)
+  const graficoHtml = totalAvaliacoes >= 2 ? (() => {
+    const maxNota = 1000;
+    return `
+      <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:20px 24px; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+          <h4 style="font-size:0.95rem; font-weight:800; margin:0; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+            <span>📈</span> Trajetória das Notas (Histórico Real)
+          </h4>
+          <span style="font-size:0.75rem; color:var(--text-secondary);">${totalAvaliacoes} avaliações registradas</span>
+        </div>
+        <div style="display:flex; align-items:flex-end; gap:16px; min-height:140px; padding:10px 0 6px; overflow-x:auto;">
+          ${cronologicas.map((r, i) => {
+            const n = r.avaliacao_ia.nota_total;
+            const h = Math.max(18, Math.round((n / maxNota) * 110));
+            const isLatest = i === cronologicas.length - 1;
+            const cor = isLatest ? 'var(--color-primary-400)' : '#38bdf8';
+            const dataCurta = new Date(r.data_envio || 0).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+            return `
+              <div style="display:flex; flex-direction:column; align-items:center; gap:6px; min-width:64px; flex-shrink:0;">
+                <span style="font-size:0.78rem; font-weight:800; color:${cor};">${n}</span>
+                <div style="width:42px; height:${h}px; background:${cor}${isLatest ? '' : '80'}; border-radius:5px 5px 0 0; transition:height 0.4s ease;"></div>
+                <span style="font-size:0.67rem; color:var(--text-secondary); text-align:center; line-height:1.2;">
+                  ${escapeHtml(dataCurta)}<br>
+                  <strong style="color:var(--text-primary);">${isLatest ? 'Atual' : `#${i + 1}`}</strong>
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  })() : '';
+
+  // 3. Evolução por Competência C1–C5
+  const evolucaoCompsHtml = mudancasComps.length > 0 ? `
+    <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:20px 24px; margin-bottom:20px;">
+      <h4 style="font-size:0.95rem; font-weight:800; margin:0 0 14px; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+        <span>🎯</span> Evolução por Competência (Última vs. Anterior)
+      </h4>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
+        ${mudancasComps.map(mc => {
+          const sinal = mc.diff > 0 ? `+${mc.diff} ↑` : mc.diff < 0 ? `${mc.diff} ↓` : `0 →`;
+          const cor = mc.diff > 0 ? '#22c55e' : mc.diff < 0 ? '#ef4444' : 'var(--text-secondary)';
+          const bg = mc.diff > 0 ? 'rgba(34,197,94,0.08)' : mc.diff < 0 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)';
+
+          return `
+            <div style="background:${bg}; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; text-align:center;">
+              <div style="font-size:0.75rem; font-weight:800; color:var(--text-secondary); margin-bottom:4px;">C${mc.numero}</div>
+              <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary);">
+                ${mc.notaAnt} → ${mc.notaAtual}
+              </div>
+              <div style="font-size:0.85rem; font-weight:800; color:${cor}; margin-top:4px;">
+                ${sinal}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
+
+  // 4. Análise: O que mudou?
+  const oQueMudouHtml = totalAvaliacoes >= 2 ? (() => {
+    const itensAnalise = [];
+
+    if (variacaoNota > 0) {
+      itensAnalise.push(`Você aumentou <strong>${variacaoNota} pontos</strong> desde sua avaliação anterior.`);
+    } else if (variacaoNota < 0) {
+      itensAnalise.push(`Sua nota total teve oscilação de <strong>${variacaoNota} pontos</strong> em relação à anterior.`);
+    } else {
+      itensAnalise.push(`Sua nota total permaneceu estável em relação à redação anterior.`);
+    }
+
+    if (compsMelhoraram.length > 0) {
+      const melhorAvanco = [...compsMelhoraram].sort((a, b) => b.diff - a.diff)[0];
+      itensAnalise.push(`Seu maior avanço ocorreu em <strong>C${melhorAvanco.numero}</strong> (+${melhorAvanco.diff} pontos).`);
+    }
+
+    if (compsPioraram.length > 0) {
+      compsPioraram.forEach(cp => {
+        itensAnalise.push(`Competência <strong>C${cp.numero}</strong> apresentou queda de ${Math.abs(cp.diff)} pontos (${cp.notaAnt} → ${cp.notaAtual}).`);
+      });
+    }
+
+    if (compsEstaveis.length > 0) {
+      const nomesEstaveis = compsEstaveis.map(c => `C${c.numero}`).join(', ');
+      itensAnalise.push(`As competências <strong>${nomesEstaveis}</strong> mantiveram a mesma pontuação.`);
+    }
+
+    return `
+      <div style="background:rgba(56,189,248,0.05); border:1px solid rgba(56,189,248,0.22); border-radius:var(--radius-xl); padding:18px 22px; margin-bottom:20px;">
+        <h4 style="font-size:0.92rem; font-weight:800; margin:0 0 10px; color:#38bdf8; display:flex; align-items:center; gap:8px;">
+          <span>🔎</span> O Que Mudou na Sua Escrita?
+        </h4>
+        <ul style="margin:0; padding-left:18px; font-size:0.83rem; color:var(--text-primary); line-height:1.6;">
+          ${itensAnalise.map(it => `<li>${it}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+  })() : '';
+
+  // 5. Diagnóstico de Competências (Melhor, Oportunidade, Atenção, Meta)
+  const diagnosticoHtml = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:20px;">
+      <div style="background:var(--bg-elevated); border:1px solid rgba(34,197,94,0.25); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.75rem; font-weight:800; color:#22c55e; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+          <span>🏆</span> Sua Melhor Competência Atual
+        </div>
+        <div style="font-size:1.05rem; font-weight:900; color:var(--text-primary); margin-bottom:4px;">
+          ${escapeHtml(melhorCompTexto)}
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.4;">
+          Domínio mais consolidado demonstrado na última avaliação.
+        </div>
+      </div>
+
+      <div style="background:var(--bg-elevated); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.75rem; font-weight:800; color:#f59e0b; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+          <span>🚀</span> Maior Oportunidade de Ganho
+        </div>
+        <div style="font-size:1.05rem; font-weight:900; color:var(--text-primary); margin-bottom:4px;">
+          ${escapeHtml(maiorOportunidadeTexto)}
+        </div>
+        <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.4;">
+          Maior margem matemática de pontuação para buscar os 200 pontos.
+        </div>
+      </div>
+
+      <div style="background:var(--bg-elevated); border:1px solid rgba(124,58,237,0.25); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.75rem; font-weight:800; color:var(--color-primary-400); margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+          <span>🎯</span> Meta para a Próxima Redação
+        </div>
+        <div style="font-size:0.83rem; color:var(--text-primary); line-height:1.45;">
+          ${metaTexto}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // 6. Plano de Evolução para a Próxima Redação (baseado em dados reais)
+  const prioridadesEstudo = Array.isArray(maisRecente.avaliacao_ia.prioridades_estudo) ? maisRecente.avaliacao_ia.prioridades_estudo : [];
+  const sugestoes = Array.isArray(maisRecente.avaliacao_ia.sugestoes) ? maisRecente.avaliacao_ia.sugestoes : [];
+  const pontosMelhoria = Array.isArray(maisRecente.avaliacao_ia.pontos_melhoria) ? maisRecente.avaliacao_ia.pontos_melhoria : [];
+  const planoAcoes = [...prioridadesEstudo, ...pontosMelhoria, ...sugestoes].filter(Boolean).slice(0, 4);
+
+  const planoEvolucaoHtml = planoAcoes.length > 0 ? `
+    <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:20px 24px; margin-bottom:20px;">
+      <h4 style="font-size:0.95rem; font-weight:800; margin:0 0 12px; color:var(--color-primary-400); display:flex; align-items:center; gap:8px;">
+        <span>📋</span> Plano Prático de Treino para a Próxima Produção
+      </h4>
+      <ol style="margin:0; padding-left:20px; font-size:0.83rem; color:var(--text-primary); line-height:1.6;">
+        ${planoAcoes.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+      </ol>
+    </div>
+  ` : '';
+
+  // 7. Comparativo Direto entre as Duas Últimas Redações
+  const comparativoDuasUltimasHtml = totalAvaliacoes >= 2 ? `
+    <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:20px 24px; margin-bottom:20px;">
+      <h4 style="font-size:0.95rem; font-weight:800; margin:0 0 14px; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+        <span>⚖️</span> Comparação Detalhada: Redação Anterior vs. Redação Atual
+      </h4>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border-color); color:var(--text-secondary);">
+              <th style="padding:8px 10px;">Item Avaliado</th>
+              <th style="padding:8px 10px; text-align:center;">Redação Anterior</th>
+              <th style="padding:8px 10px; text-align:center;">Redação Atual</th>
+              <th style="padding:8px 10px; text-align:center;">Variação</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr style="border-bottom:1px solid var(--border-color); font-weight:800;">
+              <td style="padding:10px;">Nota Geral</td>
+              <td style="padding:10px; text-align:center;">${notaAnterior} / ${anterior?.avaliacao_ia?.nota_maxima || 1000}</td>
+              <td style="padding:10px; text-align:center; color:var(--color-primary-400);">${notaAtual} / ${maisRecente.avaliacao_ia.nota_maxima || 1000}</td>
+              <td style="padding:10px; text-align:center;">${variacaoBadgeHtml}</td>
+            </tr>
+            ${mudancasComps.map(mc => {
+              const sinal = mc.diff > 0 ? `+${mc.diff} ↑` : mc.diff < 0 ? `${mc.diff} ↓` : `0 →`;
+              const cor = mc.diff > 0 ? '#22c55e' : mc.diff < 0 ? '#ef4444' : 'var(--text-secondary)';
+              return `
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                  <td style="padding:8px 10px; color:var(--text-secondary);">C${mc.numero} — ${escapeHtml(mc.nome)}</td>
+                  <td style="padding:8px 10px; text-align:center;">${mc.notaAnt}</td>
+                  <td style="padding:8px 10px; text-align:center; font-weight:700;">${mc.notaAtual}</td>
+                  <td style="padding:8px 10px; text-align:center; font-weight:800; color:${cor};">${sinal}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ` : '';
+
+  // Renderização final consolidada
+  container.innerHTML = `
+    ${renderizarBarraFiltrosEvolucao(bancasDisponiveis, filtroBancaEvolucao)}
+    ${avisoUmaRedacao}
+    ${cardsMetricasHtml}
+    ${graficoHtml}
+    ${evolucaoCompsHtml}
+    ${oQueMudouHtml}
+    ${diagnosticoHtml}
+    ${planoEvolucaoHtml}
+    ${comparativoDuasUltimasHtml}
+  `;
+
+  vincularEventosFiltroEvolucao();
+}
+
+function renderizarBarraFiltrosEvolucao(bancasDisponiveis, selecionada) {
+  if (!bancasDisponiveis || bancasDisponiveis.length <= 1) {
+    return '';
+  }
+
+  return `
+    <div style="display:flex; align-items:center; gap:8px; margin-bottom:18px; flex-wrap:wrap;">
+      <span style="font-size:0.78rem; font-weight:700; color:var(--text-secondary); margin-right:4px;">Filtrar por banca:</span>
+      <button class="chip-banca chip-filtro-evolucao ${selecionada === 'todas' ? 'active' : ''}" data-banca="todas">
+        Todas as Bancas
+      </button>
+      ${bancasDisponiveis.map(b => `
+        <button class="chip-banca chip-filtro-evolucao ${selecionada === b ? 'active' : ''}" data-banca="${escapeHtml(b)}">
+          ${escapeHtml(b)}
+        </button>
+      `).join('')}
+    </div>
+  `;
+}
+
+function vincularEventosFiltroEvolucao() {
+  const chips = document.querySelectorAll('.chip-filtro-evolucao');
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      filtroBancaEvolucao = chip.dataset.banca || 'todas';
+      renderizarEvolucaoInteligente();
     });
   });
 }
@@ -1552,37 +2012,57 @@ function configurarEventosUI() {
   const tabPropostas = document.getElementById('tab-btn-propostas');
   const tabEditor = document.getElementById('tab-btn-editor');
   const tabHistorico = document.getElementById('tab-btn-historico');
+  const tabEvolucao = document.getElementById('tab-btn-evolucao');
 
   const abaPropostas = document.getElementById('aba-propostas');
   const abaEditor = document.getElementById('aba-editor');
   const abaHistorico = document.getElementById('aba-historico');
+  const abaEvolucao = document.getElementById('aba-evolucao');
 
   tabPropostas?.addEventListener('click', () => {
     tabPropostas.classList.add('active');
     tabEditor?.classList.remove('active');
     tabHistorico?.classList.remove('active');
+    tabEvolucao?.classList.remove('active');
     abaPropostas.style.display = 'block';
-    abaEditor.style.display = 'none';
-    abaHistorico.style.display = 'none';
+    if (abaEditor) abaEditor.style.display = 'none';
+    if (abaHistorico) abaHistorico.style.display = 'none';
+    if (abaEvolucao) abaEvolucao.style.display = 'none';
   });
 
   tabEditor?.addEventListener('click', () => {
     tabEditor.classList.add('active');
     tabPropostas?.classList.remove('active');
     tabHistorico?.classList.remove('active');
+    tabEvolucao?.classList.remove('active');
     abaEditor.style.display = 'flex';
-    abaPropostas.style.display = 'none';
-    abaHistorico.style.display = 'none';
+    if (abaPropostas) abaPropostas.style.display = 'none';
+    if (abaHistorico) abaHistorico.style.display = 'none';
+    if (abaEvolucao) abaEvolucao.style.display = 'none';
   });
 
   tabHistorico?.addEventListener('click', () => {
     tabHistorico.classList.add('active');
     tabPropostas?.classList.remove('active');
     tabEditor?.classList.remove('active');
+    tabEvolucao?.classList.remove('active');
     abaHistorico.style.display = 'flex';
-    abaPropostas.style.display = 'none';
-    abaEditor.style.display = 'none';
+    if (abaPropostas) abaPropostas.style.display = 'none';
+    if (abaEditor) abaEditor.style.display = 'none';
+    if (abaEvolucao) abaEvolucao.style.display = 'none';
     renderizarHistorico();
+  });
+
+  tabEvolucao?.addEventListener('click', () => {
+    tabEvolucao.classList.add('active');
+    tabPropostas?.classList.remove('active');
+    tabEditor?.classList.remove('active');
+    tabHistorico?.classList.remove('active');
+    if (abaEvolucao) abaEvolucao.style.display = 'flex';
+    if (abaPropostas) abaPropostas.style.display = 'none';
+    if (abaEditor) abaEditor.style.display = 'none';
+    if (abaHistorico) abaHistorico.style.display = 'none';
+    renderizarEvolucaoInteligente();
   });
 
   // Filtros por Banca
