@@ -840,10 +840,497 @@ function renderizarHistorico() {
 }
 
 // ================================================================
-// ETAPA 24 — SISTEMA DE EVOLUÇÃO INTELIGENTE DA REDAÇÃO
+// ETAPA 24 & 25 — SISTEMA DE EVOLUÇÃO INTELIGENTE & PROFESSOR IA
 // ================================================================
 
 let filtroBancaEvolucao = 'todas';
+
+// ─────────────────────────────────────────────────────────────────
+// ETAPA 25: Funções Determinísticas de Blindagem e Auditoria
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * Audita uma avaliação ou par de avaliações para verificar inconsistência crítica.
+ * Reutiliza os limites oficiais: diferença > 100 total ou > 80 em competência única.
+ */
+function auditarAvaliacaoInconsistente(av, avAnterior = null) {
+  if (!av) return false;
+  if (av.avaliacao_inconsistente === true) return true;
+  if (av.discrepancia?.classificacao === 'inconsistente') return true;
+
+  if (avAnterior && typeof av.nota_total === 'number' && typeof avAnterior.nota_total === 'number') {
+    const diffTotal = Math.abs(av.nota_total - avAnterior.nota_total);
+    if (diffTotal > 100) return true;
+
+    if (Array.isArray(av.competencias) && Array.isArray(avAnterior.competencias)) {
+      for (let i = 0; i < Math.min(av.competencias.length, avAnterior.competencias.length); i++) {
+        const nAtual = Number(av.competencias[i]?.nota) || 0;
+        const nAnt = Number(avAnterior.competencias[i]?.nota) || 0;
+        if (Math.abs(nAtual - nAnt) > 80) return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Separa a lista bruta de redações avaliadas entre pedagogicamente válidas e inconsistentes.
+ * Preserva o histórico intacto, mas filtra qualquer avaliação que apresente discrepância crítica.
+ */
+function auditarAvaliacoesRedacao(listaRedacoes) {
+  const todasAvaliadas = (listaRedacoes || []).filter(r => r?.avaliacao_ia && typeof r.avaliacao_ia.nota_total === 'number');
+  
+  // Ordena cronologicamente
+  const cronologicas = [...todasAvaliadas].sort((a, b) => new Date(a.data_envio || 0) - new Date(b.data_envio || 0));
+
+  const validas = [];
+  const inconsistentes = [];
+  let temDiscrepanciaCriticaPar = false;
+
+  cronologicas.forEach((r, idx) => {
+    const av = r.avaliacao_ia;
+    const anterior = idx > 0 ? cronologicas[idx - 1].avaliacao_ia : null;
+
+    const ehInconsistente = auditarAvaliacaoInconsistente(av, anterior);
+
+    if (ehInconsistente) {
+      inconsistentes.push(r);
+      temDiscrepanciaCriticaPar = true;
+    } else {
+      validas.push(r);
+    }
+  });
+
+  return {
+    todas: cronologicas,
+    validas,
+    inconsistentes,
+    temDiscrepanciaCritica: temDiscrepanciaCriticaPar || inconsistentes.length > 0
+  };
+}
+
+/**
+ * Calcula médias válidas das competências C1 a C5
+ */
+function calcularMediasCompetencias(redacoesValidas) {
+  const compsMap = {};
+  for (let i = 1; i <= 5; i++) {
+    compsMap[i] = { numero: i, soma: 0, count: 0, notas: [], nome: `Competência ${i}` };
+  }
+
+  (redacoesValidas || []).forEach(r => {
+    const comps = r.avaliacao_ia?.competencias;
+    if (Array.isArray(comps)) {
+      comps.forEach(c => {
+        const num = Number(c.numero);
+        if (num >= 1 && num <= 5 && typeof c.nota === 'number') {
+          compsMap[num].soma += c.nota;
+          compsMap[num].count++;
+          compsMap[num].notas.push(c.nota);
+          if (c.nome) compsMap[num].nome = c.nome;
+        }
+      });
+    }
+  });
+
+  const resultado = [];
+  for (let i = 1; i <= 5; i++) {
+    const item = compsMap[i];
+    const media = item.count > 0 ? Math.round(item.soma / item.count) : null;
+    resultado.push({
+      numero: i,
+      nome: item.nome,
+      media,
+      count: item.count,
+      notas: item.notas
+    });
+  }
+
+  return resultado;
+}
+
+/**
+ * Calcula gaps até 200 pontos para cada competência
+ */
+function calcularGapsCompetencias(mediasComps) {
+  return (mediasComps || []).map(c => ({
+    numero: c.numero,
+    nome: c.nome,
+    media: c.media,
+    gap: c.media !== null ? Math.max(0, 200 - c.media) : null
+  }));
+}
+
+/**
+ * Determina a competência prioritária de forma determinística:
+ * 1. Menor média
+ * 2. Maior gap
+ * 3. Menor número da competência
+ */
+function determinarCompetenciaPrioritaria(mediasComps) {
+  const comDados = (mediasComps || []).filter(c => c.media !== null);
+  if (comDados.length === 0) return null;
+
+  const ordenadas = [...comDados].sort((a, b) => {
+    if (a.media !== b.media) return a.media - b.media; // menor média primeiro
+    const gapA = 200 - a.media;
+    const gapB = 200 - b.media;
+    if (gapA !== gapB) return gapB - gapA; // maior gap primeiro
+    return a.numero - b.numero; // menor número desempata
+  });
+
+  return ordenadas[0];
+}
+
+/**
+ * Extrai problemas das avaliações válidas identificando ocorrências e recorrências
+ */
+function extrairProblemasRecorrentes(redacoesValidas, numCompetencia = null) {
+  const problemasIdentificados = [];
+
+  (redacoesValidas || []).forEach((r, idxR) => {
+    const av = r.avaliacao_ia;
+    if (!av) return;
+    const redId = r.id || `redacao_${idxR}`;
+
+    const comps = Array.isArray(av.competencias) ? av.competencias : [];
+    comps.forEach(c => {
+      if (numCompetencia !== null && Number(c.numero) !== Number(numCompetencia)) return;
+
+      const probs = Array.isArray(c.problemas) ? c.problemas : [];
+      probs.forEach(p => {
+        const desc = typeof p === 'string' ? p : (p?.descricao || p?.mensagem || '');
+        if (desc && desc.trim().length > 0) {
+          problemasIdentificados.push({
+            redacaoId: redId,
+            competencia: c.numero,
+            descricao: desc.trim(),
+            tipo: p?.tipo || c.tipo_apontamento || 'ATENÇÃO',
+            trecho: p?.trecho_original || ''
+          });
+        }
+      });
+
+      // Também inspeciona pontos_melhoria se não houver problemas específicos
+      if (probs.length === 0 && Array.isArray(av.pontos_melhoria)) {
+        av.pontos_melhoria.forEach(pm => {
+          if (typeof pm === 'string' && pm.trim().length > 0) {
+            problemasIdentificados.push({
+              redacaoId: redId,
+              competencia: c.numero,
+              descricao: pm.trim(),
+              tipo: 'ATENÇÃO',
+              trecho: ''
+            });
+          }
+        });
+      }
+    });
+  });
+
+  // Agrupa para detectar recorrência REAL (aparece em 2 ou mais avaliações/redações distintas)
+  const contagemPorRedacao = {};
+  problemasIdentificados.forEach(p => {
+    const chave = p.descricao.toLowerCase().slice(0, 40);
+    const redId = p.redacaoId || ('red_' + Math.random());
+    if (!contagemPorRedacao[chave]) {
+      contagemPorRedacao[chave] = { item: p, redacoesSet: new Set([redId]) };
+    } else {
+      contagemPorRedacao[chave].redacoesSet.add(redId);
+    }
+  });
+
+  const recorrentes = [];
+  const pontosAtencao = [];
+
+  Object.values(contagemPorRedacao).forEach(obj => {
+    const ocorrencias = obj.redacoesSet.size;
+    if (ocorrencias >= 2) {
+      recorrentes.push({ ...obj.item, ocorrencias });
+    } else {
+      pontosAtencao.push({ ...obj.item, ocorrencias: 1 });
+    }
+  });
+
+  return {
+    todos: problemasIdentificados,
+    recorrentes,
+    pontosAtencao
+  };
+}
+
+/**
+ * Mapa determinístico entre competência e conteúdos teóricos
+ */
+function gerarConteudoEstudo(numeroComp) {
+  const mapa = {
+    1: {
+      titulo: 'Domínio da modalidade escrita formal',
+      topicos: [
+        'Concordância verbal e nominal (casos especiais e sujeito posposto)',
+        'Regência verbal e emprego do sinal indicativo de crase',
+        'Pontuação e isolamento de orações subordinadas e termos adverbiais',
+        'Ortografia e adequação ao registro culto da língua',
+        'Construção sintática (evitar truncamento e paralelismo sintático)'
+      ]
+    },
+    2: {
+      titulo: 'Compreensão do tema e repertório sociocultural',
+      topicos: [
+        'Interpretação e delimitação exata do recorte temático (evitar tangenciamento)',
+        'Seleção de repertório sociocultural legitimado e produtivo',
+        'Articulação orgânica entre repertório e a tese defendida',
+        'Estrutura do texto dissertativo-argumentativo em prosa',
+        'Construção do projeto de texto estratégico'
+      ]
+    },
+    3: {
+      titulo: 'Seleção, organização e interpretação de argumentos',
+      topicos: [
+        'Elaboração de tese clara e consistente na introdução',
+        'Progressão argumentativa entre parágrafos (projeto de texto estratégico)',
+        'Aprofundamento de ideias: argumento → explicação → consequência',
+        'Relação explícita de cada tópico frasal com a tese central',
+        'Eliminação de lacunas argumentativas e generalizações'
+      ]
+    },
+    4: {
+      titulo: 'Mecanismos linguísticos de coesão textual',
+      topicos: [
+        'Emprego variado de conectivos interparágrafos (em primeiro lugar, outrossim)',
+        'Elos coesivos intraparágrafos (relações de causa, oposição e finalidade)',
+        'Referenciação lexical e sinonímia (evitar repetições de palavras)',
+        'Fluidez e harmonia sintática entre períodos compostos'
+      ]
+    },
+    5: {
+      titulo: 'Proposta de intervenção social',
+      topicos: [
+        'Estruturação dos 5 elementos obrigatórios: Agente, Ação, Meio/Modo, Efeito/Finalidade e Detalhamento',
+        'Detalhamento qualificado (especificação do meio, explicação da ação ou exemplo concreto)',
+        'Coerência e aplicabilidade prática em relação ao problema abordado',
+        'Respeito irrestrito aos direitos humanos'
+      ]
+    }
+  };
+
+  return mapa[numeroComp] || {
+    titulo: `Competência ${numeroComp}`,
+    topicos: ['Prática orientada pela rubrica oficial do ENEM']
+  };
+}
+
+/**
+ * Treino focal acionável por competência
+ */
+function gerarTreinoFocal(numeroComp) {
+  const mapa = {
+    1: {
+      titulo: 'Reescrita e lapidação da norma-padrão',
+      instrucao: 'Reescreva um parágrafo que você já produziu eliminando desvios gramaticais, ajustando concordâncias e aplicando pontuação precisa.',
+      exemplo: 'Revise conectivos, pontuação de orações intercaladas e garanta que não haja paralelismo quebrado.',
+      botaoTexto: 'Reescrever Parágrafo no Editor ✍️'
+    },
+    2: {
+      titulo: 'Construção de introdução com repertório produtivo',
+      instrucao: 'Escreva uma introdução completa apresentando contextualização com repertório legítimo, delimitação do tema e tese com dois argumentos.',
+      exemplo: 'Repertório (filósofo, lei, fato histórico) → Vinculação ao tema → Tese explícita.',
+      botaoTexto: 'Treinar Introdução no Editor ✍️'
+    },
+    3: {
+      titulo: 'Parágrafo de desenvolvimento com progressão plena',
+      instrucao: 'Escreva um parágrafo de desenvolvimento estruturado contendo: Tópico Frasal + Argumento + Explicação Detalhada + Consequência + Vínculo com a Tese.',
+      exemplo: 'Afirmação → "Isso ocorre porque..." → "Como consequência..." → "Logo, confirma-se o impacto..."',
+      botaoTexto: 'Treinar Desenvolvimento no Editor ✍️'
+    },
+    4: {
+      titulo: 'Articulação lógica e variação de conectivos',
+      instrucao: 'Produza ou reescreva um parágrafo conectando todos os períodos com conectores adequados, sem repetições mecânicas.',
+      exemplo: 'Intercale elos de causa ("haja vista que"), consequência ("por conseguinte") e adversidade ("todavia").',
+      botaoTexto: 'Treinar Coesão no Editor ✍️'
+    },
+    5: {
+      titulo: 'Proposta de intervenção completa com os 5 elementos',
+      instrucao: 'Escreva uma proposta de intervenção para a conclusão contendo com clareza: Agente, Ação, Meio/Modo, Finalidade e 1 Detalhamento explicativo.',
+      exemplo: 'Ministério X (Agente) deve criar Y (Ação), por meio de Z (Modo), com o intuito de W (Finalidade), com detalhamento explícito.',
+      botaoTexto: 'Treinar Proposta de Intervenção ✍️'
+    }
+  };
+
+  return mapa[numeroComp] || {
+    titulo: 'Treino de produção textual',
+    instrucao: 'Produza uma redação completa focando nos critérios avaliativos da banca.',
+    exemplo: 'Pratique com tempo cronometrado.',
+    botaoTexto: 'Iniciar Treino no Editor ✍️'
+  };
+}
+
+/**
+ * Próxima meta segura calculada em degraus progressivos de 40 pontos
+ */
+function calcularProximaMeta(mediaAtual, notaMaxima = 200) {
+  if (mediaAtual === null || typeof mediaAtual !== 'number') return null;
+  if (mediaAtual >= notaMaxima) return notaMaxima;
+
+  // Próximo degrau múltiplo de 40 estritamente maior que a média atual
+  const proximoDegrau = Math.ceil((mediaAtual + 1) / 40) * 40;
+  return Math.min(notaMaxima, proximoDegrau);
+}
+
+/**
+ * Checklist prático de autoavaliação por competência
+ */
+function gerarChecklist(numeroComp) {
+  const mapa = {
+    1: [
+      'Revisei concordâncias verbais e nominais em todos os períodos?',
+      'Utilizei vírgulas corretamente para isolar termos explicativos e orações subordinadas?',
+      'Evitei períodos longos demais ou truncamento sintático?',
+      'Acentuei e grafou todas as palavras no padrão culto?',
+      'O vocabulário é formal, claro e sem gírias ou clichês?'
+    ],
+    2: [
+      'Compreendi o tema em sua totalidade, sem fugir nem tangenciar?',
+      'Apresentei pelo menos um repertório legitimado de outra área do conhecimento?',
+      'O repertório tem relação direta e produtiva com o argumento defendido?',
+      'O texto é dissertativo-argumentativo do início ao fim (sem narrar fatos soltos)?',
+      'Minha introdução possui contextualização e tese clara?'
+    ],
+    3: [
+      'Minha tese está expressa de forma evidente na introdução?',
+      'Cada parágrafo de desenvolvimento possui uma ideia central definida?',
+      'Expliquei os argumentos detalhadamente em vez de apenas enunciá-los?',
+      'Mostrei a consequência prática dos problemas analisados?',
+      'Todos os parágrafos convergem para defender a mesma tese?'
+    ],
+    4: [
+      'Iniciei os desenvolvimentos e a conclusão com operadores argumentativos variados?',
+      'Articulei os períodos internos com conectivos de causa, consequência ou oposição?',
+      'Substituí palavras repetidas por pronomes, sinônimos ou elipses?',
+      'Os conectivos empregados refletem o sentido exato que pretendo transmitir?',
+      'O texto tem fluidez de leitura sem truncamentos?'
+    ],
+    5: [
+      'Indiquei com clareza QUEM vai agir (Agente público ou institucional)?',
+      'Descrevi O QUE deve ser feito (Ação propositiva e afirmativa)?',
+      'Expliquei COMO ou POR MEIO DE QUE a ação será realizada (Meio/Modo)?',
+      'Deixei explícito PARA QUE a ação serve (Efeito/Finalidade)?',
+      'Inclui um DETALHAMENTO específico em um dos elementos?',
+      'A proposta respeita integralmente os direitos humanos?'
+    ]
+  };
+
+  return mapa[numeroComp] || [
+    'Revisei todos os parágrafos do texto com atenção aos critérios da banca?'
+  ];
+}
+
+/**
+ * Motor central de diagnóstico do Professor IA — Responde às 7 Perguntas
+ */
+function gerarDiagnosticoProfessorIA(redacoesValidas, redacoesInconsistentes = []) {
+  const totalValidas = redacoesValidas.length;
+
+  if (totalValidas === 0) {
+    return {
+      estado: 'vazio',
+      mensagem: 'Ainda preciso de uma redação avaliada para começar seu diagnóstico pedagógico.'
+    };
+  }
+
+  const cronologicas = [...redacoesValidas].sort((a, b) => new Date(a.data_envio || 0) - new Date(b.data_envio || 0));
+  const notas = cronologicas.map(r => r.avaliacao_ia.nota_total);
+  const notaAtual = notas[notas.length - 1];
+  const notaAnterior = totalValidas >= 2 ? notas[notas.length - 2] : null;
+  const melhorNotaValida = Math.max(...notas);
+  const mediaGeralValida = Math.round(notas.reduce((a, b) => a + b, 0) / totalValidas);
+  const variacaoValida = notaAnterior !== null ? notaAtual - notaAnterior : null;
+
+  // Médias e Gaps das Competências
+  const mediasComps = calcularMediasCompetencias(cronologicas);
+  const gapsComps = calcularGapsCompetencias(mediasComps);
+  const compPrioritaria = determinarCompetenciaPrioritaria(mediasComps);
+  const numPrio = compPrioritaria ? compPrioritaria.numero : 1;
+
+  // 1. Como estou?
+  let comoEstouTexto = '';
+  let nivelGlobal = '';
+  if (mediaGeralValida >= 900) nivelGlobal = 'Excelente (Faixa de aprovação competitiva)';
+  else if (mediaGeralValida >= 760) nivelGlobal = 'Avançado (Consistente, refinando detalhes)';
+  else if (mediaGeralValida >= 600) nivelGlobal = 'Intermediário (Base consolidada com oportunidades de salto)';
+  else nivelGlobal = 'Em desenvolvimento (Foco na estrutura e critérios essenciais)';
+
+  if (totalValidas === 1) {
+    comoEstouTexto = `Você possui 1 avaliação válida registrada (${notaAtual} pontos). Este é seu primeiro diagnóstico pedagógico: já consigo identificar seus principais pontos de atenção, mas ainda não há histórico suficiente para medir sua evolução percentual.`;
+  } else {
+    const ritmo = variacaoValida > 0 ? `apresentando evolução recente de +${variacaoValida} pontos` : variacaoValida < 0 ? `com oscilação de ${variacaoValida} pontos na última produção` : `mantendo pontuação estável`;
+    comoEstouTexto = `Você tem ${totalValidas} redações com avaliação pedagógica válida. Média geral de <strong>${mediaGeralValida} pontos</strong> (${nivelGlobal}), ${ritmo}.`;
+  }
+
+  // 2. Onde estou perdendo pontos?
+  const ondePercoPontosTexto = compPrioritaria ? {
+    competencia: compPrioritaria.numero,
+    nome: compPrioritaria.nome,
+    media: compPrioritaria.media,
+    gap: 200 - compPrioritaria.media,
+    todasComps: gapsComps
+  } : null;
+
+  // 3. Por que estou perdendo pontos?
+  const problemas = extrairProblemasRecorrentes(cronologicas, numPrio);
+  const justificativasReais = cronologicas.map(r => {
+    const c = (r.avaliacao_ia?.competencias || []).find(comp => Number(comp.numero) === numPrio);
+    return c?.justificativa || '';
+  }).filter(Boolean);
+
+  // 4. O que devo estudar?
+  const conteudoEstudo = gerarConteudoEstudo(numPrio);
+
+  // 5. O que devo treinar?
+  const treinoFocal = gerarTreinoFocal(numPrio);
+
+  // 6. Qual minha próxima meta?
+  const metaComp = compPrioritaria ? calcularProximaMeta(compPrioritaria.media, 200) : 160;
+  let metaGlobalTexto = '';
+  if (totalValidas === 1) {
+    const alvo = Math.min(1000, notaAtual + 40);
+    metaGlobalTexto = `Buscar consolidar <strong>${alvo} pontos</strong> na sua próxima redação (+40 pts).`;
+  } else {
+    const proximoAlvo = Math.min(1000, Math.max(notaAtual + 40, melhorNotaValida));
+    const salto = proximoAlvo - notaAtual;
+    metaGlobalTexto = `Sua próxima meta é avançar uma faixa de desempenho: buscar <strong>${proximoAlvo} pontos</strong>${salto > 0 ? ` (+${salto} pts)` : ''}.`;
+  }
+
+  // 7. Como melhorar na próxima redação?
+  const checklist = gerarChecklist(numPrio);
+
+  return {
+    estado: 'valido',
+    totalValidas,
+    notaAtual,
+    notaAnterior,
+    melhorNotaValida,
+    mediaGeralValida,
+    variacaoValida,
+    compPrioritaria,
+    gapsComps,
+    comoEstouTexto,
+    nivelGlobal,
+    ondePercoPontosTexto,
+    problemas,
+    justificativasReais,
+    conteudoEstudo,
+    treinoFocal,
+    metaComp,
+    metaGlobalTexto,
+    checklist
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// ETAPA 24 & 25: Renderização Integrada da Aba de Evolução
+// ─────────────────────────────────────────────────────────────────
 
 function renderizarEvolucaoInteligente() {
   const container = document.getElementById('evolucao-conteudo');
@@ -855,7 +1342,7 @@ function renderizarEvolucaoInteligente() {
         <span style="font-size:3rem; display:block; margin-bottom:12px;">🔒</span>
         <h3 style="font-size:1.25rem; color:var(--text-primary); margin-bottom:6px;">Acesso restrito ao seu progresso</h3>
         <p style="font-size:0.9rem; max-width:440px; margin:0 auto 20px;">
-          Para acompanhar sua evolução nota a nota e por competência, faça login na sua conta do Vestibular+.
+          Para acompanhar sua evolução nota a nota e ter acesso ao Professor IA, faça login na sua conta do Vestibular+.
         </p>
         <a class="btn btn-primary" href="./login.html">Fazer Login no Vestibular+ →</a>
       </div>
@@ -870,10 +1357,10 @@ function renderizarEvolucaoInteligente() {
   if (avaliadasTotal.length === 0) {
     container.innerHTML = `
       <div style="text-align:center; padding:60px 20px; color:var(--text-secondary); background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl);">
-        <span style="font-size:3rem; display:block; margin-bottom:12px;">📈</span>
-        <h3 style="font-size:1.25rem; color:var(--text-primary); margin-bottom:6px;">Você ainda não possui redações corrigidas</h3>
+        <span style="font-size:3rem; display:block; margin-bottom:12px;">🎓</span>
+        <h3 style="font-size:1.25rem; color:var(--text-primary); margin-bottom:6px;">Ainda preciso de uma redação para começar seu diagnóstico</h3>
         <p style="font-size:0.9rem; max-width:460px; margin:0 auto 20px; line-height:1.5;">
-          Produza seu primeiro texto e solicite a correção com IA. O sistema mapeará sua evolução e traçará suas prioridades de treino.
+          Produza seu primeiro texto e solicite a correção com IA. O <strong>Professor IA</strong> analisará seus resultados e traçará seu plano de evolução personalizado.
         </p>
         <button class="btn btn-primary" onclick="document.getElementById('tab-btn-propostas').click()">
           Escolher uma Proposta 🚀
@@ -887,12 +1374,11 @@ function renderizarEvolucaoInteligente() {
   const bancasDisponiveis = Array.from(new Set(avaliadasTotal.map(r => r.vestibular_nome || r.vestibular_id?.toUpperCase() || 'ENEM'))).filter(Boolean);
 
   // Aplica filtro de vestibular selecionado
-  const avaliadas = filtroBancaEvolucao === 'todas'
+  const avaliadasFiltro = filtroBancaEvolucao === 'todas'
     ? avaliadasTotal
     : avaliadasTotal.filter(r => (r.vestibular_nome || r.vestibular_id?.toUpperCase()) === filtroBancaEvolucao);
 
-  // Se filtro atual não retornar redações
-  if (avaliadas.length === 0) {
+  if (avaliadasFiltro.length === 0) {
     container.innerHTML = `
       <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:24px;">
         ${renderizarBarraFiltrosEvolucao(bancasDisponiveis, filtroBancaEvolucao)}
@@ -905,68 +1391,145 @@ function renderizarEvolucaoInteligente() {
     return;
   }
 
-  // Ordenação cronológica (mais antiga para mais recente para calcular evolução)
-  const cronologicas = [...avaliadas].sort((a, b) => new Date(a.data_envio || 0) - new Date(b.data_envio || 0));
-  const totalAvaliacoes = cronologicas.length;
-  const maisRecente = cronologicas[cronologicas.length - 1];
-  const anterior = totalAvaliacoes >= 2 ? cronologicas[cronologicas.length - 2] : null;
+  // ─────────────────────────────────────────────────────────────
+  // ETAPA 25: Auditoria Determinística — Separação Válidas x Inconsistentes
+  // ─────────────────────────────────────────────────────────────
+  const auditoria = auditarAvaliacoesRedacao(avaliadasFiltro);
+  const redacoesValidas = auditoria.validas;
+  const redacoesInconsistentes = auditoria.inconsistentes;
+  const temDiscrepanciaCritica = auditoria.temDiscrepanciaCritica;
 
-  const notaAtual = maisRecente.avaliacao_ia.nota_total;
-  const notaAnterior = anterior ? anterior.avaliacao_ia.nota_total : null;
-  const variacaoNota = anterior ? notaAtual - notaAnterior : null;
+  const totalValidas = redacoesValidas.length;
+  const totalHistorico = auditoria.todas.length;
 
-  const todasNotas = cronologicas.map(r => r.avaliacao_ia.nota_total);
-  const melhorNota = Math.max(...todasNotas);
-  const somaNotas = todasNotas.reduce((acc, n) => acc + n, 0);
-  const mediaNotas = Math.round(somaNotas / totalAvaliacoes);
+  // Banner explícito de Alerta de Evolução Inconclusiva
+  const alertaInconclusivoHtml = temDiscrepanciaCritica ? `
+    <div style="margin-bottom:20px; padding:16px 20px; border-radius:var(--radius-lg); background:rgba(239,68,68,0.08); border:2px solid rgba(239,68,68,0.4); color:#ef4444; font-size:0.86rem; line-height:1.55;">
+      <div style="display:flex; align-items:center; gap:8px; font-weight:800; font-size:0.95rem; margin-bottom:4px;">
+        <span>⚠️</span> Evolução inconclusiva
+      </div>
+      <div>
+        Identificamos uma diferença muito grande entre avaliações (${redacoesInconsistentes.length > 0 ? `${redacoesInconsistentes.length} avaliação com discrepância crítica` : 'variação crítica detectada'}).
+        Os resultados continuam disponíveis no seu histórico, mas essa comparação <strong>não será utilizada para calcular sua evolução pedagógica, média ou metas</strong>.
+      </div>
+    </div>
+  ` : '';
 
-  // Análise das competências da redação mais recente
-  const compsAtuais = maisRecente.avaliacao_ia.competencias || [];
-  const compsAnteriores = anterior?.avaliacao_ia?.competencias || [];
+  // Aviso de 1 redação válida
+  const avisoUmaRedacao = (totalValidas === 1 && !temDiscrepanciaCritica) ? `
+    <div style="margin-bottom:20px; padding:14px 18px; border-radius:var(--radius-md); background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25); color:var(--text-secondary); font-size:0.84rem; line-height:1.5;">
+      💡 <strong>Você possui 1 redação avaliada.</strong> Este é seu primeiro diagnóstico. Com novas redações conseguiremos medir as variações de nota e a evolução específica de cada competência.
+    </div>
+  ` : '';
 
-  // Melhor competência atual (maior pontuação percentual)
-  let melhorCompTexto = 'Não disponível';
-  if (compsAtuais.length > 0) {
-    const maiorNotaC = Math.max(...compsAtuais.map(c => c.nota));
-    const melhoresComps = compsAtuais.filter(c => c.nota === maiorNotaC);
-    if (melhoresComps.length === 1) {
-      melhorCompTexto = `C${melhoresComps[0].numero} (${melhoresComps[0].nota}/${melhoresComps[0].nota_maxima || 200})`;
-    } else {
-      melhorCompTexto = `${melhoresComps.map(c => `C${c.numero}`).join(', ')} (${maiorNotaC} pts)`;
+  // ─────────────────────────────────────────────────────────────
+  // Variáveis para cálculos pedagógicos BASEADOS EM AVALIAÇÕES VÁLIDAS
+  // ─────────────────────────────────────────────────────────────
+  const cronologicasValidas = [...redacoesValidas].sort((a, b) => new Date(a.data_envio || 0) - new Date(b.data_envio || 0));
+  const totalAvaliacoes = totalValidas; // Aliases para compatibilidade total com os testes da Etapa 24
+  const anterior = totalAvaliacoes >= 2 ? cronologicasValidas[totalAvaliacoes - 2] : null;
+  const maisRecente = totalValidas > 0 ? cronologicasValidas[totalValidas - 1] : null;
+  const maisRecenteValida = maisRecente;
+  const anteriorValida = anterior;
+
+  const notaAtual = maisRecenteValida ? maisRecenteValida.avaliacao_ia.nota_total : '—';
+  const notaAnterior = anteriorValida ? anteriorValida.avaliacao_ia.nota_total : null;
+  const variacaoNota = (anteriorValida && typeof notaAtual === 'number') ? notaAtual - notaAnterior : null;
+
+  const todasNotasValidas = cronologicasValidas.map(r => r.avaliacao_ia.nota_total);
+  const melhorNota = todasNotasValidas.length > 0 ? Math.max(...todasNotasValidas) : '—';
+  const somaNotas = todasNotasValidas.reduce((acc, n) => acc + n, 0);
+  const mediaNotas = totalValidas > 0 ? Math.round(somaNotas / totalValidas) : '—';
+
+  // Badge da última evolução: se houve discrepância crítica na última, NÃO mostra +440, mostra Inconclusiva
+  const variacaoBadgeHtml = (() => {
+    if (temDiscrepanciaCritica && redacoesInconsistentes.length > 0) {
+      return `<span style="color:#ef4444; font-weight:800; font-size:0.85rem;">⚠️ Evolução inconclusiva</span>`;
     }
-  }
-
-  // Maior oportunidade de ganho (maior margem matemática até 200)
-  let maiorOportunidadeTexto = 'Potencial máximo atingido';
-  let compMaiorOportunidade = null;
-  if (compsAtuais.length > 0) {
-    const gaps = compsAtuais.map(c => ({
-      c,
-      gap: (Number(c.nota_maxima) || 200) - c.nota
-    })).filter(g => g.gap > 0).sort((a, b) => b.gap - a.gap);
-
-    if (gaps.length > 0) {
-      compMaiorOportunidade = gaps[0].c;
-      maiorOportunidadeTexto = `C${gaps[0].c.numero} (margem de até +${gaps[0].gap} pts)`;
+    if (variacaoNota !== null) {
+      if (variacaoNota > 0) return `<span style="color:#22c55e; font-weight:800; font-size:0.9rem;">+${variacaoNota} pontos ↑</span>`;
+      if (variacaoNota < 0) return `<span style="color:#ef4444; font-weight:800; font-size:0.9rem;">${variacaoNota} pontos ↓</span>`;
+      return `<span style="color:var(--text-secondary); font-weight:800; font-size:0.9rem;">= estável (0 pts)</span>`;
     }
-  }
+    return '<span style="color:var(--text-secondary); font-size:0.8rem;">Primeira avaliação</span>';
+  })();
 
-  // Meta para a próxima redação (baseada matematicamente no histórico real)
-  let metaTexto = '';
-  if (totalAvaliacoes === 1) {
-    metaTexto = `Meta sugerida de treino: buscar consolidar a pontuação de ${Math.min(1000, notaAtual + 40)} pontos na próxima produção.`;
-  } else {
-    const metaPontos = Math.min(1000, Math.max(notaAtual + 40, melhorNota));
-    metaTexto = `Meta de treino: buscar alcançar <strong>${metaPontos} pontos</strong> (+${metaPontos - notaAtual} pts em relação à nota atual).`;
-  }
+  // 1. Cards de Resumo da Evolução (Alimentados apenas por dados válidos)
+  const cardsMetricasHtml = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Nota Atual</div>
+        <div style="font-size:2rem; font-weight:900; font-family:var(--font-display); color:var(--text-primary); line-height:1.1;">${notaAtual}</div>
+        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">${maisRecenteValida ? 'Última avaliação válida' : 'Sem avaliação válida'}</div>
+      </div>
 
-  // Identificação de competências que melhoraram, pioraram ou estagnaram
+      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Melhor Nota</div>
+        <div style="font-size:2rem; font-weight:900; font-family:var(--font-display); color:#22c55e; line-height:1.1;">${melhorNota}</div>
+        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">Seu recorde pedagógico</div>
+      </div>
+
+      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Média Pedagógica</div>
+        <div style="font-size:2rem; font-weight:900; font-family:var(--font-display); color:#38bdf8; line-height:1.1;">${mediaNotas}</div>
+        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">Baseada em ${totalValidas} redação${totalValidas !== 1 ? 'ões' : ''} válida${totalValidas !== 1 ? 's' : ''}</div>
+      </div>
+
+      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
+        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Última Evolução</div>
+        <div style="margin-top:4px; line-height:1.2;">${variacaoBadgeHtml}</div>
+        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:6px;">${anteriorValida ? `Anterior: ${notaAnterior} pts` : 'Sem anterior para comparar'}</div>
+      </div>
+    </div>
+  `;
+
+  // 2. Gráfico Visual de Evolução (Mostra trajetória válida)
+  const graficoHtml = totalValidas >= 2 ? (() => {
+    const maxNota = 1000;
+    return `
+      <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:20px 24px; margin-bottom:20px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
+          <h4 style="font-size:0.95rem; font-weight:800; margin:0; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+            <span>📈</span> Trajetória das Notas (Histórico Válido)
+          </h4>
+          <span style="font-size:0.75rem; color:var(--text-secondary);">${totalValidas} avaliações pedagógicas registradas</span>
+        </div>
+        <div style="display:flex; align-items:flex-end; gap:16px; min-height:140px; padding:10px 0 6px; overflow-x:auto;">
+          ${cronologicasValidas.map((r, i) => {
+            const n = r.avaliacao_ia.nota_total;
+            const h = Math.max(18, Math.round((n / maxNota) * 110));
+            const isLatest = i === cronologicasValidas.length - 1;
+            const cor = isLatest ? 'var(--color-primary-400)' : '#38bdf8';
+            const dataCurta = new Date(r.data_envio || 0).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+            return `
+              <div style="display:flex; flex-direction:column; align-items:center; gap:6px; min-width:64px; flex-shrink:0;">
+                <span style="font-size:0.78rem; font-weight:800; color:${cor};">${n}</span>
+                <div style="width:42px; height:${h}px; background:${cor}${isLatest ? '' : '80'}; border-radius:5px 5px 0 0; transition:height 0.4s ease;"></div>
+                <span style="font-size:0.67rem; color:var(--text-secondary); text-align:center; line-height:1.2;">
+                  ${escapeHtml(dataCurta)}<br>
+                  <strong style="color:var(--text-primary);">${isLatest ? 'Atual' : `#${i + 1}`}</strong>
+                </span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  })() : '';
+
+  // 3. Competências e Diagnóstico do Professor IA
+  const diagnosticoProfessor = gerarDiagnosticoProfessorIA(redacoesValidas, redacoesInconsistentes);
+
+  // Variáveis da Etapa 24 preservadas com base nos dados válidos
+  const compsAtuais = maisRecenteValida?.avaliacao_ia?.competencias || [];
+  const compsAnteriores = anteriorValida?.avaliacao_ia?.competencias || [];
   const mudancasComps = [];
   const compsMelhoraram = [];
   const compsPioraram = [];
   const compsEstaveis = [];
 
-  if (anterior && compsAtuais.length > 0 && compsAnteriores.length > 0) {
+  if (anteriorValida && compsAtuais.length > 0 && compsAnteriores.length > 0) {
     compsAtuais.forEach((cAtual, idx) => {
       const cAnt = compsAnteriores.find(c => c.numero === cAtual.numero) || compsAnteriores[idx];
       if (cAnt && typeof cAnt.nota === 'number') {
@@ -987,89 +1550,7 @@ function renderizarEvolucaoInteligente() {
     });
   }
 
-  // Estado com exatamente 1 redação
-  const avisoUmaRedacao = totalAvaliacoes === 1 ? `
-    <div style="margin-bottom:20px; padding:14px 18px; border-radius:var(--radius-md); background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25); color:var(--text-secondary); font-size:0.84rem; line-height:1.5;">
-      💡 <strong>Você possui 1 redação avaliada.</strong> Continue praticando — com mais uma redação poderemos mapear as variações de nota e a evolução específica de cada competência.
-    </div>
-  ` : '';
-
-  // 1. Cards de Resumo da Evolução
-  const variacaoBadgeHtml = variacaoNota !== null ? (() => {
-    if (variacaoNota > 0) {
-      return `<span style="color:#22c55e; font-weight:800; font-size:0.9rem;">+${variacaoNota} pontos ↑</span>`;
-    } else if (variacaoNota < 0) {
-      return `<span style="color:#ef4444; font-weight:800; font-size:0.9rem;">${variacaoNota} pontos ↓</span>`;
-    } else {
-      return `<span style="color:var(--text-secondary); font-weight:800; font-size:0.9rem;">= estável (0 pts)</span>`;
-    }
-  })() : '<span style="color:var(--text-secondary); font-size:0.8rem;">Primeira avaliação</span>';
-
-  const cardsMetricasHtml = `
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
-      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
-        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Nota Atual</div>
-        <div style="font-size:2rem; font-weight:900; font-family:var(--font-display); color:var(--text-primary); line-height:1.1;">${notaAtual}</div>
-        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">Última redação avaliada</div>
-      </div>
-
-      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
-        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Melhor Nota</div>
-        <div style="font-size:2rem; font-weight:900; font-family:var(--font-display); color:#22c55e; line-height:1.1;">${melhorNota}</div>
-        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">Seu recorde no portfólio</div>
-      </div>
-
-      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
-        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Média das Redações</div>
-        <div style="font-size:2rem; font-weight:900; font-family:var(--font-display); color:#38bdf8; line-height:1.1;">${mediaNotas}</div>
-        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">Baseada em ${totalAvaliacoes} redação${totalAvaliacoes !== 1 ? 'ões' : ''}</div>
-      </div>
-
-      <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 18px;">
-        <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; color:var(--text-secondary); margin-bottom:4px;">Última Evolução</div>
-        <div style="margin-top:4px; line-height:1.2;">${variacaoBadgeHtml}</div>
-        <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:6px;">${anterior ? `Anterior: ${notaAnterior} pts` : 'Sem anterior para comparar'}</div>
-      </div>
-    </div>
-  `;
-
-  // 2. Gráfico Visual de Evolução (Eixo X = Redações, Eixo Y = Nota)
-  const graficoHtml = totalAvaliacoes >= 2 ? (() => {
-    const maxNota = 1000;
-    return `
-      <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:20px 24px; margin-bottom:20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:8px;">
-          <h4 style="font-size:0.95rem; font-weight:800; margin:0; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
-            <span>📈</span> Trajetória das Notas (Histórico Real)
-          </h4>
-          <span style="font-size:0.75rem; color:var(--text-secondary);">${totalAvaliacoes} avaliações registradas</span>
-        </div>
-        <div style="display:flex; align-items:flex-end; gap:16px; min-height:140px; padding:10px 0 6px; overflow-x:auto;">
-          ${cronologicas.map((r, i) => {
-            const n = r.avaliacao_ia.nota_total;
-            const h = Math.max(18, Math.round((n / maxNota) * 110));
-            const isLatest = i === cronologicas.length - 1;
-            const cor = isLatest ? 'var(--color-primary-400)' : '#38bdf8';
-            const dataCurta = new Date(r.data_envio || 0).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-
-            return `
-              <div style="display:flex; flex-direction:column; align-items:center; gap:6px; min-width:64px; flex-shrink:0;">
-                <span style="font-size:0.78rem; font-weight:800; color:${cor};">${n}</span>
-                <div style="width:42px; height:${h}px; background:${cor}${isLatest ? '' : '80'}; border-radius:5px 5px 0 0; transition:height 0.4s ease;"></div>
-                <span style="font-size:0.67rem; color:var(--text-secondary); text-align:center; line-height:1.2;">
-                  ${escapeHtml(dataCurta)}<br>
-                  <strong style="color:var(--text-primary);">${isLatest ? 'Atual' : `#${i + 1}`}</strong>
-                </span>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    `;
-  })() : '';
-
-  // 3. Evolução por Competência C1–C5
-  const evolucaoCompsHtml = mudancasComps.length > 0 ? `
+  const evolucaoCompsHtml = (mudancasComps.length > 0 && !temDiscrepanciaCritica) ? `
     <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:20px 24px; margin-bottom:20px;">
       <h4 style="font-size:0.95rem; font-weight:800; margin:0 0 14px; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
         <span>🎯</span> Evolução por Competência (Última vs. Anterior)
@@ -1079,16 +1560,11 @@ function renderizarEvolucaoInteligente() {
           const sinal = mc.diff > 0 ? `+${mc.diff} ↑` : mc.diff < 0 ? `${mc.diff} ↓` : `0 →`;
           const cor = mc.diff > 0 ? '#22c55e' : mc.diff < 0 ? '#ef4444' : 'var(--text-secondary)';
           const bg = mc.diff > 0 ? 'rgba(34,197,94,0.08)' : mc.diff < 0 ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)';
-
           return `
             <div style="background:${bg}; border:1px solid var(--border-color); border-radius:var(--radius-md); padding:12px; text-align:center;">
               <div style="font-size:0.75rem; font-weight:800; color:var(--text-secondary); margin-bottom:4px;">C${mc.numero}</div>
-              <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary);">
-                ${mc.notaAnt} → ${mc.notaAtual}
-              </div>
-              <div style="font-size:0.85rem; font-weight:800; color:${cor}; margin-top:4px;">
-                ${sinal}
-              </div>
+              <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary);">${mc.notaAnt} → ${mc.notaAtual}</div>
+              <div style="font-size:0.85rem; font-weight:800; color:${cor}; margin-top:4px;">${sinal}</div>
             </div>
           `;
         }).join('')}
@@ -1096,29 +1572,21 @@ function renderizarEvolucaoInteligente() {
     </div>
   ` : '';
 
-  // 4. Análise: O que mudou?
-  const oQueMudouHtml = totalAvaliacoes >= 2 ? (() => {
+  const oQueMudouHtml = (totalValidas >= 2 && !temDiscrepanciaCritica) ? (() => {
     const itensAnalise = [];
-
-    if (variacaoNota > 0) {
-      itensAnalise.push(`Você aumentou <strong>${variacaoNota} pontos</strong> desde sua avaliação anterior.`);
-    } else if (variacaoNota < 0) {
-      itensAnalise.push(`Sua nota total teve oscilação de <strong>${variacaoNota} pontos</strong> em relação à anterior.`);
-    } else {
-      itensAnalise.push(`Sua nota total permaneceu estável em relação à redação anterior.`);
-    }
+    if (variacaoNota > 0) itensAnalise.push(`Você aumentou <strong>${variacaoNota} pontos</strong> desde sua avaliação anterior.`);
+    else if (variacaoNota < 0) itensAnalise.push(`Sua nota total teve oscilação de <strong>${variacaoNota} pontos</strong> em relação à anterior.`);
+    else itensAnalise.push(`Sua nota total permaneceu estável em relação à redação anterior.`);
 
     if (compsMelhoraram.length > 0) {
       const melhorAvanco = [...compsMelhoraram].sort((a, b) => b.diff - a.diff)[0];
       itensAnalise.push(`Seu maior avanço ocorreu em <strong>C${melhorAvanco.numero}</strong> (+${melhorAvanco.diff} pontos).`);
     }
-
     if (compsPioraram.length > 0) {
       compsPioraram.forEach(cp => {
         itensAnalise.push(`Competência <strong>C${cp.numero}</strong> apresentou queda de ${Math.abs(cp.diff)} pontos (${cp.notaAnt} → ${cp.notaAtual}).`);
       });
     }
-
     if (compsEstaveis.length > 0) {
       const nomesEstaveis = compsEstaveis.map(c => `C${c.numero}`).join(', ');
       itensAnalise.push(`As competências <strong>${nomesEstaveis}</strong> mantiveram a mesma pontuação.`);
@@ -1136,48 +1604,23 @@ function renderizarEvolucaoInteligente() {
     `;
   })() : '';
 
-  // 5. Diagnóstico de Competências (Melhor, Oportunidade, Atenção, Meta)
-  const diagnosticoHtml = `
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:20px;">
-      <div style="background:var(--bg-elevated); border:1px solid rgba(34,197,94,0.25); border-radius:var(--radius-lg); padding:16px 18px;">
-        <div style="font-size:0.75rem; font-weight:800; color:#22c55e; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
-          <span>🏆</span> Sua Melhor Competência Atual
-        </div>
-        <div style="font-size:1.05rem; font-weight:900; color:var(--text-primary); margin-bottom:4px;">
-          ${escapeHtml(melhorCompTexto)}
-        </div>
-        <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.4;">
-          Domínio mais consolidado demonstrado na última avaliação.
-        </div>
-      </div>
+  let maiorOportunidadeTexto = 'Potencial máximo atingido';
+  if (compsAtuais.length > 0) {
+    const gaps = compsAtuais.map(c => ({ c, gap: (Number(c.nota_maxima) || 200) - c.nota })).filter(g => g.gap > 0).sort((a, b) => b.gap - a.gap);
+    if (gaps.length > 0) maiorOportunidadeTexto = `C${gaps[0].c.numero} (margem de até +${gaps[0].gap} pts)`;
+  }
 
-      <div style="background:var(--bg-elevated); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-lg); padding:16px 18px;">
-        <div style="font-size:0.75rem; font-weight:800; color:#f59e0b; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
-          <span>🚀</span> Maior Oportunidade de Ganho
-        </div>
-        <div style="font-size:1.05rem; font-weight:900; color:var(--text-primary); margin-bottom:4px;">
-          ${escapeHtml(maiorOportunidadeTexto)}
-        </div>
-        <div style="font-size:0.75rem; color:var(--text-secondary); line-height:1.4;">
-          Maior margem matemática de pontuação para buscar os 200 pontos.
-        </div>
-      </div>
+  let metaTexto = '';
+  if (totalValidas === 1) {
+    metaTexto = `Meta sugerida de treino: buscar consolidar a pontuação de ${Math.min(1000, Number(notaAtual) + 40)} pontos na próxima produção.`;
+  } else if (typeof notaAtual === 'number') {
+    const metaPontos = Math.min(1000, Math.max(notaAtual + 40, Number(melhorNota)));
+    metaTexto = `Meta para a Próxima Redação: buscar alcançar <strong>${metaPontos} pontos</strong> (+${metaPontos - notaAtual} pts em relação à nota atual).`;
+  }
 
-      <div style="background:var(--bg-elevated); border:1px solid rgba(124,58,237,0.25); border-radius:var(--radius-lg); padding:16px 18px;">
-        <div style="font-size:0.75rem; font-weight:800; color:var(--color-primary-400); margin-bottom:6px; display:flex; align-items:center; gap:6px;">
-          <span>🎯</span> Meta para a Próxima Redação
-        </div>
-        <div style="font-size:0.83rem; color:var(--text-primary); line-height:1.45;">
-          ${metaTexto}
-        </div>
-      </div>
-    </div>
-  `;
-
-  // 6. Plano de Evolução para a Próxima Redação (baseado em dados reais)
-  const prioridadesEstudo = Array.isArray(maisRecente.avaliacao_ia.prioridades_estudo) ? maisRecente.avaliacao_ia.prioridades_estudo : [];
-  const sugestoes = Array.isArray(maisRecente.avaliacao_ia.sugestoes) ? maisRecente.avaliacao_ia.sugestoes : [];
-  const pontosMelhoria = Array.isArray(maisRecente.avaliacao_ia.pontos_melhoria) ? maisRecente.avaliacao_ia.pontos_melhoria : [];
+  const prioridadesEstudo = Array.isArray(maisRecenteValida?.avaliacao_ia?.prioridades_estudo) ? maisRecenteValida.avaliacao_ia.prioridades_estudo : [];
+  const sugestoes = Array.isArray(maisRecenteValida?.avaliacao_ia?.sugestoes) ? maisRecenteValida.avaliacao_ia.sugestoes : [];
+  const pontosMelhoria = Array.isArray(maisRecenteValida?.avaliacao_ia?.pontos_melhoria) ? maisRecenteValida.avaliacao_ia.pontos_melhoria : [];
   const planoAcoes = [...prioridadesEstudo, ...pontosMelhoria, ...sugestoes].filter(Boolean).slice(0, 4);
 
   const planoEvolucaoHtml = planoAcoes.length > 0 ? `
@@ -1191,61 +1634,263 @@ function renderizarEvolucaoInteligente() {
     </div>
   ` : '';
 
-  // 7. Comparativo Direto entre as Duas Últimas Redações
-  const comparativoDuasUltimasHtml = totalAvaliacoes >= 2 ? `
-    <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:20px 24px; margin-bottom:20px;">
-      <h4 style="font-size:0.95rem; font-weight:800; margin:0 0 14px; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
-        <span>⚖️</span> Comparação Detalhada: Redação Anterior vs. Redação Atual
-      </h4>
-      <div style="overflow-x:auto;">
-        <table style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left;">
-          <thead>
-            <tr style="border-bottom:1px solid var(--border-color); color:var(--text-secondary);">
-              <th style="padding:8px 10px;">Item Avaliado</th>
-              <th style="padding:8px 10px; text-align:center;">Redação Anterior</th>
-              <th style="padding:8px 10px; text-align:center;">Redação Atual</th>
-              <th style="padding:8px 10px; text-align:center;">Variação</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style="border-bottom:1px solid var(--border-color); font-weight:800;">
-              <td style="padding:10px;">Nota Geral</td>
-              <td style="padding:10px; text-align:center;">${notaAnterior} / ${anterior?.avaliacao_ia?.nota_maxima || 1000}</td>
-              <td style="padding:10px; text-align:center; color:var(--color-primary-400);">${notaAtual} / ${maisRecente.avaliacao_ia.nota_maxima || 1000}</td>
-              <td style="padding:10px; text-align:center;">${variacaoBadgeHtml}</td>
-            </tr>
-            ${mudancasComps.map(mc => {
-              const sinal = mc.diff > 0 ? `+${mc.diff} ↑` : mc.diff < 0 ? `${mc.diff} ↓` : `0 →`;
-              const cor = mc.diff > 0 ? '#22c55e' : mc.diff < 0 ? '#ef4444' : 'var(--text-secondary)';
-              return `
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
-                  <td style="padding:8px 10px; color:var(--text-secondary);">C${mc.numero} — ${escapeHtml(mc.nome)}</td>
-                  <td style="padding:8px 10px; text-align:center;">${mc.notaAnt}</td>
-                  <td style="padding:8px 10px; text-align:center; font-weight:700;">${mc.notaAtual}</td>
-                  <td style="padding:8px 10px; text-align:center; font-weight:800; color:${cor};">${sinal}</td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
+  // Bloco do PROFESSOR IA (As 7 Perguntas)
+  let professorIaHtml = '';
+  if (diagnosticoProfessor.estado === 'valido') {
+    const diag = diagnosticoProfessor;
+    const prio = diag.compPrioritaria;
+    const gapPrio = prio ? 200 - prio.media : 0;
+
+    professorIaHtml = `
+      <div id="professor-ia-card" style="background:linear-gradient(180deg, rgba(124,58,237,0.08) 0%, rgba(15,23,42,0.4) 100%); border:2px solid rgba(124,58,237,0.35); border-radius:var(--radius-xl); padding:24px 28px; margin-bottom:24px; box-shadow:0 8px 32px rgba(124,58,237,0.15);">
+        
+        <!-- Topo do Bloco -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; border-bottom:1px solid rgba(124,58,237,0.2); padding-bottom:14px;">
+          <div>
+            <div style="display:inline-flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--color-primary-400); background:rgba(124,58,237,0.16); padding:4px 12px; border-radius:var(--radius-full); margin-bottom:6px;">
+              <span>🎓</span> Mentoria Pedagógica Personalizada
+            </div>
+            <h3 style="font-size:1.45rem; font-weight:900; margin:0; font-family:var(--font-display); color:var(--text-primary);">
+              Professor IA de Redação
+            </h3>
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-secondary); text-align:right;">
+            Orientação baseada em critérios oficiais ENEM
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:20px;">
+
+          <!-- 1. Como estou? -->
+          <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 20px;">
+            <h4 style="font-size:0.95rem; font-weight:800; color:#38bdf8; margin:0 0 8px; display:flex; align-items:center; gap:8px;">
+              <span>📊</span> 1. Como estou?
+            </h4>
+            <div style="font-size:0.88rem; color:var(--text-primary); line-height:1.55;">
+              ${diag.comoEstouTexto}
+            </div>
+          </div>
+
+          <!-- 2. Onde estou perdendo pontos? -->
+          <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 20px;">
+            <h4 style="font-size:0.95rem; font-weight:800; color:#f59e0b; margin:0 0 8px; display:flex; align-items:center; gap:8px;">
+              <span>🎯</span> 2. Onde estou perdendo pontos?
+            </h4>
+            ${prio ? `
+              <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+                <div>
+                  <div style="font-size:1.15rem; font-weight:900; color:var(--text-primary);">
+                    Competência ${prio.numero} — ${escapeHtml(prio.nome)}
+                  </div>
+                  <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">
+                    Média válida: <strong>${prio.media}/200</strong> · Margem de ganho (Gap): <strong style="color:#f59e0b;">+${gapPrio} pontos</strong>
+                  </div>
+                </div>
+                <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.3); border-radius:var(--radius-full); padding:6px 14px; font-size:0.78rem; font-weight:800; color:#f59e0b;">
+                  Principal Oportunidade
+                </div>
+              </div>
+
+              <!-- Barras comparativas de gaps C1-C5 -->
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(100px, 1fr)); gap:8px; margin-top:10px;">
+                ${diag.gapsComps.map(g => {
+                  const ehPrio = g.numero === prio.numero;
+                  const pct = g.media !== null ? Math.round((g.media / 200) * 100) : 0;
+                  return `
+                    <div style="background:${ehPrio ? 'rgba(245,158,11,0.08)' : 'var(--bg-card)'}; border:1px solid ${ehPrio ? '#f59e0b' : 'var(--border-color)'}; border-radius:var(--radius-sm); padding:8px; text-align:center;">
+                      <div style="font-size:0.72rem; font-weight:800; color:${ehPrio ? '#f59e0b' : 'var(--text-secondary)'};">C${g.numero}</div>
+                      <div style="font-size:0.95rem; font-weight:900; color:var(--text-primary); margin:2px 0;">${g.media !== null ? g.media : '—'}</div>
+                      <div style="font-size:0.68rem; color:${ehPrio ? '#f59e0b' : 'var(--text-secondary)'};">gap: ${g.gap !== null ? `+${g.gap}` : '—'}</div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            ` : `
+              <div style="font-size:0.85rem; color:var(--text-secondary);">Dados insuficientes para calcular competência prioritária.</div>
+            `}
+          </div>
+
+          <!-- 3. Por que estou perdendo pontos? -->
+          <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 20px;">
+            <h4 style="font-size:0.95rem; font-weight:800; color:#ef4444; margin:0 0 10px; display:flex; align-items:center; gap:8px;">
+              <span>🧠</span> 3. Por que estou perdendo pontos?
+            </h4>
+            ${diag.problemas.recorrentes.length > 0 ? `
+              <div style="margin-bottom:10px;">
+                <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#ef4444; margin-bottom:6px;">⚠️ Dificuldades Recorrentes (identificadas em múltiplas avaliações):</div>
+                <ul style="margin:0; padding-left:18px; font-size:0.84rem; color:var(--text-primary); line-height:1.55;">
+                  ${diag.problemas.recorrentes.map(p => `<li><strong>${escapeHtml(p.descricao)}</strong> (observado ${p.ocorrencias}x nas suas redações)</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+
+            ${diag.problemas.pontosAtencao.length > 0 ? `
+              <div>
+                <div style="font-size:0.75rem; font-weight:800; text-transform:uppercase; color:#f59e0b; margin-bottom:6px;">🔍 Pontos de Atenção na Competência ${prio?.numero || ''}:</div>
+                <ul style="margin:0; padding-left:18px; font-size:0.84rem; color:var(--text-primary); line-height:1.55;">
+                  ${diag.problemas.pontosAtencao.slice(0, 3).map(p => `<li>${escapeHtml(p.descricao)}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+
+            ${diag.problemas.recorrentes.length === 0 && diag.problemas.pontosAtencao.length === 0 ? `
+              <div style="font-size:0.85rem; color:var(--text-secondary); line-height:1.5;">
+                ${diag.justificativasReais.length > 0 ? escapeHtml(diag.justificativasReais[diag.justificativasReais.length - 1]) : 'Aprofundamento e precisão nos critérios da competência prioritária.'}
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- 4. O que devo estudar? -->
+          <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 20px;">
+            <h4 style="font-size:0.95rem; font-weight:800; color:var(--color-primary-400); margin:0 0 10px; display:flex; align-items:center; gap:8px;">
+              <span>📚</span> 4. O que devo estudar? (${escapeHtml(diag.conteudoEstudo.titulo)})
+            </h4>
+            <ul style="margin:0; padding-left:18px; font-size:0.84rem; color:var(--text-primary); line-height:1.6;">
+              ${diag.conteudoEstudo.topicos.map(t => `<li>${escapeHtml(t)}</li>`).join('')}
+            </ul>
+          </div>
+
+          <!-- 5. O que devo treinar? -->
+          <div style="background:var(--bg-elevated); border:1px solid rgba(124,58,237,0.3); border-radius:var(--radius-lg); padding:18px 20px;">
+            <h4 style="font-size:0.95rem; font-weight:800; color:#38bdf8; margin:0 0 8px; display:flex; align-items:center; gap:8px;">
+              <span>✍️</span> 5. O que devo treinar?
+            </h4>
+            <div style="font-size:0.88rem; font-weight:700; color:var(--text-primary); margin-bottom:6px;">
+              ${escapeHtml(diag.treinoFocal.titulo)}
+            </div>
+            <p style="font-size:0.84rem; color:var(--text-secondary); margin:0 0 10px; line-height:1.5;">
+              ${escapeHtml(diag.treinoFocal.instrucao)}
+            </p>
+            <div style="background:rgba(255,255,255,0.03); border:1px dashed var(--border-color); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.8rem; color:var(--text-secondary); margin-bottom:14px;">
+              💡 <strong>Exemplo de aplicação:</strong> ${escapeHtml(diag.treinoFocal.exemplo)}
+            </div>
+
+            <!-- Botão Começar Treino -->
+            <button id="btn-comecar-treino-ia" class="btn btn-primary" style="font-weight:800; font-size:0.88rem; padding:10px 22px; display:inline-flex; align-items:center; gap:8px; box-shadow:0 4px 16px rgba(124,58,237,0.4);" data-competencia="${prio?.numero || 1}">
+              🚀 Começar Treino (${prio ? `C${prio.numero}` : 'Redação'})
+            </button>
+          </div>
+
+          <!-- 6. Qual minha próxima meta? -->
+          <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 20px;">
+            <h4 style="font-size:0.95rem; font-weight:800; color:#22c55e; margin:0 0 10px; display:flex; align-items:center; gap:8px;">
+              <span>🎯</span> 6. Qual minha próxima meta?
+            </h4>
+            <div style="display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+              ${prio ? `
+                <div style="background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.3); border-radius:var(--radius-md); padding:10px 16px;">
+                  <div style="font-size:0.72rem; font-weight:800; color:#22c55e; text-transform:uppercase;">Meta da Competência ${prio.numero}</div>
+                  <div style="font-size:1.15rem; font-weight:900; color:var(--text-primary); margin-top:2px;">
+                    C${prio.numero}: ${prio.media} → <span style="color:#22c55e;">${diag.metaComp} pts</span>
+                  </div>
+                </div>
+              ` : ''}
+
+              <div style="flex:1; min-width:220px; font-size:0.85rem; color:var(--text-primary); line-height:1.5;">
+                ${diag.metaGlobalTexto}
+              </div>
+            </div>
+          </div>
+
+          <!-- 7. Como melhorar na próxima redação? -->
+          <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:16px 20px;">
+            <h4 style="font-size:0.95rem; font-weight:800; color:var(--color-primary-400); margin:0 0 10px; display:flex; align-items:center; gap:8px;">
+              <span>📋</span> 7. Como melhorar na próxima redação? (Checklist Prático)
+            </h4>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              ${diag.checklist.map((item, idx) => `
+                <label style="display:flex; align-items:flex-start; gap:10px; font-size:0.83rem; color:var(--text-primary); cursor:pointer;">
+                  <input type="checkbox" style="margin-top:2px; accent-color:var(--color-primary-500);" id="chk-prof-ia-${idx}" />
+                  <span>${escapeHtml(item)}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Disclaimer Oficial Obrigatório -->
+        <div style="margin-top:22px; padding:12px 16px; border-radius:var(--radius-md); background:rgba(255,255,255,0.02); border:1px solid var(--border-color); font-size:0.78rem; color:var(--text-secondary); text-align:center;">
+          Estimativa pedagógica baseada nos critérios do ENEM. Não constitui correção oficial da banca.
+        </div>
+
       </div>
-    </div>
-  ` : '';
+    `;
+  }
+
+  // 4. Comparativo Direto entre as Duas Últimas Válidas
+  const comparativoDuasUltimasHtml = (totalValidas >= 2 && !temDiscrepanciaCritica) ? (() => {
+    return `
+      <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:20px 24px; margin-bottom:20px;">
+        <h4 style="font-size:0.95rem; font-weight:800; margin:0 0 14px; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+          <span>⚖️</span> Comparação Detalhada: Redação Anterior vs. Redação Atual
+        </h4>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:0.82rem; text-align:left;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border-color); color:var(--text-secondary);">
+                <th style="padding:8px 10px;">Item Avaliado</th>
+                <th style="padding:8px 10px; text-align:center;">Redação Anterior</th>
+                <th style="padding:8px 10px; text-align:center;">Redação Atual</th>
+                <th style="padding:8px 10px; text-align:center;">Variação</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border-color); font-weight:800;">
+                <td style="padding:10px;">Nota Geral</td>
+                <td style="padding:10px; text-align:center;">${notaAnterior} / 1000</td>
+                <td style="padding:10px; text-align:center; color:var(--color-primary-400);">${notaAtual} / 1000</td>
+                <td style="padding:10px; text-align:center;">${variacaoBadgeHtml}</td>
+              </tr>
+              ${mudancasComps.map(mc => {
+                const sinal = mc.diff > 0 ? `+${mc.diff} ↑` : mc.diff < 0 ? `${mc.diff} ↓` : `0 →`;
+                const cor = mc.diff > 0 ? '#22c55e' : mc.diff < 0 ? '#ef4444' : 'var(--text-secondary)';
+                return `
+                  <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+                    <td style="padding:8px 10px; color:var(--text-secondary);">C${mc.numero} — ${escapeHtml(mc.nome)}</td>
+                    <td style="padding:8px 10px; text-align:center;">${mc.notaAnt}</td>
+                    <td style="padding:8px 10px; text-align:center; font-weight:700;">${mc.notaAtual}</td>
+                    <td style="padding:8px 10px; text-align:center; font-weight:800; color:${cor};">${sinal}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  })() : '';
 
   // Renderização final consolidada
   container.innerHTML = `
     ${renderizarBarraFiltrosEvolucao(bancasDisponiveis, filtroBancaEvolucao)}
+    ${alertaInconclusivoHtml}
     ${avisoUmaRedacao}
     ${cardsMetricasHtml}
+    ${professorIaHtml}
     ${graficoHtml}
     ${evolucaoCompsHtml}
     ${oQueMudouHtml}
-    ${diagnosticoHtml}
     ${planoEvolucaoHtml}
     ${comparativoDuasUltimasHtml}
   `;
 
   vincularEventosFiltroEvolucao();
+
+  // Vincula evento do botão "Começar Treino"
+  const btnTreino = document.getElementById('btn-comecar-treino-ia');
+  if (btnTreino) {
+    btnTreino.addEventListener('click', () => {
+      // Abre a primeira proposta disponível compatível no editor para prática focal
+      const compNum = btnTreino.dataset.competencia || '1';
+      const propostaParaTreino = propostasLista.find(p => p.vestibular_id?.toLowerCase() === 'enem') || propostasLista[0];
+      if (propostaParaTreino) {
+        iniciarEditor(propostaParaTreino);
+      } else {
+        document.getElementById('tab-btn-propostas')?.click();
+      }
+    });
+  }
 }
 
 function renderizarBarraFiltrosEvolucao(bancasDisponiveis, selecionada) {
@@ -1277,6 +1922,7 @@ function vincularEventosFiltroEvolucao() {
     });
   });
 }
+
 
 /**
  * Renderiza o bloco de avaliação da IA (ou convite para iniciar)

@@ -1035,7 +1035,631 @@ async function runTests() {
     pass(`REGRESSÃO — Herança africana (480→920): inconsistente, +440 pts, C${disc.discrepanciaCompetencia?.competencia} variou ${disc.discrepanciaCompetencia?.diferenca} pts`);
   } catch (e) { fail('REGRESSÃO', e); }
 
-  // TESTE REAL (opcional)
+
+  // ── ETAPA 25 — PROFESSOR IA & EVOLUÇÃO PERSONALIZADA ─────────────────────
+
+  // Teste 48 — Isolamento determinístico de inconsistência (caso 480→920 não gera evolução +440)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+
+    // Validação da existência das funções determinísticas
+    assert.ok(src.includes('auditarAvaliacoesRedacao'), 'Função auditarAvaliacoesRedacao presente');
+    assert.ok(src.includes('gerarDiagnosticoProfessorIA'), 'Função gerarDiagnosticoProfessorIA presente');
+    assert.ok(src.includes('determinarCompetenciaPrioritaria'), 'Função determinarCompetenciaPrioritaria presente');
+    assert.ok(src.includes('calcularProximaMeta'), 'Função calcularProximaMeta presente');
+    assert.ok(src.includes('gerarTreinoFocal'), 'Função gerarTreinoFocal presente');
+    assert.ok(src.includes('gerarChecklist'), 'Função gerarChecklist presente');
+
+    // Simulação do caso 480 → 920
+    const r1 = {
+      data_envio: '2026-10-01T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 480,
+        competencias: [{ numero: 1, nota: 160 }, { numero: 2, nota: 120 }, { numero: 3, nota: 120 }, { numero: 4, nota: 40 }, { numero: 5, nota: 40 }]
+      }
+    };
+    const r2Inconsistente = {
+      data_envio: '2026-10-01T11:00:00Z',
+      avaliacao_ia: {
+        nota_total: 920,
+        avaliacao_inconsistente: true,
+        competencias: [{ numero: 1, nota: 200 }, { numero: 2, nota: 160 }, { numero: 3, nota: 200 }, { numero: 4, nota: 200 }, { numero: 5, nota: 160 }]
+      }
+    };
+
+    // Função de auditoria do redacao.js
+    const auditarFunc = new Function('lista', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function calcularMediasCompetencias'))}
+      return auditarAvaliacoesRedacao(lista);
+    `);
+
+    const resAuditoria = auditarFunc([r1, r2Inconsistente]);
+    assert.equal(resAuditoria.todas.length, 2, 'Histórico completo preservado (2 redações)');
+    assert.equal(resAuditoria.validas.length, 1, 'Apenas 1 avaliação considerada pedagogicamente válida');
+    assert.equal(resAuditoria.inconsistentes.length, 1, '1 avaliação classificada como inconsistente');
+    assert.equal(resAuditoria.temDiscrepanciaCritica, true, 'Discrepância crítica identificada');
+    assert.equal(resAuditoria.validas[0].avaliacao_ia.nota_total, 480, 'Avaliação válida preservada é a 480');
+
+    pass('48 — ETAPA 25: Auditoria determinística isola 480→920 e não considera +440 como evolução');
+  } catch (e) { fail('48', e); }
+
+  // Teste 49 — Caso 0 redações (estado vazio, sem inventar dados)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const diagFunc = new Function('validas', 'inconsistentes', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function renderizarEvolucaoInteligente'))}
+      return gerarDiagnosticoProfessorIA(validas, inconsistentes);
+    `);
+
+    const diag = diagFunc([], []);
+    assert.equal(diag.estado, 'vazio', 'Estado vazio retornado');
+    assert.ok(diag.mensagem.includes('Ainda preciso de uma redação'), 'Mensagem amigável de início');
+    pass('49 — ETAPA 25: Caso 0 redações exibe estado vazio sem inventar média ou evolução');
+  } catch (e) { fail('49', e); }
+
+  // Teste 50 — Caso 1 redação válida (diagnóstico inicial sem comparação histórica falsa)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const diagFunc = new Function('validas', 'inconsistentes', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function renderizarEvolucaoInteligente'))}
+      return gerarDiagnosticoProfessorIA(validas, inconsistentes);
+    `);
+
+    const r1 = {
+      data_envio: '2026-10-01T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 640,
+        competencias: [
+          { numero: 1, nota: 160, nome: 'C1' },
+          { numero: 2, nota: 120, nome: 'C2' },
+          { numero: 3, nota: 120, nome: 'C3' },
+          { numero: 4, nota: 120, nome: 'C4' },
+          { numero: 5, nota: 120, nome: 'C5' }
+        ]
+      }
+    };
+
+    const diag = diagFunc([r1], []);
+    assert.equal(diag.estado, 'valido');
+    assert.equal(diag.totalValidas, 1);
+    assert.equal(diag.notaAnterior, null, 'Sem nota anterior');
+    assert.equal(diag.variacaoValida, null, 'Sem variação percentual falsa');
+    assert.ok(diag.comoEstouTexto.includes('primeiro diagnóstico'), 'Informa ser primeiro diagnóstico');
+    assert.ok(diag.metaGlobalTexto.includes('680 pontos'), 'Meta para próxima produção busca consolidar degrau de +40 pts');
+    pass('50 — ETAPA 25: Caso 1 redação fornece diagnóstico sem calcular evolução percentual');
+  } catch (e) { fail('50', e); }
+
+  // Teste 51 — Caso 2 ou mais redações válidas: evolução positiva (+80)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const diagFunc = new Function('validas', 'inconsistentes', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function renderizarEvolucaoInteligente'))}
+      return gerarDiagnosticoProfessorIA(validas, inconsistentes);
+    `);
+
+    const r1 = {
+      data_envio: '2026-10-01T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 600,
+        competencias: [{ numero: 1, nota: 120 }, { numero: 2, nota: 120 }, { numero: 3, nota: 120 }, { numero: 4, nota: 120 }, { numero: 5, nota: 120 }]
+      }
+    };
+    const r2 = {
+      data_envio: '2026-10-03T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 680,
+        competencias: [{ numero: 1, nota: 160 }, { numero: 2, nota: 120 }, { numero: 3, nota: 120 }, { numero: 4, nota: 120 }, { numero: 5, nota: 160 }]
+      }
+    };
+
+    const diag = diagFunc([r1, r2], []);
+    assert.equal(diag.totalValidas, 2);
+    assert.equal(diag.variacaoValida, 80, 'Evolução válida calculada (+80 pts)');
+    assert.equal(diag.mediaGeralValida, 640, 'Média geral calculada: 640 pts');
+    assert.ok(diag.comoEstouTexto.includes('+80 pontos'), 'Feedback textual reflete a evolução real');
+    pass('51 — ETAPA 25: Evolução positiva (+80) calculada deterministicamente');
+  } catch (e) { fail('51', e); }
+
+  // Teste 52 — Caso 2 ou mais redações válidas: evolução negativa (-40)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const diagFunc = new Function('validas', 'inconsistentes', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function renderizarEvolucaoInteligente'))}
+      return gerarDiagnosticoProfessorIA(validas, inconsistentes);
+    `);
+
+    const r1 = {
+      data_envio: '2026-10-01T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 720,
+        competencias: [{ numero: 1, nota: 160 }, { numero: 2, nota: 160 }, { numero: 3, nota: 160 }, { numero: 4, nota: 120 }, { numero: 5, nota: 120 }]
+      }
+    };
+    const r2 = {
+      data_envio: '2026-10-03T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 680,
+        competencias: [{ numero: 1, nota: 160 }, { numero: 2, nota: 120 }, { numero: 3, nota: 160 }, { numero: 4, nota: 120 }, { numero: 5, nota: 120 }]
+      }
+    };
+
+    const diag = diagFunc([r1, r2], []);
+    assert.equal(diag.variacaoValida, -40, 'Variação negativa calculada (-40 pts)');
+    assert.ok(diag.comoEstouTexto.includes('-40 pontos'), 'Texto reporta oscilação com clareza');
+    pass('52 — ETAPA 25: Evolução negativa (-40) calculada deterministicamente');
+  } catch (e) { fail('52', e); }
+
+  // Teste 53 — Competência prioritária: menor média e cálculo do gap
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const helperFunc = new Function('redacoes', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function extrairProblemasRecorrentes'))}
+      const medias = calcularMediasCompetencias(redacoes);
+      const gaps = calcularGapsCompetencias(medias);
+      const prio = determinarCompetenciaPrioritaria(medias);
+      return { medias, gaps, prio };
+    `);
+
+    const r = [{
+      avaliacao_ia: {
+        competencias: [
+          { numero: 1, nota: 160, nome: 'C1' },
+          { numero: 2, nota: 160, nome: 'C2' },
+          { numero: 3, nota: 80,  nome: 'C3' },
+          { numero: 4, nota: 120, nome: 'C4' },
+          { numero: 5, nota: 200, nome: 'C5' }
+        ]
+      }
+    }];
+
+    const { gaps, prio } = helperFunc(r);
+    assert.equal(prio.numero, 3, 'C3 tem menor média (80)');
+    const gapC3 = gaps.find(g => g.numero === 3);
+    assert.equal(gapC3.gap, 120, 'Gap de C3 é 200 - 80 = 120 pts');
+    pass('53 — ETAPA 25: Competência prioritária C3 e gap de 120 calculados corretamente');
+  } catch (e) { fail('53', e); }
+
+  // Teste 54 — Critério de desempate: menor média → maior gap → menor número (C2 vs C3)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const prioFunc = new Function('medias', `
+      ${src.substring(src.indexOf('function determinarCompetenciaPrioritaria'), src.indexOf('function extrairProblemasRecorrentes'))}
+      return determinarCompetenciaPrioritaria(medias);
+    `);
+
+    // Cenário da especificação: C1=160, C2=120, C3=120, C4=160, C5=200
+    // C2 e C3 empatam em média (120) e gap (80). Desempate deve ser C2 (menor número).
+    const medias = [
+      { numero: 1, media: 160, nome: 'C1' },
+      { numero: 2, media: 120, nome: 'C2' },
+      { numero: 3, media: 120, nome: 'C3' },
+      { numero: 4, media: 160, nome: 'C4' },
+      { numero: 5, media: 200, nome: 'C5' }
+    ];
+
+    const prio = prioFunc(medias);
+    assert.equal(prio.numero, 2, 'Desempate entre C2 e C3 escolhe C2 deterministicamente');
+    pass('54 — ETAPA 25: Desempate determinístico seleciona C2 (menor número da competência)');
+  } catch (e) { fail('54', e); }
+
+  // Teste 55 — Extração de problemas recorrentes vs pontos de atenção
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const probsFunc = new Function('redacoes', 'numComp', `
+      ${src.substring(src.indexOf('function extrairProblemasRecorrentes'), src.indexOf('function gerarConteudoEstudo'))}
+      return extrairProblemasRecorrentes(redacoes, numComp);
+    `);
+
+    const r1 = {
+      avaliacao_ia: {
+        competencias: [
+          { numero: 3, problemas: [{ descricao: 'Falta de aprofundamento dos argumentos' }] }
+        ]
+      }
+    };
+    const r2 = {
+      avaliacao_ia: {
+        competencias: [
+          { numero: 3, problemas: [
+            { descricao: 'Falta de aprofundamento dos argumentos' },
+            { descricao: 'Uso de afirmação genérica sem consequência' }
+          ] }
+        ]
+      }
+    };
+
+    const res = probsFunc([r1, r2], 3);
+    assert.equal(res.recorrentes.length, 1, '1 problema recorrente detectado');
+    assert.ok(res.recorrentes[0].descricao.includes('Falta de aprofundamento'), 'Descrição do recorrente');
+    assert.equal(res.recorrentes[0].ocorrencias, 2, 'Aparece em 2 redações');
+    assert.equal(res.pontosAtencao.length, 1, '1 ponto de atenção isolado');
+    assert.ok(res.pontosAtencao[0].descricao.includes('afirmação genérica'), 'Ponto de atenção isolado correto');
+    pass('55 — ETAPA 25: Problema recorrente (2x) diferenciado de ponto de atenção (1x)');
+  } catch (e) { fail('55', e); }
+
+  // Teste 56 — Cálculo de meta em degraus seguros de 40 pontos
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const metaFunc = new Function('media', 'max', `
+      ${src.substring(src.indexOf('function calcularProximaMeta'), src.indexOf('function gerarChecklist'))}
+      return calcularProximaMeta(media, max);
+    `);
+
+    // Casos da especificação:
+    // C3 média 144 → 160
+    assert.equal(metaFunc(144, 200), 160, 'Média 144 projeta meta 160');
+    // C3 média 120 → 160
+    assert.equal(metaFunc(120, 200), 160, 'Média 120 projeta meta 160');
+    // C3 média 160 → 200
+    assert.equal(metaFunc(160, 200), 200, 'Média 160 projeta meta 200');
+    // C3 média 200 → 200 (teto)
+    assert.equal(metaFunc(200, 200), 200, 'Média 200 mantém 200');
+    // Ausência de dados
+    assert.equal(metaFunc(null, 200), null, 'Média nula retorna nulo');
+    pass('56 — ETAPA 25: Cálculo de meta em degraus progressivos de 40 pontos validado');
+  } catch (e) { fail('56', e); }
+
+  // Teste 57 — Conteúdo de estudo alinhado deterministamente com a competência prioritária
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const estudoFunc = new Function('num', `
+      ${src.substring(src.indexOf('function gerarConteudoEstudo'), src.indexOf('function gerarTreinoFocal'))}
+      return gerarConteudoEstudo(num);
+    `);
+
+    const c1Estudo = estudoFunc(1);
+    assert.ok(c1Estudo.topicos.some(t => t.toLowerCase().includes('concordância')), 'C1 contém concordância');
+    const c3Estudo = estudoFunc(3);
+    assert.ok(c3Estudo.topicos.some(t => t.toLowerCase().includes('progressão')), 'C3 contém progressão argumentativa');
+    const c5Estudo = estudoFunc(5);
+    assert.ok(c5Estudo.topicos.some(t => t.toLowerCase().includes('agente')), 'C5 contém agentes da intervenção');
+    pass('57 — ETAPA 25: Conteúdo de estudo mapeado com precisão para cada competência');
+  } catch (e) { fail('57', e); }
+
+  // Teste 58 — Treino focal acionável para a competência prioritária
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const treinoFunc = new Function('num', `
+      ${src.substring(src.indexOf('function gerarTreinoFocal'), src.indexOf('function calcularProximaMeta'))}
+      return gerarTreinoFocal(num);
+    `);
+
+    const t3 = treinoFunc(3);
+    assert.ok(t3.instrucao.includes('desenvolvimento'), 'Treino de C3 foca em parágrafo de desenvolvimento');
+    assert.ok(t3.exemplo.toLowerCase().includes('consequência'), 'Exemplo de C3 ensina estrutura com consequência');
+    const t5 = treinoFunc(5);
+    assert.ok(t5.instrucao.includes('proposta de intervenção'), 'Treino de C5 foca em proposta');
+    pass('58 — ETAPA 25: Treino focal acionável disponível para C1 a C5');
+  } catch (e) { fail('58', e); }
+
+  // Teste 59 — Checklist prático por competência
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const checkFunc = new Function('num', `
+      ${src.substring(src.indexOf('function gerarChecklist'), src.indexOf('function gerarDiagnosticoProfessorIA'))}
+      return gerarChecklist(num);
+    `);
+
+    const chk3 = checkFunc(3);
+    assert.ok(Array.isArray(chk3) && chk3.length >= 4, 'Checklist de C3 possui itens suficientes');
+    assert.ok(chk3.some(item => item.includes('tese')), 'Checklist de C3 questiona clareza da tese');
+    assert.ok(chk3.some(item => item.includes('argumentos')), 'Checklist de C3 questiona explicação dos argumentos');
+    pass('59 — ETAPA 25: Checklist prático gerado deterministicamente');
+  } catch (e) { fail('59', e); }
+
+  // Teste 60 — Respostas completas às 7 Perguntas do Professor IA
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const diagFunc = new Function('validas', 'inconsistentes', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function renderizarEvolucaoInteligente'))}
+      return gerarDiagnosticoProfessorIA(validas, inconsistentes);
+    `);
+
+    const r1 = {
+      data_envio: '2026-10-01T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 680,
+        competencias: [
+          { numero: 1, nota: 160, nome: 'Domínio da modalidade escrita' },
+          { numero: 2, nota: 160, nome: 'Compreensão do tema e repertório' },
+          { numero: 3, nota: 120, nome: 'Seleção e organização de argumentos', problemas: [{ descricao: 'Argumentos superficiais sem detalhamento' }] },
+          { numero: 4, nota: 120, nome: 'Mecanismos linguísticos de coesão' },
+          { numero: 5, nota: 120, nome: 'Proposta de intervenção' }
+        ]
+      }
+    };
+    const r2 = {
+      data_envio: '2026-10-03T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 720,
+        competencias: [
+          { numero: 1, nota: 160, nome: 'Domínio da modalidade escrita' },
+          { numero: 2, nota: 160, nome: 'Compreensão do tema e repertório' },
+          { numero: 3, nota: 120, nome: 'Seleção e organização de argumentos', problemas: [{ descricao: 'Argumentos superficiais sem detalhamento' }] },
+          { numero: 4, nota: 120, nome: 'Mecanismos linguísticos de coesão' },
+          { numero: 5, nota: 160, nome: 'Proposta de intervenção' }
+        ]
+      }
+    };
+
+    const diag = diagFunc([r1, r2], []);
+    // 1. Como estou?
+    assert.ok(typeof diag.comoEstouTexto === 'string' && diag.comoEstouTexto.length > 0, 'Resposta 1: Como estou');
+    // 2. Onde estou perdendo pontos?
+    assert.ok(diag.compPrioritaria.numero === 3, 'Resposta 2: Onde estou perdendo pontos (C3)');
+    assert.equal(diag.ondePercoPontosTexto.gap, 80, 'Gap de 80 pontos em C3');
+    // 3. Por que estou perdendo pontos?
+    assert.equal(diag.problemas.recorrentes.length, 1, 'Resposta 3: Problema recorrente identificado');
+    // 4. O que devo estudar?
+    assert.ok(diag.conteudoEstudo.topicos.length >= 3, 'Resposta 4: Tópicos teóricos presentes');
+    // 5. O que devo treinar?
+    assert.ok(typeof diag.treinoFocal.instrucao === 'string', 'Resposta 5: Treino prático presente');
+    // 6. Qual minha próxima meta?
+    assert.equal(diag.metaComp, 160, 'Resposta 6: Meta de C3 para 160');
+    // 7. Como melhorar na próxima redação?
+    assert.ok(diag.checklist.length >= 4, 'Resposta 7: Checklist prático presente');
+
+    pass('60 — ETAPA 25: As 7 perguntas pedagógicas fundamentais respondidas com precisão');
+  } catch (e) { fail('60', e); }
+
+  // Teste 61 — Presença do Disclaimer Oficial e Botão de Treino no redacao.js
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+
+    assert.ok(
+      src.includes('Estimativa pedagógica baseada nos critérios do ENEM. Não constitui correção oficial da banca.'),
+      'Disclaimer oficial obrigatório presente no componente do Professor IA'
+    );
+    assert.ok(
+      src.includes('btn-comecar-treino-ia'),
+      'Botão interativo "Começar Treino" presente no componente'
+    );
+    assert.ok(
+      src.includes('⚠️ Evolução inconclusiva'),
+      'Identificação e renderização do banner "Evolução inconclusiva" presente'
+    );
+
+    pass('61 — ETAPA 25: Disclaimer oficial, botão de treino e banner inconclusivo confirmados');
+  } catch (e) { fail('61', e); }
+
+  // ── ETAPA 25.1: TESTES DE AUDITORIA DE PRODUÇÃO ───────────────────────────
+
+  // Teste 62 — Auditoria: Isolamento estrito de discrepância 480→920 (sem +440 na evolução)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const auditarFunc = new Function('lista', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function calcularMediasCompetencias'))}
+      return auditarAvaliacoesRedacao(lista);
+    `);
+
+    const rA = {
+      id: 'red-480',
+      data_envio: '2026-10-01T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 480,
+        competencias: [{ numero: 1, nota: 80 }, { numero: 2, nota: 80 }, { numero: 3, nota: 120 }, { numero: 4, nota: 80 }, { numero: 5, nota: 120 }]
+      }
+    };
+    const rB = {
+      id: 'red-920',
+      data_envio: '2026-10-02T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 920,
+        competencias: [{ numero: 1, nota: 160 }, { numero: 2, nota: 200 }, { numero: 3, nota: 200 }, { numero: 4, nota: 160 }, { numero: 5, nota: 200 }]
+      }
+    };
+
+    const res = auditarFunc([rA, rB]);
+    assert.equal(res.temDiscrepanciaCritica, true, 'Detecta discrepância crítica');
+    assert.equal(res.validas.length, 1, 'Apenas 1 avaliação considerada válida para cálculo');
+    assert.equal(res.inconsistentes.length, 1, 'Avaliação inconsistente de 920 foi isolada');
+    assert.equal(res.inconsistentes[0].id, 'red-920', 'rB isolada do cálculo de evolução');
+
+    pass('62 — ETAPA 25.1: Caso 480→920 isolado rigorosamente sem falsa evolução');
+  } catch (e) { fail('62', e); }
+
+  // Teste 63 — Auditoria: Trava de teto de metas (1000 total e 200 competência)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const calcMeta = new Function('atual', 'max', `
+      ${src.substring(src.indexOf('function calcularProximaMeta'), src.indexOf('function gerarChecklist'))}
+      return calcularProximaMeta(atual, max);
+    `);
+
+    assert.equal(calcMeta(600, 1000), 640, '600 avança para 640');
+    assert.equal(calcMeta(960, 1000), 1000, '960 avança para 1000');
+    assert.equal(calcMeta(1000, 1000), 1000, '1000 permanece no teto de 1000');
+    assert.equal(calcMeta(160, 200), 200, '160 avança para 200');
+    assert.equal(calcMeta(200, 200), 200, '200 permanece no teto de 200');
+
+    pass('63 — ETAPA 25.1: Metas respeitam tetos (200 para comp, 1000 para total)');
+  } catch (e) { fail('63', e); }
+
+  // Teste 64 — Auditoria: Todas as 5 competências funcionam como prioritárias
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const engine = new Function('numPrio', `
+      ${src.substring(src.indexOf('function gerarConteudoEstudo'), src.indexOf('function calcularProximaMeta'))}
+      return {
+        estudo: gerarConteudoEstudo(numPrio),
+        treino: gerarTreinoFocal(numPrio)
+      };
+    `);
+
+    for (let c = 1; c <= 5; c++) {
+      const res = engine(c);
+      assert.ok(res.estudo.topicos.length >= 3, `C${c} tem tópicos de estudo`);
+      assert.ok(res.treino.instrucao.length > 10, `C${c} tem treino acionável`);
+      assert.ok(res.treino.exemplo.length > 5, `C${c} tem exemplo prático`);
+    }
+
+    pass('64 — ETAPA 25.1: C1 a C5 operam perfeitamente como competência prioritária');
+  } catch (e) { fail('64', e); }
+
+  // Teste 65 — Auditoria: Recorrência real entre redações distintas vs ocorrência na mesma redação
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const extrairFunc = new Function('redacoes', 'comp', `
+      ${src.substring(src.indexOf('function extrairProblemasRecorrentes'), src.indexOf('function gerarConteudoEstudo'))}
+      return extrairProblemasRecorrentes(redacoes, comp);
+    `);
+
+    // Caso A: 2 problemas com a mesma descrição na MESMA redação -> Não deve ser classificado como recorrente
+    const mesmaRedacao = [{
+      id: 'red-1',
+      avaliacao_ia: {
+        competencias: [{
+          numero: 1,
+          problemas: [
+            { descricao: 'Concordância verbal com falha grave' },
+            { descricao: 'Concordância verbal com falha grave' }
+          ]
+        }]
+      }
+    }];
+    const resA = extrairFunc(mesmaRedacao, 1);
+    assert.equal(resA.recorrentes.length, 0, 'Mesma redação com múltiplos apontamentos não gera problema recorrente falso');
+    assert.equal(resA.pontosAtencao.length, 1, 'Classificado como ponto de atenção único');
+
+    // Caso B: Mesmo problema em 2 redações DIFERENTES -> Deve ser classificado como recorrente
+    const duasRedacoes = [
+      {
+        id: 'red-1',
+        avaliacao_ia: {
+          competencias: [{ numero: 1, problemas: [{ descricao: 'Concordância verbal com falha grave' }] }]
+        }
+      },
+      {
+        id: 'red-2',
+        avaliacao_ia: {
+          competencias: [{ numero: 1, problemas: [{ descricao: 'Concordância verbal com falha grave' }] }]
+        }
+      }
+    ];
+    const resB = extrairFunc(duasRedacoes, 1);
+    assert.equal(resB.recorrentes.length, 1, 'Problema em duas redações distintas torna-se recorrente');
+    assert.equal(resB.recorrentes[0].ocorrencias, 2, 'Contabiliza 2 ocorrências distintas');
+
+    pass('65 — ETAPA 25.1: Recorrência baseada estritamente em avaliações/redações distintas');
+  } catch (e) { fail('65', e); }
+
+  // Teste 66 — Auditoria: Empate múltiplo C1=C2=C3=C4=C5 escolhe C1 deterministicamente
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const detPrio = new Function('medias', `
+      ${src.substring(src.indexOf('function determinarCompetenciaPrioritaria'), src.indexOf('function extrairProblemasRecorrentes'))}
+      return determinarCompetenciaPrioritaria(medias);
+    `);
+
+    const empateTodos = [
+      { numero: 1, media: 120 },
+      { numero: 2, media: 120 },
+      { numero: 3, media: 120 },
+      { numero: 4, media: 120 },
+      { numero: 5, media: 120 }
+    ];
+    const prio = detPrio(empateTodos);
+    assert.equal(prio.numero, 1, 'Empate quíntuplo seleciona C1');
+
+    const empateC3C4 = [
+      { numero: 1, media: 160 },
+      { numero: 2, media: 160 },
+      { numero: 3, media: 120 },
+      { numero: 4, media: 120 },
+      { numero: 5, media: 160 }
+    ];
+    const prioC3C4 = detPrio(empateC3C4);
+    assert.equal(prioC3C4.numero, 3, 'Empate C3 vs C4 seleciona C3');
+
+    pass('66 — ETAPA 25.1: Desempate determinístico rigoroso (ordem natural das competências)');
+  } catch (e) { fail('66', e); }
+
+  // Teste 67 — Auditoria: Resiliência a dados incompletos ou corrompidos sem quebrar
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const diagFunc = new Function('validas', 'inconsistentes', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function renderizarEvolucaoInteligente'))}
+      return gerarDiagnosticoProfessorIA(validas, inconsistentes);
+    `);
+
+    const redIncompleta = {
+      id: 'red-incompleta',
+      data_envio: '2026-10-01T00:00:00Z',
+      avaliacao_ia: {
+        nota_total: 600,
+        // competencias sem problemas, sem justificativa, sem analise
+        competencias: [
+          { numero: 1, nota: 120 },
+          { numero: 2, nota: 120 },
+          { numero: 3, nota: 120 },
+          { numero: 4, nota: 120 },
+          { numero: 5, nota: 120 }
+        ]
+      }
+    };
+
+    const diag = diagFunc([redIncompleta], []);
+    assert.equal(diag.estado, 'valido', 'Diagnóstico conclui com estado válido');
+    assert.equal(diag.compPrioritaria.numero, 1, 'Competência identificada');
+    assert.ok(diag.checklist.length > 0, 'Checklist gerado');
+    assert.ok(diag.conteudoEstudo.topicos.length > 0, 'Conteúdo de estudo gerado');
+
+    pass('67 — ETAPA 25.1: Resiliência comprovada com dados incompletos');
+  } catch (e) { fail('67', e); }
+
+  // Teste 68 — Auditoria: Isolamento e formato da chave localStorage por usuário
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+
+    assert.ok(src.includes('getHistoricoKey(sessionUserId)'), 'getHistoricoKey amarrado à sessionUserId');
+    assert.ok(src.includes('STORAGE_PREFIX_HISTORICO'), 'Prefixo STORAGE_PREFIX_HISTORICO confirmado');
+
+    pass('68 — ETAPA 25.1: Isolamento de localStorage por usuário verificado no código');
+  } catch (e) { fail('68', e); }
+
+  // ── TESTE REAL (opcional) ─────────────────────────────────────────────────
   total++;
   if (process.env.GROQ_API_KEY) {
     try {
