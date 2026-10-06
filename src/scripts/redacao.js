@@ -856,7 +856,21 @@ let filtroBancaEvolucao = 'todas';
 function auditarAvaliacaoInconsistente(av, avAnterior = null) {
   if (!av) return false;
   if (av.avaliacao_inconsistente === true) return true;
+  if (av.avaliacao_incompleta === true) return true;
   if (av.discrepancia?.classificacao === 'inconsistente') return true;
+
+  // ETAPA 25.3: Avaliação sem as 5 competências do ENEM é incompleta/inconsistente
+  if (!Array.isArray(av.competencias) || av.competencias.length < 5) {
+    return true;
+  }
+
+  // Verifica se faltam competências ou notas
+  for (let i = 0; i < 5; i++) {
+    const comp = av.competencias[i];
+    if (!comp || typeof comp.nota !== 'number' || isNaN(comp.nota)) {
+      return true;
+    }
+  }
 
   if (avAnterior && typeof av.nota_total === 'number' && typeof avAnterior.nota_total === 'number') {
     const diffTotal = Math.abs(av.nota_total - avAnterior.nota_total);
@@ -1948,6 +1962,41 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
     `;
   }
 
+  // ETAPA 25.3: Tratamento defensivo de avaliação incompleta (ex: apenas C1 retornada)
+  const isEnem = (matriz?.nome || '').toUpperCase().includes('ENEM');
+  const compsRecebidas = Array.isArray(av.competencias) ? av.competencias.length : 0;
+  const ehIncompleta = av.avaliacao_incompleta === true || (isEnem && compsRecebidas < 5);
+
+  if (ehIncompleta) {
+    return `
+      <div style="background:var(--bg-card); border:2px solid rgba(245,158,11,0.5); border-radius:var(--radius-xl); padding:24px; margin-bottom:24px; box-shadow:var(--shadow-soft);">
+        <div style="display:flex; align-items:flex-start; gap:16px;">
+          <div style="font-size:2.2rem; line-height:1;">⚠️</div>
+          <div style="flex:1;">
+            <div style="display:inline-block; font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:#d97706; background:rgba(245,158,11,0.12); padding:3px 10px; border-radius:var(--radius-full); margin-bottom:6px;">
+              Correção Incompleta
+            </div>
+            <h4 style="font-size:1.15rem; font-weight:800; font-family:var(--font-display); color:var(--text-primary); margin:0 0 8px;">
+              Avaliação Parcial Detectada (${compsRecebidas} de 5 Competências)
+            </h4>
+            <p style="font-size:0.86rem; color:var(--text-secondary); line-height:1.6; margin:0 0 16px;">
+              A correção recebida não continha todas as 5 competências oficiais do ENEM. Por segurança pedagógica e integridade do seu diagnóstico, nenhuma pontuação parcial (como ${av.nota_total || 0}/1000) foi considerada como sua nota final nem enviada para seu histórico de evolução.
+            </p>
+            <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
+              <button id="btn-disparar-correcao-ia" class="btn btn-primary" data-id="${r.id}" style="padding:10px 20px; font-weight:700; font-size:0.88rem;">
+                Repetir Correção 🔄
+              </button>
+              <span style="font-size:0.78rem; color:var(--text-secondary);">
+                Você pode solicitar uma nova análise completa a qualquer momento.
+              </span>
+            </div>
+            <div id="correcao-ia-feedback" style="margin-top:12px; font-size:0.82rem; display:none;"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   // Se já possui avaliação
   const percentual = Math.round((av.nota_total / (av.nota_maxima || 1000)) * 100);
   const corNota = percentual >= 80 ? '#22c55e' : percentual >= 60 ? '#38bdf8' : '#f59e0b';
@@ -2472,9 +2521,13 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
     const historico = lerHistoricoLocal(sessionUserId);
     const itemIndex = historico.findIndex(item => item.id === redacaoId);
 
+    const compsCount = Array.isArray(data.avaliacao.competencias) ? data.avaliacao.competencias.length : 0;
+    const ehIncompleta = compsCount < 5;
+
     const novaAvaliacao = {
       ...data.avaliacao,
       persistido_no_banco: Boolean(data.persistido_no_banco),
+      avaliacao_incompleta: ehIncompleta,
       // Inclui fingerprint e versão da rubrica para rastreabilidade
       fingerprint: data.fingerprint || null,
       rubrica_versao: data.rubrica_versao || null

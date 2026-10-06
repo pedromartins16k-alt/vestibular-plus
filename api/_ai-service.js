@@ -420,6 +420,60 @@ FORMATO DE RESPOSTA — JSON válido (sem markdown):
       "evidencias_textuais": ["<trecho ou elemento real do texto que fundamenta a nota>"]
     },
     {
+      "numero": 2,
+      "nome": "Compreensão da Proposta e Aplicação das Áreas do Conhecimento",
+      "nota": <0|40|80|120|160|200>,
+      "nota_maxima": 200,
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise clara e objetiva de 2-4 frases com referência ao repertório e tema>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"]
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho ou repertório do texto>"]
+    },
+    {
+      "numero": 3,
+      "nome": "Seleção, Relação, Organização e Interpretação de Informações",
+      "nota": <0|40|80|120|160|200>,
+      "nota_maxima": 200,
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise clara e objetiva de 2-4 frases sobre tese e projeto de texto>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"]
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho ou argumento do texto>"]
+    },
+    {
+      "numero": 4,
+      "nome": "Demonstração de Conhecimento dos Mecanismos Linguísticos",
+      "nota": <0|40|80|120|160|200>,
+      "nota_maxima": 200,
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise clara e objetiva de 2-4 frases sobre coesão inter e intraparágrafos>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"]
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho ou conectivo do texto>"]
+    },
+    {
       "numero": 5,
       "nome": "Proposta de Intervenção",
       "nota": <0|40|80|120|160|200>,
@@ -455,7 +509,11 @@ FORMATO DE RESPOSTA — JSON válido (sem markdown):
   "aviso_educacional": "Esta avaliação é uma estimativa pedagógica gerada por inteligência artificial para fins de treino. Não substitui a correção oficial da banca examinadora."
 }
 
-NOTA: Para competências 1 a 4, o campo "analise" NÃO precisa de "elementos_proposta". Apenas C5 inclui esse campo.`;
+REGRA ABSOLUTA DE INTEGRIDADE:
+- O array "competencias" DEVE conter EXATAMENTE as 5 competências (C1, C2, C3, C4 e C5).
+- Nunca omita, resuma ou deixe de fora nenhuma competência, mesmo se o texto for curto, fraco ou excelente.
+- Avaliações incompletas serão sumariamente descartadas.
+- Para competências 1 a 4, o campo "analise" NÃO precisa de "elementos_proposta". Apenas C5 inclui esse campo.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -644,6 +702,27 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) 
 
   if (!Array.isArray(parsed.competencias) || parsed.competencias.length === 0) {
     throw new Error('A resposta da IA não contém a lista de competências obrigatória.');
+  }
+
+  // ETAPA 25.3: Validação estrita de integridade das competências
+  // Se for ENEM ou se houver matriz com competências definidas, todas devem estar presentes
+  const qtdEsperada = competenciasOficiais.length > 0 ? competenciasOficiais.length : (isEnem ? 5 : 0);
+  if (qtdEsperada > 0 && parsed.competencias.length !== qtdEsperada) {
+    throw new Error(
+      `A avaliação está incompleta: esperadas ${qtdEsperada} competências (${isEnem ? 'C1 a C5' : 'oficiais'}), mas a IA retornou apenas ${parsed.competencias.length}. Nenhuma nota parcial será atribuída.`
+    );
+  }
+
+  // Verifica se todos os números de competência esperados estão presentes
+  if (qtdEsperada > 0) {
+    const numerosPresentes = new Set(parsed.competencias.map((c, i) => Number(c.numero) || (i + 1)));
+    for (let cNum = 1; cNum <= qtdEsperada; cNum++) {
+      if (!numerosPresentes.has(cNum)) {
+        throw new Error(
+          `A avaliação está incompleta: a competência C${cNum} não foi retornada pela IA. Nenhuma nota parcial será atribuída.`
+        );
+      }
+    }
   }
 
   const competenciasNormalizadas = parsed.competencias.map((comp, idx) => {

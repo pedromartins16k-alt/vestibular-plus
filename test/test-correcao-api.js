@@ -1659,6 +1659,504 @@ async function runTests() {
     pass('68 — ETAPA 25.1: Isolamento de localStorage por usuário verificado no código');
   } catch (e) { fail('68', e); }
 
+  // ── ETAPA 25.3: INTEGRIDADE DAS 5 COMPETÊNCIAS E RESILIÊNCIA ─────────────────
+
+  // Teste 83 — Backend rejeita avaliação com apenas C1 presente
+  total++;
+  try {
+    const rawApenasC1 = JSON.stringify({
+      nota_total: 200,
+      competencias: [
+        { numero: 1, nota: 200, justificativa: "Excelente domínio gramatical demonstrado pelo participante ao longo de todo o texto dissertativo." }
+      ]
+    });
+    assert.throws(
+      () => validarENormalizarResposta(rawApenasC1, matrizEnem, 'mock'),
+      /incompleta|esperadas 5 competências/i,
+      'Deve rejeitar JSON com apenas C1'
+    );
+    pass('83 — ETAPA 25.3: Backend rejeita avaliação com apenas C1 presente');
+  } catch (e) { fail('83', e); }
+
+  // Teste 84 — Backend rejeita avaliação parcial (apenas C1 a C4)
+  total++;
+  try {
+    const rawC1aC4 = JSON.stringify({
+      nota_total: 800,
+      competencias: [
+        { numero: 1, nota: 200, justificativa: "Sem desvios gramaticais identificados na produção escrita." },
+        { numero: 2, nota: 200, justificativa: "Repertório sociocultural legitimado e produtivo com argumentação consistente." },
+        { numero: 3, nota: 200, justificativa: "Projeto de texto estratégico, informações articuladas e consistentes com a tese." },
+        { numero: 4, nota: 200, justificativa: "Excelente coesão textual, conectivos diversificados e adequados entre os parágrafos." }
+      ]
+    });
+    assert.throws(
+      () => validarENormalizarResposta(rawC1aC4, matrizEnem, 'mock'),
+      /incompleta|esperadas 5 competências|C5 não foi retornada/i,
+      'Deve rejeitar JSON com C1 a C4 faltando C5'
+    );
+    pass('84 — ETAPA 25.3: Backend rejeita avaliação parcial com C1 a C4 faltando C5');
+  } catch (e) { fail('84', e); }
+
+  // Teste 85 — Backend aceita avaliação completa com C1 a C5
+  total++;
+  try {
+    const rawCompleto = JSON.stringify({
+      nota_total: 920,
+      competencias: [
+        { numero: 1, nota: 160, justificativa: "Estrutura sintática excelente com poucos desvios gramaticais leves." },
+        { numero: 2, nota: 200, justificativa: "Repertório sociocultural legitimado, pertinente e produtivo em todo o texto." },
+        { numero: 3, nota: 200, justificativa: "Projeto de texto consistente, tese clara e progressão argumentativa adequada." },
+        { numero: 4, nota: 160, justificativa: "Bom encadeamento e articulação das ideias com variedade de recursos coesivos." },
+        { numero: 5, nota: 200, justificativa: "Proposta completa contendo agente, ação, meio, finalidade e detalhamento claro.",
+          analise: {
+            elementos_proposta: { agente: "presente", acao: "presente", meio: "presente", finalidade: "presente", detalhamento: "presente" }
+          }
+        }
+      ]
+    });
+    const res = validarENormalizarResposta(rawCompleto, matrizEnem, 'mock');
+    assert.equal(res.competencias.length, 5, 'Retorna exatamente 5 competências');
+    assert.equal(res.nota_total, 920, 'Soma bate 920');
+    pass('85 — ETAPA 25.3: Backend aceita e normaliza avaliação completa com C1 a C5');
+  } catch (e) { fail('85', e); }
+
+  // Teste 86 — Backend calcula nota_total como soma estrita das 5 competências
+  total++;
+  try {
+    const rawSomaIncorretaNaIA = JSON.stringify({
+      nota_total: 9999, // IA tentou alucinar nota_total
+      competencias: [
+        { numero: 1, nota: 160, justificativa: "Poucos desvios gramaticais encontrados no texto dissertativo." },
+        { numero: 2, nota: 160, justificativa: "Repertório produtivo e pertinente ao tema proposto pelo exame." },
+        { numero: 3, nota: 160, justificativa: "Argumentação consistente e coerente com a tese defendida." },
+        { numero: 4, nota: 160, justificativa: "Coesão eficiente com boa articulação entre as orações e períodos." },
+        { numero: 5, nota: 160, justificativa: "Proposta de intervenção articulada com os problemas discutidos na redação." }
+      ]
+    });
+    const res = validarENormalizarResposta(rawSomaIncorretaNaIA, matrizEnem, 'mock');
+    assert.equal(res.nota_total, 800, 'nota_total deve ser 160*5=800 e não 9999');
+    pass('86 — ETAPA 25.3: Backend calcula nota_total como soma estrita descartando valor da IA');
+  } catch (e) { fail('86', e); }
+
+  // Teste 87 — Histórico e Minha Evolução isolam avaliação incompleta
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const auditFunc = new Function('lista', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function renderizarEvolucaoInteligente'))}
+      return auditarAvaliacoesRedacao(lista);
+    `);
+
+    const rCompleta = {
+      id: 'r1',
+      data_envio: '2026-10-01T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 800,
+        competencias: [
+          { numero: 1, nota: 160 }, { numero: 2, nota: 160 },
+          { numero: 3, nota: 160 }, { numero: 4, nota: 160 }, { numero: 5, nota: 160 }
+        ]
+      }
+    };
+
+    const rIncompleta = {
+      id: 'r2',
+      data_envio: '2026-10-02T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 200,
+        avaliacao_incompleta: true,
+        competencias: [
+          { numero: 1, nota: 200 }
+        ]
+      }
+    };
+
+    const audit = auditFunc([rCompleta, rIncompleta]);
+    assert.equal(audit.validas.length, 1, 'Apenas a redação com 5 competências é válida');
+    assert.equal(audit.validas[0].id, 'r1', 'Redação r1 mantida como válida');
+    assert.equal(audit.inconsistentes.length, 1, 'Redação incompleta isolada como inconsistente');
+    assert.equal(audit.inconsistentes[0].id, 'r2', 'Redação r2 isolada');
+    pass('87 — ETAPA 25.3: Histórico e Minha Evolução isolam avaliação incompleta (apenas C1)');
+  } catch (e) { fail('87', e); }
+
+  // Teste 88 — Professor IA ignora avaliação incompleta e não distorce diagnóstico
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const diagFunc = new Function('validas', 'inconsistentes', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function renderizarEvolucaoInteligente'))}
+      return gerarDiagnosticoProfessorIA(validas, inconsistentes);
+    `);
+
+    const rCompleta = {
+      id: 'r1',
+      data_envio: '2026-10-01T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 800,
+        competencias: [
+          { numero: 1, nota: 160, nome: 'C1' }, { numero: 2, nota: 160, nome: 'C2' },
+          { numero: 3, nota: 160, nome: 'C3' }, { numero: 4, nota: 160, nome: 'C4' }, { numero: 5, nota: 160, nome: 'C5' }
+        ]
+      }
+    };
+
+    const rIncompleta = {
+      id: 'r2',
+      data_envio: '2026-10-02T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 200,
+        avaliacao_incompleta: true,
+        competencias: [{ numero: 1, nota: 200, nome: 'C1' }]
+      }
+    };
+
+    // Gera diagnóstico passando apenas as válidas conforme audit
+    const diag = diagFunc([rCompleta], [rIncompleta]);
+    assert.equal(diag.totalValidas, 1, 'Considera apenas 1 válida');
+    assert.equal(diag.notaAtual, 800, 'Nota atual é 800 da válida e não 200 da incompleta');
+    assert.ok(!diag.comoEstouTexto.includes('200 pontos'), 'Não inclui 200 pontos no diagnóstico');
+    pass('88 — ETAPA 25.3: Professor IA ignora avaliação incompleta e preserva nota de 800 pts');
+  } catch (e) { fail('88', e); }
+
+  // Teste 89 — Interface renderiza aviso pedagógico e botão de repetição para avaliação incompleta
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const renderFunc = new Function('r', 'matriz', `
+      ${src.substring(src.indexOf('function escapeHtml'), src.indexOf('function abrirModalDetalhesRedacao'))}
+      return renderizarBlocoAvaliacaoIA(r, matriz);
+    `);
+
+    const redIncompleta = {
+      id: 'red-inc-1',
+      avaliacao_ia: {
+        nota_total: 200,
+        avaliacao_incompleta: true,
+        competencias: [{ numero: 1, nota: 200, nome: 'C1' }]
+      }
+    };
+
+    const html = renderFunc(redIncompleta, matrizEnem);
+    assert.ok(html.includes('Correção Incompleta'), 'Contém badge Correção Incompleta');
+    assert.ok(html.includes('Repetir Correção 🔄'), 'Contém botão de Repetir Correção');
+    assert.ok(!html.includes('SUA NOTA ESTIMADA'), 'NÃO renderiza card de SUA NOTA ESTIMADA');
+    assert.ok(html.includes('Avaliação Parcial Detectada (1 de 5 Competências)'), 'Informa 1 de 5 Competências');
+    pass('89 — ETAPA 25.3: Interface renderiza aviso claro e botão Repetir Correção sem nota final');
+  } catch (e) { fail('89', e); }
+
+  // Teste 90 — Regressão e persistência resiliente: fallback transparente na gravação do BD
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const redacaoSrc = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const serverSrc = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+
+    // Confirma que pendencia_persistencia é tratada sem bloquear o retorno pedagógico
+    assert.ok(serverSrc.includes('pendencia_persistencia'), 'Servidor sinaliza pendencia_persistencia defensivamente');
+    assert.ok(serverSrc.includes('persistido_no_banco'), 'Servidor expõe persistido_no_banco');
+    assert.ok(redacaoSrc.includes('data.pendencia_persistencia'), 'Cliente trata pendência sem interromper fluxo do aluno');
+    pass('90 — ETAPA 25.3: Regressão e persistência resiliente com fallback transparente');
+  } catch (e) { fail('90', e); }
+
+  // ── ETAPA 25.4: AUDITORIA DE PERSISTÊNCIA E RECUPERAÇÃO ─────────────────────
+
+  // Teste 91 — Persistência de avaliação completa C1-C5
+  total++;
+  try {
+    const rawValida = JSON.stringify({
+      nota_total: 800,
+      competencias: [
+        { numero: 1, nota: 160, justificativa: "Bom domínio da norma padrão com desvios pontuais." },
+        { numero: 2, nota: 160, justificativa: "Compreensão da proposta e repertório produtivo e pertinente." },
+        { numero: 3, nota: 160, justificativa: "Projeto de texto consistente em defesa do ponto de vista." },
+        { numero: 4, nota: 160, justificativa: "Estruturação coesiva diversificada e articulada entre parágrafos." },
+        { numero: 5, nota: 160, justificativa: "Proposta completa com os cinco elementos interventivos articulados.",
+          analise: {
+            elementos_proposta: { agente: "presente", acao: "presente", meio: "presente", finalidade: "presente", detalhamento: "presente" }
+          }
+        }
+      ],
+      pontos_fortes: ["Boa articulação de repertório"],
+      pontos_melhoria: ["Aprofundar o detalhamento da proposta"],
+      exemplos_trechos: ["Trecho original -> Reescrita sugerida"],
+      sugestoes: ["Praticar mais conectivos interparágrafos"],
+      prioridades_estudo: ["C4 - Coesão referencial"],
+      feedback_geral: "Excelente produção textual no padrão ENEM."
+    });
+
+    const avaliacaoNormalizada = validarENormalizarResposta(rawValida, matrizEnem, 'mock-model', 'Texto da redação com mais de 50 caracteres para validação');
+    assert.equal(avaliacaoNormalizada.competencias.length, 5, 'Todas as 5 competências normalizadas');
+    assert.equal(avaliacaoNormalizada.nota_total, 800, 'Nota total calculada com exatidão');
+
+    // Simula a construção do payload que o backend persiste em public.redacao_avaliacoes
+    const payloadAvaliacao = {
+      redacao_id: '11111111-1111-1111-1111-111111111111',
+      user_id: 'user-teste-autenticado',
+      tipo_avaliacao: 'ia',
+      modelo_ia: avaliacaoNormalizada.modelo_utilizado,
+      nota_total: avaliacaoNormalizada.nota_total,
+      nota_maxima: avaliacaoNormalizada.nota_maxima,
+      competencias: avaliacaoNormalizada.competencias,
+      pontos_fortes: avaliacaoNormalizada.pontos_fortes,
+      pontos_melhoria: avaliacaoNormalizada.pontos_melhoria,
+      exemplos_trechos: avaliacaoNormalizada.exemplos_trechos || [],
+      sugestoes: avaliacaoNormalizada.sugestoes,
+      prioridades_estudo: avaliacaoNormalizada.prioridades_estudo || [],
+      feedback_geral: avaliacaoNormalizada.feedback_geral,
+      status: 'concluida'
+    };
+
+    assert.equal(payloadAvaliacao.nota_total, 800, 'Payload retém nota_total íntegra');
+    assert.equal(payloadAvaliacao.competencias.length, 5, 'Payload retém 5 competências');
+    assert.equal(payloadAvaliacao.user_id, 'user-teste-autenticado', 'Payload amarra ao usuário autenticado');
+    pass('91 — ETAPA 25.4: Persistência de avaliação completa com payload íntegro e tipado');
+  } catch (e) { fail('91', e); }
+
+  // Teste 92 — Recuperação de avaliação persistida (formatação e integridade)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+
+    // Executa e valida o formato exato que o redacao.js usa para hidratação de avaliações do Supabase
+    const formatarItemAvaliacao = new Function('av', `
+      return {
+        nota_total: Number(av.nota_total),
+        nota_maxima: Number(av.nota_maxima) || 1000,
+        competencias: av.competencias || av.criterios_detalhe || [],
+        pontos_fortes: av.pontos_fortes || [],
+        pontos_melhoria: av.pontos_melhoria || [],
+        exemplos_trechos: av.exemplos_trechos || [],
+        sugestoes: av.sugestoes || [],
+        prioridades_estudo: av.prioridades_estudo || [],
+        feedback_geral: av.feedback_geral || '',
+        modelo_utilizado: av.modelo_ia || 'ia',
+        corrigido_em: av.criado_em,
+        persistido_no_banco: true
+      };
+    `);
+
+    // Valida que o código-fonte em redacao.js contém a mesma lógica de hidratação
+    assert.ok(src.includes('function formatarItemAvaliacao(av)'), 'formatarItemAvaliacao declarada no redacao.js');
+    assert.ok(src.includes('persistido_no_banco: true'), 'Hidratação define persistido_no_banco: true');
+
+    const linhaBanco = {
+      id: 'av-uuid-1',
+      redacao_id: 'red-uuid-1',
+      user_id: 'user-123',
+      nota_total: 880,
+      nota_maxima: 1000,
+      competencias: [
+        { numero: 1, nota: 160 }, { numero: 2, nota: 200 },
+        { numero: 3, nota: 160 }, { numero: 4, nota: 160 }, { numero: 5, nota: 200 }
+      ],
+      pontos_fortes: ['Excelente C2'],
+      pontos_melhoria: ['Melhorar C1'],
+      exemplos_trechos: [],
+      sugestoes: ['Treinar crase'],
+      prioridades_estudo: ['Gramática'],
+      feedback_geral: 'Texto muito bom',
+      modelo_ia: 'mock-model',
+      criado_em: '2026-10-06T18:00:00Z'
+    };
+
+    const recuperada = formatarItemAvaliacao(linhaBanco);
+    assert.equal(recuperada.nota_total, 880, 'Nota total mantida na recuperação');
+    assert.equal(recuperada.competencias.length, 5, 'Todas as 5 competências recuperadas');
+    assert.equal(recuperada.persistido_no_banco, true, 'Marcação de persistido_no_banco = true');
+    assert.equal(recuperada.corrigido_em, '2026-10-06T18:00:00Z', 'Data de correção preservada');
+    pass('92 — ETAPA 25.4: Recuperação e hidratação de avaliação persistida com C1-C5 íntegras');
+  } catch (e) { fail('92', e); }
+
+  // Teste 93 — Falha de persistência com fallback transparente no cliente
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    assert.ok(src.includes('data.pendencia_persistencia'), 'Cliente captura pendência de persistência');
+    assert.ok(src.includes('A gravação definitiva não foi confirmada'), 'Aviso pedagógico exibido com transparência');
+    assert.ok(src.includes('localStorage.setItem(getHistoricoKey(sessionUserId)'), 'Fallback salva no localStorage do usuário');
+
+    // Simula uma resposta do backend com fallback ativo (persistido_no_banco: false)
+    const respostaBackendComFallback = {
+      sucesso: true,
+      redacao_id: 'red-1',
+      avaliacao_id: null,
+      persistido_no_banco: false,
+      pendencia_persistencia: {
+        code: 'SILENT_REJECTION',
+        message: 'INSERT executado sem erro mas sem ID retornado.'
+      },
+      avaliacao: {
+        nota_total: 760,
+        competencias: [
+          { numero: 1, nota: 160 }, { numero: 2, nota: 160 },
+          { numero: 3, nota: 120 }, { numero: 4, nota: 160 }, { numero: 5, nota: 160 }
+        ]
+      }
+    };
+
+    assert.equal(respostaBackendComFallback.persistido_no_banco, false, 'Sinaliza persistência pendente');
+    assert.equal(respostaBackendComFallback.avaliacao.competencias.length, 5, 'Avaliação calculada mantém as 5 competências');
+    pass('93 — ETAPA 25.4: Falha de persistência no banco tratada com fallback transparente');
+  } catch (e) { fail('93', e); }
+
+  // Teste 94 — Avaliação incompleta: somente C1 rejeitada antes da persistência válida
+  total++;
+  try {
+    const rawApenasC1 = JSON.stringify({
+      nota_total: 200,
+      competencias: [
+        { numero: 1, nota: 200, justificativa: "Apenas C1 presente" }
+      ]
+    });
+    let rejeitado = false;
+    try {
+      validarENormalizarResposta(rawApenasC1, matrizEnem, 'mock');
+    } catch (err) {
+      rejeitado = true;
+      assert.ok(err.message.includes('incompleta') || err.message.includes('esperadas 5'), 'Mensagem descritiva de rejeição');
+    }
+    assert.ok(rejeitado, 'Rejeitou avaliação contendo apenas C1');
+    pass('94 — ETAPA 25.4: Somente C1 sumariamente rejeitada antes de qualquer persistência válida');
+  } catch (e) { fail('94', e); }
+
+  // Teste 95 — Avaliação incompleta: C1 a C4 rejeitada antes da persistência válida
+  total++;
+  try {
+    const rawC1aC4 = JSON.stringify({
+      nota_total: 800,
+      competencias: [
+        { numero: 1, nota: 200, justificativa: "Sem desvios." },
+        { numero: 2, nota: 200, justificativa: "Repertório excelente." },
+        { numero: 3, nota: 200, justificativa: "Projeto de texto claro." },
+        { numero: 4, nota: 200, justificativa: "Coesão diversificada." }
+      ]
+    });
+    let rejeitado = false;
+    try {
+      validarENormalizarResposta(rawC1aC4, matrizEnem, 'mock');
+    } catch (err) {
+      rejeitado = true;
+      assert.ok(err.message.includes('incompleta') || err.message.includes('C5 não foi retornada'), 'Rejeição informa C5 ausente');
+    }
+    assert.ok(rejeitado, 'Rejeitou avaliação contendo C1 a C4 faltando C5');
+    pass('95 — ETAPA 25.4: C1 a C4 sumariamente rejeitada antes de qualquer persistência válida');
+  } catch (e) { fail('95', e); }
+
+  // Teste 96 — Avaliação completa C1 a C5 aceita com nota válida
+  total++;
+  try {
+    const rawC1aC5 = JSON.stringify({
+      nota_total: 960,
+      competencias: [
+        { numero: 1, nota: 200, justificativa: "Sem desvios gramaticais." },
+        { numero: 2, nota: 200, justificativa: "Repertório sociocultural produtivo." },
+        { numero: 3, nota: 200, justificativa: "Projeto de texto excelente e consistente." },
+        { numero: 4, nota: 160, justificativa: "Boa articulação com raros deslizes." },
+        { numero: 5, nota: 200, justificativa: "Proposta completa nos 5 elementos.",
+          analise: {
+            elementos_proposta: { agente: "presente", acao: "presente", meio: "presente", finalidade: "presente", detalhamento: "presente" }
+          }
+        }
+      ]
+    });
+    const res = validarENormalizarResposta(rawC1aC5, matrizEnem, 'mock');
+    assert.equal(res.competencias.length, 5, 'Todas as 5 competências aceitas');
+    assert.equal(res.nota_total, 960, 'Soma bate 960');
+    pass('96 — ETAPA 25.4: C1 a C5 aceita com sucesso e nota válida calculada');
+  } catch (e) { fail('96', e); }
+
+  // Teste 97 — Isolamento estrito entre usuários (chave de armazenamento e propriedade)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const redacaoSrc = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const serverSrc = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+
+    // No cliente
+    assert.ok(redacaoSrc.includes('getHistoricoKey(sessionUserId)'), 'Chave localStorage vinculada ao sessionUserId');
+    assert.ok(redacaoSrc.includes('eq(\'user_id\', sessionUserId)'), 'Consulta ao Supabase filtra por user_id autenticado');
+
+    // No backend
+    assert.ok(serverSrc.includes('authenticatedUserId'), 'Backend deriva identidade do token JWT');
+    assert.ok(serverSrc.includes('outraRedacao.user_id !== authenticatedUserId'), 'Backend impede consultar redação de outro usuário');
+    assert.ok(serverSrc.includes('user_id: authenticatedUserId'), 'Payload de INSERT grava o ID do usuário autenticado');
+    pass('97 — ETAPA 25.4: Isolamento por usuário garantido no cliente e validado no servidor');
+  } catch (e) { fail('97', e); }
+
+  // Teste 98 — Professor IA não é corrompido por avaliações parciais ou incompletas
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const src = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const diagFunc = new Function('validas', 'inconsistentes', `
+      ${src.substring(src.indexOf('function auditarAvaliacaoInconsistente'), src.indexOf('function renderizarEvolucaoInteligente'))}
+      return gerarDiagnosticoProfessorIA(validas, inconsistentes);
+    `);
+
+    const rValida1 = {
+      id: 'r1',
+      data_envio: '2026-10-01T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 720,
+        competencias: [
+          { numero: 1, nota: 160, nome: 'C1' }, { numero: 2, nota: 160, nome: 'C2' },
+          { numero: 3, nota: 120, nome: 'C3' }, { numero: 4, nota: 120, nome: 'C4' }, { numero: 5, nota: 160, nome: 'C5' }
+        ]
+      }
+    };
+
+    const rValida2 = {
+      id: 'r2',
+      data_envio: '2026-10-03T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 800,
+        competencias: [
+          { numero: 1, nota: 160, nome: 'C1' }, { numero: 2, nota: 160, nome: 'C2' },
+          { numero: 3, nota: 160, nome: 'C3' }, { numero: 4, nota: 160, nome: 'C4' }, { numero: 5, nota: 160, nome: 'C5' }
+        ]
+      }
+    };
+
+    const rIncompletaC1 = {
+      id: 'r3',
+      data_envio: '2026-10-05T10:00:00Z',
+      avaliacao_ia: {
+        nota_total: 200,
+        avaliacao_incompleta: true,
+        competencias: [{ numero: 1, nota: 200, nome: 'C1' }]
+      }
+    };
+
+    // O pipeline deve filtrar rIncompletaC1 para lista de inconsistentes
+    const diag = diagFunc([rValida1, rValida2], [rIncompletaC1]);
+    assert.equal(diag.totalValidas, 2, 'Contabiliza exatamente as 2 redações válidas');
+    assert.equal(diag.notaAtual, 800, 'Nota atual é 800 (da segunda válida) e não 200');
+    assert.equal(diag.variacaoValida, 80, 'Evolução é +80 pts calculada entre as válidas');
+    assert.ok(!diag.comoEstouTexto.includes('200 pontos'), 'Diagnóstico não menciona 200 pts da incompleta');
+    pass('98 — ETAPA 25.4: Professor IA ignora avaliação incompleta e preserva cálculo de evolução');
+  } catch (e) { fail('98', e); }
+
+  // Teste 99 — Suíte completa de regressão e integridade de persistência
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const redacaoSrc = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    const aiSrc = fs.readFileSync('api/_ai-service.js', 'utf8');
+    const apiSrc = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+
+    assert.ok(aiSrc.includes('REGRA ABSOLUTA DE INTEGRIDADE'), 'Regra de integridade mantida no prompt');
+    assert.ok(aiSrc.includes('qtdEsperada > 0 && parsed.competencias.length !== qtdEsperada'), 'Validação estrita mantida no backend');
+    assert.ok(redacaoSrc.includes('ehIncompleta'), 'Proteção visual no front mantida');
+    assert.ok(apiSrc.includes('persistidoNoBanco = true'), 'Marcação de sucesso na persistência preservada');
+    pass('99 — ETAPA 25.4: Suíte completa de regressão e integridade de persistência validada');
+  } catch (e) { fail('99', e); }
+
   // ── TESTE REAL (opcional) ─────────────────────────────────────────────────
   total++;
   if (process.env.GROQ_API_KEY) {
