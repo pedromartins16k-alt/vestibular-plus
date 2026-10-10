@@ -274,6 +274,8 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto, proposta }) 
   const pontuacaoMax = matriz?.pontuacao_maxima || 1000;
   const genero = matriz?.tipo_genero || proposta?.genero || 'Dissertativo-argumentativo em prosa';
   const isEnem = (vestibular || '').toLowerCase() === 'enem' || nomeBanca.toUpperCase().includes('ENEM');
+  const competenciasOficiais = matriz?.competencias || [];
+  const qtdCompetencias = competenciasOficiais.length > 0 ? competenciasOficiais.length : (isEnem ? 5 : 3);
 
   // Seção da proposta — inclui textos motivadores e instruções se disponíveis
   let secaoProposta = `- Tema: "${tema}"
@@ -306,31 +308,141 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto, proposta }) 
   if (isEnem) {
     rubricaSecao = `${RUBRICA_C1}\n\n${RUBRICA_C2}\n\n${RUBRICA_C3}\n\n${RUBRICA_C4}\n\n${RUBRICA_C5}`;
   } else {
-    // Para outras bancas, usa descrições da matriz
-    const competencias = matriz?.competencias || [];
-    rubricaSecao = competencias.map(c =>
+    rubricaSecao = competenciasOficiais.map(c =>
       `--- COMPETÊNCIA ${c.numero}: ${c.nome} ---\nCritério: ${c.descricao}\nPeso máximo: ${c.peso} pts.`
     ).join('\n\n');
   }
 
-  return `Você é um avaliador especialista em redações de vestibulares brasileiros, com domínio da matriz de avaliação do ENEM (INEP).
+  // Bloco de exemplo estruturado de competências conforme a banca ativa
+  const competenciasExemploJson = isEnem
+    ? `    {
+      "numero": 1,
+      "nome": "Domínio da modalidade escrita formal",
+      "nota": <0|40|80|120|160|200>,
+      "nota_maxima": 200,
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise clara de 2-4 frases>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"]
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho real>"]
+    },
+    {
+      "numero": 2,
+      "nome": "Compreensão da Proposta e Aplicação das Áreas do Conhecimento",
+      "nota": <0|40|80|120|160|200>,
+      "nota_maxima": 200,
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise clara de 2-4 frases>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"]
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho ou repertório>"]
+    },
+    {
+      "numero": 3,
+      "nome": "Seleção, Relação, Organização e Interpretação de Informações",
+      "nota": <0|40|80|120|160|200>,
+      "nota_maxima": 200,
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise clara de 2-4 frases>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"]
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho ou argumento>"]
+    },
+    {
+      "numero": 4,
+      "nome": "Demonstração de Conhecimento dos Mecanismos Linguísticos",
+      "nota": <0|40|80|120|160|200>,
+      "nota_maxima": 200,
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise clara de 2-4 frases>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"]
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho ou conectivo>"]
+    },
+    {
+      "numero": 5,
+      "nome": "Proposta de Intervenção",
+      "nota": <0|40|80|120|160|200>,
+      "nota_maxima": 200,
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise clara de 2-4 frases>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"],
+        "elementos_proposta": {
+          "agente": "presente|ausente|insuficiente",
+          "acao": "presente|ausente|insuficiente",
+          "meio": "presente|ausente|insuficiente",
+          "finalidade": "presente|ausente|insuficiente",
+          "detalhamento": "presente|ausente|insuficiente",
+          "relacao_com_problema": "forte|media|fraca"
+        }
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho da proposta>"]
+    }`
+    : competenciasOficiais.map(c => `    {
+      "numero": ${c.numero},
+      "nome": "${c.nome}",
+      "nota": <0 a ${c.peso}>,
+      "nota_maxima": ${c.peso},
+      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
+      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
+      "prioridade": "<alta|media|baixa>",
+      "justificativa": "<análise de 2-4 frases>",
+      "analise": {
+        "criterios_atendidos": ["<critério atendido>"],
+        "criterios_parciais": ["<critério parcial>"],
+        "criterios_ausentes": ["<critério ausente>"]
+      },
+      "pontos_positivos": ["<aspecto positivo>"],
+      "problemas": [],
+      "evidencias_textuais": ["<trecho real>"]
+    }`).join(',\n');
 
-Sua função é avaliar a redação abaixo seguindo ESTRITAMENTE as rubricas por nível. Não atribua notas por impressão geral.
+  const regraEscala = isEnem
+    ? `3. ESCALA OBRIGATÓRIA DO ENEM: use SOMENTE 0, 40, 80, 120, 160 ou 200 para cada competência. Valores como 70, 90, 110, 130, 150, 170 ou 190 são PROIBIDOS.`
+    : `3. ESCALA DA BANCA ${nomeBanca}: a nota de cada competência deve ser um número inteiro entre 0 e seu peso máximo oficial especificado na matriz.`;
 
-ATENÇÃO: Você deve executar DUAS FASES obrigatórias antes de retornar o JSON:
+  return `Você é um avaliador especialista em redações de vestibulares brasileiros, com domínio da matriz de avaliação da banca ${nomeBanca}.
 
-FASE A — ANÁLISE (obrigatória, por competência):
-  Para cada competência, ANTES de atribuir a nota:
-  1. Liste os critérios ATENDIDOS pelo texto (com evidência textual).
-  2. Liste os critérios PARCIALMENTE atendidos (com evidência textual).
-  3. Liste os critérios AUSENTES ou violados (com evidência textual ou ausência confirmada).
-  4. Para C1: identifique cada desvio real com trecho_original.
-  5. Para C5: descreva elemento a elemento (agente, ação, meio, finalidade, detalhamento).
-  Inclua essa análise no campo "analise" de cada competência.
+Sua função é avaliar a redação abaixo seguindo ESTRITAMENTE as rubricas oficiais por nível. Não atribua notas por impressão geral.
 
-FASE B — NOTA (consequência obrigatória da análise):
-  Somente após a análise, atribua a nota que é consequência direta do que foi encontrado.
-  A nota NUNCA pode contradizer a análise. Se houver conflito, revise.
+Retorne EXCLUSIVAMENTE um único objeto JSON válido, iniciando imediatamente com { e terminando com }, sem texto antes ou depois, sem explicações fora do JSON e sem blocos markdown.
+
+A análise pedagógica de cada competência (critérios atendidos, parciais e ausentes) deve ser registrada internamente no campo "analise" do JSON, garantindo que a nota atribuída seja consequência direta dessa análise.
 
 ═══════════════════════════════════════════════════
 PROPOSTA DE REDAÇÃO:
@@ -357,148 +469,37 @@ REGRAS FUNDAMENTAIS (obrigatórias):
    - PONTO_DE_ATENCAO: algo que pode ser melhorado, mas não reduz muito a nota.
    - SUGESTAO: maneira de deixar o texto ainda melhor (não penaliza).
 
-3. ESCALA OBRIGATÓRIA DO ENEM: use SOMENTE 0, 40, 80, 120, 160 ou 200 para cada competência.
-   Valores como 70, 90, 110, 130, 150, 170 ou 190 são PROIBIDOS.
+${regraEscala}
 
 4. FUGA AO TEMA: somente se o texto aborda assunto completamente diferente do tema proposto.
-   Tangenciamento ≠ fuga. Tangenciamento limita C2 e C3 mas não as zera automaticamente.
+   Tangenciamento ≠ fuga. Tangenciamento limita os critérios temáticos mas não os zera automaticamente.
 
 5. EXTENSÃO MÍNIMA: texto com menos de 7 linhas completas → todas as competências recebem 0.
 
-6. NOTA TOTAL: NÃO declare uma "nota geral" por impressão. O campo nota_total deve ser a SOMA EXATA das 5 competências.
+6. NOTA TOTAL: NÃO declare uma "nota geral" por impressão. O campo nota_total deve ser a SOMA EXATA das competências da banca.
 
 7. EVIDÊNCIA OBRIGATÓRIA: cada nota deve ter ao menos 1 evidência textual (trecho real ou paráfrase do texto avaliado).
    Se não encontrar problema, diga explicitamente "nenhum desvio identificado nesta competência".
 
 8. ANTI-CONTRADIÇÃO OBRIGATÓRIA:
-   - Se a nota for 200, a justificativa NÃO pode conter frases como:
+   - Se a nota for máxima, a justificativa NÃO pode conter frases como:
      "há problemas", "faltam elementos", "poderia ser melhor", "insuficiente",
      "parcialmente", "limitado", "fraco", "desenvolvimento inadequado".
    - Se encontrar conflito, revise a nota para baixo OU revise a justificativa.
-   - A nota deve ser CONSEQUÊNCIA da análise, nunca o contrário.
 
-9. NOTAS MÁXIMAS (200) EXIGEM JUSTIFICATIVA FORTE:
-   - C1=200: citar explicitamente que não foram encontrados desvios gramaticais.
-   - C2=200: citar repertório específico + demonstrar uso produtivo na argumentação.
-   - C3=200: citar tese + progressão + todos os argumentos coerentes.
-   - C4=200: citar mecanismos coesivos variados + articulação entre parágrafos.
-   - C5=200: confirmar todos os 5 elementos com detalhamento real.
+9. NOTAS MÁXIMAS EXIGEM JUSTIFICATIVA FORTE com base no texto.
 ═══════════════════════════════════════════════════
 
 RUBRICAS OFICIAIS POR COMPETÊNCIA:
 ${rubricaSecao}
 
 ═══════════════════════════════════════════════════
-FORMATO DE RESPOSTA — JSON válido (sem markdown):
+FORMATO DE RESPOSTA — Retorne SOMENTE este JSON (sem markdown):
 {
-  "nota_total": <SOMA_EXATA_DAS_5_COMPETENCIAS>,
+  "nota_total": <SOMA_EXATA_DAS_COMPETENCIAS>,
   "nota_maxima": ${pontuacaoMax},
   "competencias": [
-    {
-      "numero": 1,
-      "nome": "<nome oficial>",
-      "nota": <0|40|80|120|160|200>,
-      "nota_maxima": 200,
-      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
-      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO> (pior tipo encontrado nesta competência, ou SUGESTAO se não há erros)",
-      "prioridade": "<alta|media|baixa> (alta = nota abaixo de 120; media = nota 120; baixa = nota acima de 120)",
-      "justificativa": "<análise clara e objetiva de 2-4 frases com referência ao texto>",
-      "analise": {
-        "criterios_atendidos": ["<critério atendido com evidência>"],
-        "criterios_parciais": ["<critério parcialmente atendido>"],
-        "criterios_ausentes": ["<critério ausente ou violado>"]
-      },
-      "pontos_positivos": ["<aspecto positivo real identificado no texto>"],
-      "problemas": [
-        {
-          "tipo": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
-          "descricao": "<descrição objetiva>",
-          "trecho_original": "<trecho real do texto, se aplicável>",
-          "sugestao_reescrita": "<reescrita sugerida, se aplicável>"
-        }
-      ],
-      "evidencias_textuais": ["<trecho ou elemento real do texto que fundamenta a nota>"]
-    },
-    {
-      "numero": 2,
-      "nome": "Compreensão da Proposta e Aplicação das Áreas do Conhecimento",
-      "nota": <0|40|80|120|160|200>,
-      "nota_maxima": 200,
-      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
-      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
-      "prioridade": "<alta|media|baixa>",
-      "justificativa": "<análise clara e objetiva de 2-4 frases com referência ao repertório e tema>",
-      "analise": {
-        "criterios_atendidos": ["<critério atendido>"],
-        "criterios_parciais": ["<critério parcial>"],
-        "criterios_ausentes": ["<critério ausente>"]
-      },
-      "pontos_positivos": ["<aspecto positivo>"],
-      "problemas": [],
-      "evidencias_textuais": ["<trecho ou repertório do texto>"]
-    },
-    {
-      "numero": 3,
-      "nome": "Seleção, Relação, Organização e Interpretação de Informações",
-      "nota": <0|40|80|120|160|200>,
-      "nota_maxima": 200,
-      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
-      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
-      "prioridade": "<alta|media|baixa>",
-      "justificativa": "<análise clara e objetiva de 2-4 frases sobre tese e projeto de texto>",
-      "analise": {
-        "criterios_atendidos": ["<critério atendido>"],
-        "criterios_parciais": ["<critério parcial>"],
-        "criterios_ausentes": ["<critério ausente>"]
-      },
-      "pontos_positivos": ["<aspecto positivo>"],
-      "problemas": [],
-      "evidencias_textuais": ["<trecho ou argumento do texto>"]
-    },
-    {
-      "numero": 4,
-      "nome": "Demonstração de Conhecimento dos Mecanismos Linguísticos",
-      "nota": <0|40|80|120|160|200>,
-      "nota_maxima": 200,
-      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
-      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
-      "prioridade": "<alta|media|baixa>",
-      "justificativa": "<análise clara e objetiva de 2-4 frases sobre coesão inter e intraparágrafos>",
-      "analise": {
-        "criterios_atendidos": ["<critério atendido>"],
-        "criterios_parciais": ["<critério parcial>"],
-        "criterios_ausentes": ["<critério ausente>"]
-      },
-      "pontos_positivos": ["<aspecto positivo>"],
-      "problemas": [],
-      "evidencias_textuais": ["<trecho ou conectivo do texto>"]
-    },
-    {
-      "numero": 5,
-      "nome": "Proposta de Intervenção",
-      "nota": <0|40|80|120|160|200>,
-      "nota_maxima": 200,
-      "nivel": "<Excelente|Bom|Médio|Insuficiente|Precário|Ausente>",
-      "tipo_apontamento": "<ERRO|PONTO_DE_ATENCAO|SUGESTAO>",
-      "prioridade": "<alta|media|baixa>",
-      "justificativa": "<análise clara e objetiva de 2-4 frases>",
-      "analise": {
-        "criterios_atendidos": ["<critério atendido>"],
-        "criterios_parciais": ["<critério parcial>"],
-        "criterios_ausentes": ["<critério ausente>"],
-        "elementos_proposta": {
-          "agente": "presente|ausente|insuficiente",
-          "acao": "presente|ausente|insuficiente",
-          "meio": "presente|ausente|insuficiente",
-          "finalidade": "presente|ausente|insuficiente",
-          "detalhamento": "presente|ausente|insuficiente",
-          "relacao_com_problema": "forte|media|fraca"
-        }
-      },
-      "pontos_positivos": ["<aspecto positivo>"],
-      "problemas": [],
-      "evidencias_textuais": ["<trecho da proposta no texto>"]
-    }
+${competenciasExemploJson}
   ],
   "pontos_fortes": ["<ponto forte global do texto, com base em evidência>"],
   "pontos_melhoria": ["<melhoria prioritária global, objetiva e aplicável>"],
@@ -510,10 +511,9 @@ FORMATO DE RESPOSTA — JSON válido (sem markdown):
 }
 
 REGRA ABSOLUTA DE INTEGRIDADE:
-- O array "competencias" DEVE conter EXATAMENTE as 5 competências (C1, C2, C3, C4 e C5).
-- Nunca omita, resuma ou deixe de fora nenhuma competência, mesmo se o texto for curto, fraco ou excelente.
-- Avaliações incompletas serão sumariamente descartadas.
-- Para competências 1 a 4, o campo "analise" NÃO precisa de "elementos_proposta". Apenas C5 inclui esse campo.`;
+- O array "competencias" DEVE conter EXATAMENTE as ${qtdCompetencias} competências oficiais da banca.
+- Nunca omita, resuma ou deixe de fora nenhuma competência da matriz.
+- Responda estritamente com o objeto JSON.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -535,7 +535,7 @@ async function chamarGroq(apiKey, prompt) {
       messages: [
         {
           role: 'system',
-          content: 'Você é um avaliador especialista em redações do ENEM. Avalie SOMENTE o texto fornecido. Nunca invente erros ou evidências. Responda estritamente em JSON válido conforme o formato solicitado.'
+          content: 'Você é um avaliador especialista em redações de vestibulares. Sua resposta DEVE ser estritamente um único objeto JSON válido, iniciando imediatamente com { e terminando com }, sem texto introdutório, sem conclusões e sem markdown.'
         },
         { role: 'user', content: prompt }
       ]
@@ -552,8 +552,35 @@ async function chamarGroq(apiKey, prompt) {
     if (!response.ok) {
       const errBody = await response.text();
       let msg = `Erro no serviço Groq (${response.status})`;
-      try { const p = JSON.parse(errBody); if (p.error?.message) msg += `: ${p.error.message}`; } catch (_) {}
-      throw new Error(msg);
+      let erroCode = null;
+      let erroTipo = 'ERRO_PROVEDOR_IA';
+      let amostraFailedGen = null;
+
+      try {
+        const p = JSON.parse(errBody);
+        if (p.error?.message) msg += `: ${p.error.message}`;
+        if (p.error?.code) erroCode = p.error.code;
+        if (p.error?.type) erroTipo = p.error.type;
+        if (p.error?.failed_generation) {
+          // Sanitização estrita: captura no máximo 120 caracteres sem dados pessoais
+          amostraFailedGen = String(p.error.failed_generation).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 120);
+        }
+      } catch (_) {}
+
+      // Log estruturado e seguro no servidor (sem tokens, sem redação completa)
+      console.warn('[chamarGroq] Falha na API Groq:', {
+        status: response.status,
+        code: erroCode,
+        tipo: erroTipo,
+        modelo,
+        amostraFailedGen: amostraFailedGen ? `[amostra sanitizada: "${amostraFailedGen}..."]` : null
+      });
+
+      const erroIA = new Error(msg);
+      erroIA.statusCode = response.status;
+      erroIA.errorCode = erroCode;
+      erroIA.tipo = erroTipo;
+      throw erroIA;
     }
 
     const data = await response.json();
@@ -562,7 +589,12 @@ async function chamarGroq(apiKey, prompt) {
     return { rawText, modelo: `groq/${modelo}` };
   } catch (err) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError') throw new Error('Tempo limite excedido ao aguardar resposta da IA (timeout de 28s).');
+    if (err.name === 'AbortError') {
+      const erroTimeout = new Error('Tempo limite excedido ao aguardar resposta da IA (timeout de 28s).');
+      erroTimeout.statusCode = 504;
+      erroTimeout.tipo = 'TIMEOUT_IA';
+      throw erroTimeout;
+    }
     throw err;
   }
 }

@@ -216,14 +216,34 @@ export default async function handler(req, res) {
       });
     } catch (errIA) {
       console.error('[corrigir-redacao] Erro na chamada de IA:', errIA.message);
-      if (errIA.isConfigError) {
+      if (errIA.isConfigError || errIA.statusCode === 503) {
         return responderJson(res, 503, {
           error: errIA.message,
           tipo: 'CONFIGURACAO_IA_PENDENTE'
         });
       }
+      if (errIA.statusCode === 429) {
+        return responderJson(res, 429, {
+          error: 'Limite temporário de requisições do serviço de IA atingido. Por favor, aguarde alguns instantes e tente novamente.',
+          tipo: 'TAXA_LIMITE_IA'
+        });
+      }
+      if (errIA.statusCode === 504 || errIA.name === 'AbortError') {
+        return responderJson(res, 504, {
+          error: 'Tempo limite excedido ao aguardar resposta do corretor de IA. Tente novamente.',
+          tipo: 'TIMEOUT_IA'
+        });
+      }
+      if (errIA.statusCode === 400) {
+        return responderJson(res, 502, {
+          error: 'O serviço de IA não pôde formatar a avaliação estruturada para esta redação. Tente solicitar a correção novamente.',
+          detalhe: errIA.message,
+          tipo: 'FORMATO_IA_INVALIDO'
+        });
+      }
       return responderJson(res, 502, {
-        error: `Não foi possível obter a correção do provedor de IA: ${errIA.message}`
+        error: `Não foi possível obter a correção do provedor de IA: ${errIA.message}`,
+        tipo: 'FALHA_PROVEDOR_IA'
       });
     }
 

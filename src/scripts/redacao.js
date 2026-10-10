@@ -853,19 +853,20 @@ let filtroBancaEvolucao = 'todas';
  * Audita uma avaliação ou par de avaliações para verificar inconsistência crítica.
  * Reutiliza os limites oficiais: diferença > 100 total ou > 80 em competência única.
  */
-function auditarAvaliacaoInconsistente(av, avAnterior = null) {
+function auditarAvaliacaoInconsistente(av, avAnterior = null, qtdEsperada = 5) {
   if (!av) return false;
   if (av.avaliacao_inconsistente === true) return true;
   if (av.avaliacao_incompleta === true) return true;
   if (av.discrepancia?.classificacao === 'inconsistente') return true;
 
-  // ETAPA 25.3: Avaliação sem as 5 competências do ENEM é incompleta/inconsistente
-  if (!Array.isArray(av.competencias) || av.competencias.length < 5) {
+  // Integridade de competências: se não informada ou for ENEM, exige 5; caso contrário, a quantidade da matriz
+  const totalEsperado = typeof qtdEsperada === 'number' && qtdEsperada > 0 ? qtdEsperada : 5;
+  if (!Array.isArray(av.competencias) || av.competencias.length < totalEsperado) {
     return true;
   }
 
   // Verifica se faltam competências ou notas
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < totalEsperado; i++) {
     const comp = av.competencias[i];
     if (!comp || typeof comp.nota !== 'number' || isNaN(comp.nota)) {
       return true;
@@ -905,8 +906,12 @@ function auditarAvaliacoesRedacao(listaRedacoes) {
   cronologicas.forEach((r, idx) => {
     const av = r.avaliacao_ia;
     const anterior = idx > 0 ? cronologicas[idx - 1].avaliacao_ia : null;
+    const bancaId = (r.vestibular_id || '').toLowerCase();
+    const bancasRef = typeof criteriosBancas !== 'undefined' ? criteriosBancas : {};
+    const matriz = r.matriz_criterios || bancasRef[bancaId] || bancasRef.enem || null;
+    const qtdEsperada = matriz?.competencias?.length || (bancaId === 'enem' ? 5 : 5);
 
-    const ehInconsistente = auditarAvaliacaoInconsistente(av, anterior);
+    const ehInconsistente = auditarAvaliacaoInconsistente(av, anterior, qtdEsperada);
 
     if (ehInconsistente) {
       inconsistentes.push(r);
@@ -1962,10 +1967,11 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
     `;
   }
 
-  // ETAPA 25.3: Tratamento defensivo de avaliação incompleta (ex: apenas C1 retornada)
+  // ETAPA 25.3 / 25.9: Tratamento defensivo de avaliação incompleta conforme matriz da banca
   const isEnem = (matriz?.nome || '').toUpperCase().includes('ENEM');
+  const qtdEsperada = matriz?.competencias?.length || (isEnem ? 5 : 3);
   const compsRecebidas = Array.isArray(av.competencias) ? av.competencias.length : 0;
-  const ehIncompleta = av.avaliacao_incompleta === true || (isEnem && compsRecebidas < 5);
+  const ehIncompleta = av.avaliacao_incompleta === true || compsRecebidas < qtdEsperada;
 
   if (ehIncompleta) {
     return `
@@ -1977,10 +1983,10 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
               Correção Incompleta
             </div>
             <h4 style="font-size:1.15rem; font-weight:800; font-family:var(--font-display); color:var(--text-primary); margin:0 0 8px;">
-              Avaliação Parcial Detectada (${compsRecebidas} de 5 Competências)
+              Avaliação Parcial Detectada (${compsRecebidas} de ${qtdEsperada} Competências)
             </h4>
             <p style="font-size:0.86rem; color:var(--text-secondary); line-height:1.6; margin:0 0 16px;">
-              A correção recebida não continha todas as 5 competências oficiais do ENEM. Por segurança pedagógica e integridade do seu diagnóstico, nenhuma pontuação parcial (como ${av.nota_total || 0}/1000) foi considerada como sua nota final nem enviada para seu histórico de evolução.
+              A correção recebida não continha todas as ${qtdEsperada} competências oficiais da banca ${escapeHtml(matriz?.nome || 'examinadora')}. Por segurança pedagógica e integridade do seu diagnóstico, nenhuma pontuação parcial (como ${av.nota_total || 0}/${matriz?.pontuacao_maxima || 1000}) foi considerada como sua nota final nem enviada para seu histórico de evolução.
             </p>
             <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center;">
               <button id="btn-disparar-correcao-ia" class="btn btn-primary" data-id="${r.id}" style="padding:10px 20px; font-weight:700; font-size:0.88rem;">
@@ -2521,8 +2527,13 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
     const historico = lerHistoricoLocal(sessionUserId);
     const itemIndex = historico.findIndex(item => item.id === redacaoId);
 
+    const redacaoExistente = itemIndex !== -1 ? historico[itemIndex] : null;
+    const bancaIdAtual = (redacaoExistente?.vestibular_id || '').toLowerCase();
+    const matrizAtual = redacaoExistente?.matriz_criterios || criteriosBancas[bancaIdAtual] || criteriosBancas.enem;
+    const qtdEsperadaBanca = matrizAtual?.competencias?.length || (bancaIdAtual === 'enem' ? 5 : 5);
+
     const compsCount = Array.isArray(data.avaliacao.competencias) ? data.avaliacao.competencias.length : 0;
-    const ehIncompleta = compsCount < 5;
+    const ehIncompleta = compsCount < qtdEsperadaBanca;
 
     const novaAvaliacao = {
       ...data.avaliacao,
