@@ -235,22 +235,23 @@ OS 5 ELEMENTOS DA PROPOSTA (análise individual):
 2. AÇÃO: o que será feito concretamente? (não pode ser vago como "conscientizar")
 3. MEIO/MODO: como será executado? (canais, instrumentos, métodos)
 4. FINALIDADE/EFEITO: qual o resultado esperado? qual problema resolve?
-5. DETALHAMENTO: há especificidade? (lei, programa, prazo, recurso, órgão responsável)
+5. DETALHAMENTO: há desdobramento explicativo ou especificação de ao menos UM dos elementos anteriores (ex: exemplificação da ação, especificação do meio/modo, esclarecimento sobre o agente ou efeito)?
+   ATENÇÃO: O INEP NÃO exige prazo, cronograma ou dotação orçamentária como requisito obrigatório de detalhamento. Qualquer elemento que agregue informação concreta suplementar é considerado detalhamento válido.
 
 ESCALA OFICIAL INEP:
-• 200 pts → Proposta completa com os 5 elementos, bem articulada com o problema discutido.
-• 160 pts → Proposta com 4 elementos ou com os 5 elementos mas detalhamento parcial.
-• 120 pts → Proposta com 3 elementos ou estrutura parcialmente incompleta.
-• 80 pts → Proposta com 2 elementos. Intervenção pouco desenvolvida.
-• 40 pts → Proposta com apenas 1 elemento ou extremamente vaga/genérica.
-• 0 pts → Ausência de proposta de intervenção.
+• 200 pts → Proposta completa com os 5 elementos (agente, ação, meio, finalidade e 1 detalhamento válido), articulada à discussão.
+• 160 pts → Proposta com 4 elementos válidos, ou 5 elementos com detalhamento muito tênue.
+• 120 pts → Proposta com 3 elementos válidos.
+• 80 pts → Proposta com 2 elementos válidos.
+• 40 pts → Proposta com apenas 1 elemento ou intervenção extremamente vaga/genérica.
+• 0 pts → Ausência de proposta de intervenção ou proposta que desrespeita os direitos humanos de forma categórica.
 
 IMPORTANTE:
 - Analise literalmente o trecho da proposta no texto.
 - NÃO presuma elementos que não estão escritos.
+- NÃO exija cronograma, prazos ou orçamento financeiro para validar o detalhamento na C5, pois a cartilha do INEP não os exige.
 - NÃO zere a competência por pequena imperfeição num texto que claramente tentou apresentar proposta.
-- Respeitando direitos humanos: verifique se a proposta não viola direitos fundamentais.
-  Se violar (ex: proposta punitiva sem garantias), reduza a nota.`;
+- Respeitando direitos humanos: verifique se a proposta não viola direitos fundamentais (ex: tortura, linchamento, censura prévia). Se violar, zere apenas a C5 (critério INEP).`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTRUÇÃO DO PROMPT
@@ -308,8 +309,18 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto, proposta }) 
   if (isEnem) {
     rubricaSecao = `${RUBRICA_C1}\n\n${RUBRICA_C2}\n\n${RUBRICA_C3}\n\n${RUBRICA_C4}\n\n${RUBRICA_C5}`;
   } else {
-    rubricaSecao = competenciasOficiais.map(c =>
-      `--- COMPETÊNCIA ${c.numero}: ${c.nome} ---\nCritério: ${c.descricao}\nPeso máximo: ${c.peso} pts.`
+    const diretrizesBanca = `ATENÇÃO CRÍTICA PARA A BANCA ${nomeBanca.toUpperCase()}:
+- NÃO exija "proposta de intervenção" como critério obrigatório na conclusão (a proposta de intervenção com 5 elementos é exclusiva do ENEM).
+- Conclusões analíticas, reflexivas, de síntese ou que abram novas perspectivas filosóficas/sociais são plenamente válidas e esperadas.
+- Respeite o perfil de gênero discursivo exigido (${genero}).`;
+
+    rubricaSecao = `${diretrizesBanca}\n\n` + competenciasOficiais.map(c =>
+      `--- CRITÉRIO ${c.numero}: ${c.nome} ---\nDescrição: ${c.descricao}\nPeso máximo oficial: ${c.peso} pts.\nNíveis de desempenho de 0 a ${c.peso}:
+• Excelente (${Math.round(c.peso * 0.9)} a ${c.peso} pts): Domínio pleno e autônomo do critério, sem falhas perceptíveis.
+• Bom (${Math.round(c.peso * 0.7)} a ${Math.round(c.peso * 0.89)} pts): Atendimento satisfatório com pequenas imperfeições isoladas.
+• Médio (${Math.round(c.peso * 0.5)} a ${Math.round(c.peso * 0.69)} pts): Atendimento regular com oscilações visíveis na aplicação do critério.
+• Insuficiente (${Math.round(c.peso * 0.25)} a ${Math.round(c.peso * 0.49)} pts): Domínio frágil e desenvolvimento precário do critério.
+• Ausente / Nulo (0 a ${Math.round(c.peso * 0.24)} pts): Não atendimento do critério ou desvio grave.`
     ).join('\n\n');
   }
 
@@ -898,12 +909,39 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) 
     );
   }
 
+  let pontosFortes = Array.isArray(parsed.pontos_fortes) ? parsed.pontos_fortes.map(String).filter(s => s.trim().length > 0) : [];
+  let pontosMelhoria = Array.isArray(parsed.pontos_melhoria) ? parsed.pontos_melhoria.map(String).filter(s => s.trim().length > 0) : [];
+
+  // ETAPA 26.1: Síntese rigorosa — se a IA omitir os arrays globais, extrai estritamente de apontamentos concretos
+  // NUNCA inventa falha ou elogio genérico apenas pela nota numérica.
+  if (pontosFortes.length === 0) {
+    competenciasNormalizadas.forEach(c => {
+      if (Array.isArray(c.pontos_positivos) && c.pontos_positivos.length > 0) {
+        c.pontos_positivos.forEach(pp => {
+          const ppStr = String(pp || '').trim();
+          if (ppStr && !pontosFortes.includes(ppStr)) pontosFortes.push(`[${c.nome}] ${ppStr}`);
+        });
+      }
+    });
+  }
+
+  if (pontosMelhoria.length === 0) {
+    competenciasNormalizadas.forEach(c => {
+      if (Array.isArray(c.problemas) && c.problemas.length > 0) {
+        c.problemas.forEach(prob => {
+          const desc = (typeof prob === 'object' && prob !== null) ? String(prob.descricao || '').trim() : String(prob || '').trim();
+          if (desc && !pontosMelhoria.includes(desc)) pontosMelhoria.push(`[${c.nome}] ${desc}`);
+        });
+      }
+    });
+  }
+
   return {
     nota_total: notaCalculadaBackend,
     nota_maxima: pontuacaoMaximaOficial,
     competencias: competenciasNormalizadas,
-    pontos_fortes: Array.isArray(parsed.pontos_fortes) ? parsed.pontos_fortes.map(String) : [],
-    pontos_melhoria: Array.isArray(parsed.pontos_melhoria) ? parsed.pontos_melhoria.map(String) : [],
+    pontos_fortes: pontosFortes,
+    pontos_melhoria: pontosMelhoria,
     exemplos_trechos: Array.isArray(parsed.exemplos_trechos) ? parsed.exemplos_trechos.map(String) : [],
     sugestoes: Array.isArray(parsed.sugestoes) ? parsed.sugestoes.map(String) : [],
     prioridades_estudo: Array.isArray(parsed.prioridades_estudo) ? parsed.prioridades_estudo.map(String) : [],

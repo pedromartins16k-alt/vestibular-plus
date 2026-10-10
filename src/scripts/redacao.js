@@ -2055,7 +2055,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
             / ${av.nota_maxima}
           </div>
           <div style="font-size:0.72rem; color:var(--text-secondary); line-height:1.4;">
-            Estimativa pedagógica baseada nos critérios do ENEM
+            Estimativa pedagógica baseada na matriz oficial da banca ${escapeHtml(matriz?.nome || 'selecionada')}
           </div>
         </div>
 
@@ -2205,7 +2205,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
       <!-- Competências Avaliadas -->
       <div style="margin-bottom:20px;">
         <h5 style="font-size:0.92rem; font-weight:800; margin-bottom:12px; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.04em;">
-          Detalhamento por Competência
+          Detalhamento por Critério da Banca
         </h5>
         <div style="display:flex; flex-direction:column; gap:14px;">
           ${(av.competencias || []).map(c => {
@@ -2307,7 +2307,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
               <div style="background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:14px 16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:8px;">
                   <span style="font-weight:700; font-size:0.88rem; color:var(--text-primary);">
-                    Competência ${c.numero}: ${escapeHtml(c.nome)}
+                    Critério ${c.numero}: ${escapeHtml(c.nome)}
                   </span>
                   <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                     ${(() => {
@@ -2349,28 +2349,37 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         </div>
       ` : ''}
 
-      <!-- Pontos Fortes e Pontos a Melhorar -->
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:20px;">
-        <!-- Fortes -->
-        <div style="background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.2); border-radius:var(--radius-md); padding:14px;">
-          <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#22c55e; display:flex; align-items:center; gap:6px;">
-            <span>👍</span> Pontos Fortes
-          </h5>
-          <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
-            ${(av.pontos_fortes || []).map(p => `<li>${escapeHtml(p)}</li>`).join('')}
-          </ul>
-        </div>
+      <!-- Pontos Fortes e Pontos a Melhorar (sem listas vazias) -->
+      ${(() => {
+        const fortes = Array.isArray(av.pontos_fortes) ? av.pontos_fortes.filter(Boolean) : [];
+        const melhorias = Array.isArray(av.pontos_melhoria) ? av.pontos_melhoria.filter(Boolean) : [];
+        if (fortes.length === 0 && melhorias.length === 0) return '';
+        return `
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px; margin-bottom:20px;">
+            ${fortes.length > 0 ? `
+              <div style="background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.2); border-radius:var(--radius-md); padding:14px;">
+                <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#22c55e; display:flex; align-items:center; gap:6px;">
+                  <span>👍</span> Pontos Fortes
+                </h5>
+                <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
+                  ${fortes.map(p => `<li>${escapeHtml(String(p))}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
 
-        <!-- Melhorias -->
-        <div style="background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:var(--radius-md); padding:14px;">
-          <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#f59e0b; display:flex; align-items:center; gap:6px;">
-            <span>🎯</span> Problemas Identificados
-          </h5>
-          <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
-            ${(av.pontos_melhoria || []).map(p => `<li>${escapeHtml(p)}</li>`).join('')}
-          </ul>
-        </div>
-      </div>
+            ${melhorias.length > 0 ? `
+              <div style="background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); border-radius:var(--radius-md); padding:14px;">
+                <h5 style="font-size:0.84rem; font-weight:800; margin:0 0 8px; color:#f59e0b; display:flex; align-items:center; gap:6px;">
+                  <span>🎯</span> Problemas Identificados
+                </h5>
+                <ul style="margin:0; padding-left:18px; font-size:0.8rem; color:var(--text-secondary); line-height:1.5;">
+                  ${melhorias.map(p => `<li>${escapeHtml(String(p))}</li>`).join('')}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      })()}
 
       <!-- Exemplos de Trechos para Revisão -->
       ${(av.exemplos_trechos && av.exemplos_trechos.length > 0) ? `
