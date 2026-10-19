@@ -541,13 +541,17 @@ async function chamarGroq(apiKey, prompt) {
     const body = {
       model: modelo,
       temperature: 0,
-      max_tokens: 4096,
+      // Aumentado de 4096 para 16384: o modelo gpt-oss-120b (reasoning) usa tokens de raciocínio
+      // interno que compartilham este orçamento com o JSON de saída visível. Com 4096, o budget
+      // se esgotava antes de completar as 5 competências ENEM (~1800-2500 tokens de JSON visível).
+      // O modelo suporta até 65536 tokens de saída (documentação Groq, 2025).
+      max_tokens: 16384,
       reasoning_effort: 'medium',
       response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
-          content: 'Você é um avaliador especialista em redações de vestibulares. Sua resposta DEVE ser estritamente um único objeto JSON válido, iniciando imediatamente com { e terminando com }, sem texto introdutório, sem conclusões e sem markdown. O array "competencias" DEVE conter obrigatoriamente todas as competências oficiais solicitadas (no ENEM: exatamente 5 competências, C1 a C5), sem omitir nenhuma.'
+          content: 'Você é um avaliador especialista em redações de vestibulares. Sua resposta DEVE ser estritamente um único objeto JSON válido, iniciando imediatamente com { e terminando com }, sem texto introdutório, sem conclusões e sem markdown. O array \"competencias\" DEVE conter obrigatoriamente todas as competências oficiais solicitadas (no ENEM: exatamente 5 competências, C1 a C5), sem omitir nenhuma.'
         },
         { role: 'user', content: prompt }
       ]
@@ -598,13 +602,38 @@ async function chamarGroq(apiKey, prompt) {
     const data = await response.json();
     const choice = data.choices?.[0];
     const rawText = choice?.message?.content;
+
+    // ── Ação D: Log seguro de metadados de uso (sem PII, sem conteúdo da redação) ──
+    // reasoning_tokens só existe em respostas de modelos com raciocínio interno.
+    const logUso = {
+      provedor: 'groq',
+      modelo,
+      finish_reason: choice?.finish_reason ?? 'ausente',
+      prompt_tokens: data.usage?.prompt_tokens ?? null,
+      completion_tokens: data.usage?.completion_tokens ?? null,
+      reasoning_tokens: data.usage?.completion_tokens_details?.reasoning_tokens ?? null
+    };
+    console.log('[chamarGroq] Metadados de uso (sem dados sensíveis):', logUso);
+
     if (!rawText) throw new Error('A Groq retornou uma resposta vazia.');
+
     if (choice?.finish_reason === 'length') {
       const erroTruncado = new Error('A resposta da IA atingiu o limite de tokens antes de concluir todas as competências.');
       erroTruncado.statusCode = 502;
       erroTruncado.tipo = 'RESPOSTA_TRUNCADA_IA';
       throw erroTruncado;
     }
+
+    // finish_reason inesperado ou ausente: logar mas não bloquear —
+    // a validação estrutural downstream (validarENormalizarResposta) garante
+    // que respostas incompletas nunca sejam aceitas, independentemente do finish_reason.
+    if (choice?.finish_reason && choice.finish_reason !== 'stop') {
+      console.warn('[chamarGroq] finish_reason inesperado:', {
+        finish_reason: choice.finish_reason,
+        modelo
+      });
+    }
+
     return { rawText, modelo: `groq/${modelo}` };
   } catch (err) {
     clearTimeout(timeoutId);
@@ -631,7 +660,9 @@ async function chamarGemini(apiKey, prompt) {
       signal: controller.signal,
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0, topP: 1.0, maxOutputTokens: 4096, responseMimeType: 'application/json' }
+        // maxOutputTokens aumentado de 4096 para 8192 (teto oficial do gemini-1.5-flash, Google AI docs).
+        // gemini-1.5-flash não suporta valores acima de 8192 via generationConfig.
+        generationConfig: { temperature: 0, topP: 1.0, maxOutputTokens: 8192, responseMimeType: 'application/json' }
       })
     });
     clearTimeout(timeoutId);
@@ -644,7 +675,18 @@ async function chamarGemini(apiKey, prompt) {
     }
 
     const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    // ── Ação D: Log seguro de metadados de uso Gemini (sem PII) ──
+    const candidate = data.candidates?.[0];
+    console.log('[chamarGemini] Metadados de uso (sem dados sensíveis):', {
+      provedor: 'gemini',
+      modelo,
+      finishReason: candidate?.finishReason ?? 'ausente',
+      prompt_tokens: data.usageMetadata?.promptTokenCount ?? null,
+      completion_tokens: data.usageMetadata?.candidatesTokenCount ?? null
+    });
+
+    const rawText = candidate?.content?.parts?.[0]?.text;
     if (!rawText) throw new Error('O Gemini retornou uma resposta vazia.');
     return { rawText, modelo: `google/${modelo}` };
   } catch (err) {
@@ -668,7 +710,8 @@ async function chamarOpenAI(apiKey, prompt) {
       body: JSON.stringify({
         model: modelo,
         temperature: 0,
-        max_tokens: 4096,
+        // Aumentado de 4096 para 16384 (teto oficial do gpt-4o-mini, OpenAI docs 2025).
+        max_tokens: 16384,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: 'Você é um avaliador especialista em redações do ENEM. Avalie SOMENTE o texto fornecido. Responda estritamente em JSON válido.' },
@@ -686,7 +729,18 @@ async function chamarOpenAI(apiKey, prompt) {
     }
 
     const data = await response.json();
-    const rawText = data.choices?.[0]?.message?.content;
+
+    // ── Ação D: Log seguro de metadados de uso OpenAI (sem PII) ──
+    const choiceOAI = data.choices?.[0];
+    console.log('[chamarOpenAI] Metadados de uso (sem dados sensíveis):', {
+      provedor: 'openai',
+      modelo,
+      finish_reason: choiceOAI?.finish_reason ?? 'ausente',
+      prompt_tokens: data.usage?.prompt_tokens ?? null,
+      completion_tokens: data.usage?.completion_tokens ?? null
+    });
+
+    const rawText = choiceOAI?.message?.content;
     if (!rawText) throw new Error('A OpenAI retornou uma resposta vazia.');
     return { rawText, modelo: `openai/${modelo}` };
   } catch (err) {
