@@ -541,12 +541,13 @@ async function chamarGroq(apiKey, prompt) {
     const body = {
       model: modelo,
       temperature: 0,
+      max_tokens: 4096,
       reasoning_effort: 'medium',
       response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
-          content: 'Você é um avaliador especialista em redações de vestibulares. Sua resposta DEVE ser estritamente um único objeto JSON válido, iniciando imediatamente com { e terminando com }, sem texto introdutório, sem conclusões e sem markdown.'
+          content: 'Você é um avaliador especialista em redações de vestibulares. Sua resposta DEVE ser estritamente um único objeto JSON válido, iniciando imediatamente com { e terminando com }, sem texto introdutório, sem conclusões e sem markdown. O array "competencias" DEVE conter obrigatoriamente todas as competências oficiais solicitadas (no ENEM: exatamente 5 competências, C1 a C5), sem omitir nenhuma.'
         },
         { role: 'user', content: prompt }
       ]
@@ -595,8 +596,15 @@ async function chamarGroq(apiKey, prompt) {
     }
 
     const data = await response.json();
-    const rawText = data.choices?.[0]?.message?.content;
+    const choice = data.choices?.[0];
+    const rawText = choice?.message?.content;
     if (!rawText) throw new Error('A Groq retornou uma resposta vazia.');
+    if (choice?.finish_reason === 'length') {
+      const erroTruncado = new Error('A resposta da IA atingiu o limite de tokens antes de concluir todas as competências.');
+      erroTruncado.statusCode = 502;
+      erroTruncado.tipo = 'RESPOSTA_TRUNCADA_IA';
+      throw erroTruncado;
+    }
     return { rawText, modelo: `groq/${modelo}` };
   } catch (err) {
     clearTimeout(timeoutId);
@@ -623,7 +631,7 @@ async function chamarGemini(apiKey, prompt) {
       signal: controller.signal,
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0, topP: 1.0, responseMimeType: 'application/json' }
+        generationConfig: { temperature: 0, topP: 1.0, maxOutputTokens: 4096, responseMimeType: 'application/json' }
       })
     });
     clearTimeout(timeoutId);
@@ -660,6 +668,7 @@ async function chamarOpenAI(apiKey, prompt) {
       body: JSON.stringify({
         model: modelo,
         temperature: 0,
+        max_tokens: 4096,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: 'Você é um avaliador especialista em redações do ENEM. Avalie SOMENTE o texto fornecido. Responda estritamente em JSON válido.' },
