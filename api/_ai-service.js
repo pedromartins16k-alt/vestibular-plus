@@ -36,7 +36,7 @@ export const LIMITE_DISCREPANCIA_COMPETENCIA   = 80;  // >80 pts em UMA competê
 // VERSÃO DA RUBRICA — fingerprint de versão para rastreabilidade
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const VERSAO_RUBRICA = 'enem-v4-2026';
+export const VERSAO_RUBRICA = 'enem-v5-2026';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // classificarDiscrepancia — 4 níveis + verificação por competência individual
@@ -133,123 +133,119 @@ Avalie: ortografia, acentuação, pontuação, concordância verbal e nominal,
 regência, crase, colocação pronominal, estrutura sintática e adequação vocabular ao registro formal.
 
 ESCALA OFICIAL INEP — use SOMENTE estes valores:
-• 200 pts → Excelente: sem desvios ou com no máximo 1 desvio leve e isolado que não compromete a leitura.
-• 160 pts → Bom: poucos desvios (2 a 4), nenhum grave, não afetam a compreensão do texto.
+• 200 pts → Excelente: estrutura sintática exemplar e no máximo dois desvios gramaticais/leves e isolados que não comprometam a leitura. Vocabulário preciso e adequado.
+  ATENÇÃO: Se o texto apresentar truncamentos recorrentes, desvios repetidos de pontuação/concordância ou vocabulário impreciso/repetitivo que demande recomendação substancial de revisão lexical, a nota DEVE ser 160 pts ou inferior. Nota 200 é INCOMPATÍVEL com críticas a desvios vocabulares ou repetições excessivas no feedback.
+• 160 pts → Bom: poucos desvios gramaticais e de convenções da escrita (2 a 4), ou estrutura sintática boa com pequenos deslizes locais. Vocabulário satisfatório com pontuais repetições.
 • 120 pts → Médio: desvios presentes com alguma frequência, não dominantes. O texto é compreensível, mas a norma culta não é plenamente dominada.
-• 80 pts → Insuficiente: muitos desvios, frequentes, que dificultam a leitura em alguns momentos.
+• 80 pts → Insuficiente: muitos desvios, frequentes, que dificultam a leitura em alguns momentos. Estrutura sintática deficitária.
 • 40 pts → Precário: desvios graves e sistemáticos que prejudicam seriamente a compreensão.
 • 0 pts → Apenas marcas de escrita (texto incompreensível) ou extensão mínima inadequada.
 
 IMPORTANTE:
 - Não penalize pelo estilo ou pelo fato de uma frase "poder ser mais bonita".
+- O INEP não proíbe qualquer repetição lexical natural ou termos essenciais ao tema; apenas repetições monótonas excessivas sem recurso anafórico justificam penalização.
 - A nota deve ser proporcional à quantidade, frequência e gravidade dos desvios encontrados.
 - Cite cada desvio real com o trecho exato onde ocorre.
-- Se não encontrar desvios, diga isso explicitamente e atribua nota alta.
-- Sugestão estilística ≠ erro gramatical. NÃO confundir.`;
+- Se atribuir 200 pts, a justificativa deve atestar formalmente excelência e não apontar falhas lexicais.
+- Sugestão pedagógica de refinamento estilístico opcional NÃO é erro gramatical nem impede nota 200 se a estrutura sintática for exemplar.`;
 
 const RUBRICA_C2 = `
-COMPETÊNCIA 2 — Compreensão da Proposta e Aplicação de Repertório
-Avalie DOIS aspectos separados:
+COMPETÊNCIA 2 — Compreensão da Proposta e Aplicação de Repertório Sociocultural
+Avalie DOIS aspectos inseparáveis:
 
-ASPECTO A — Compreensão e resposta ao tema:
-- O candidato respondeu ao tema proposto? (verificar: não ao título genérico, ao RECORTE TEMÁTICO da proposta)
-- O texto apresenta fuga total ao tema? (se sim → 0 pts nesta competência)
-- O texto tangencia o tema? (aborda perifericamente sem responder ao recorte) → limita a nota
+ASPECTO A — Compreensão e resposta ao tema e ao tipo textual:
+- O candidato respondeu ao recorte temático completo da proposta (e não apenas ao assunto amplo)?
+- Fuga total ao tema → 0 pts nesta competência e anulação do texto no ENEM.
+- Tangenciamento do tema → nota limitada a 80 pts.
+- Estrutura dissertativo-argumentativa em prosa com introdução, desenvolvimento e conclusão.
 
-ASPECTO B — Repertório sociocultural:
-- Há referência a autor, obra, dado estatístico, lei, teoria, evento histórico ou conceito de área de conhecimento?
-- O repertório é pertinente ao tema? (fora do tema = não conta)
-- O repertório é utilizado de forma produtiva na argumentação? (citação decorativa pesa menos)
-- O repertório é cópia direta dos textos motivadores da proposta? (não conta como repertório próprio)
+ASPECTO B — Repertório sociocultural (critério de produtividade):
+- Legitimado: respaldado por áreas do conhecimento formal (leis, autores, dados, história, filosofia, sociologia, arte, ciência).
+- Pertinente: tem relação direta com o tema em discussão.
+- Produtivo: o repertório é articulado ativamente à defesa do ponto de vista do candidato, gerando desdobramento argumentativo.
 
 ESCALA OFICIAL INEP:
-• 200 pts → Compreende e desenvolve o tema com repertório legitimado, pertinente e produtivo.
-• 160 pts → Compreende o tema com repertório adequado, mas com uso parcialmente produtivo ou repertório menos diversificado.
-• 120 pts → Compreende o tema de forma básica. Repertório limitado ou de pertinência questionável.
-• 80 pts → Tangencia o tema ou tem compreensão superficial. Repertório fraco ou ausente.
-• 40 pts → Tangenciamento grave ou compreensão muito limitada do tema.
-• 0 pts → Fuga total ao tema.
-
-IMPORTANTE:
-- Um único repertório pertinente e bem utilizado pode justificar nota 160.
-- NÃO reduza a nota simplesmente porque o repertório poderia ser mais sofisticado.
-- Se o candidato cita a Lei 10.639/03 de forma pertinente ao tema, isso é repertório legitimado.
-- Verifique SEMPRE o recorte específico da proposta antes de avaliar, não apenas o título.`;
+• 200 pts → Desenvolve o tema por meio de argumentação consistente a partir de um repertório sociocultural LEGITIMADO, PERTINENTE e com USO EFETIVAMENTE PRODUTIVO vinculado à tese.
+  FRONTEIRA 160 vs 200:
+  - Se o texto apenas menciona ou cita um dado/lei (ex: Lei 10.639/03) mas NÃO aprofunda sua relação crítica com a argumentação, ou se o repertório é restrito/apenas pontual sem demonstrar pleno domínio produtivo nos desenvolvimentos, a nota DEVE SER 160 PTS.
+  - Repertório legitimado e pertinente, mas com uso decorativo, parcial ou pouco articulado ao ponto de vista = 160 pts.
+  - Para 200 pts, é indispensável que o repertório esteja plenamente integrado à cadeia argumentativa.
+  - DIRETRIZ OFICIAL: O INEP não exige repertório famoso, clássico ou um número mínimo de referências; um único repertório legitimado, pertinente e com uso produtivo na defesa da tese é suficiente para atingir o nível máximo (200 pts).
+• 160 pts → Compreende a proposta, aplica conceitos das várias áreas do conhecimento e desenvolve o tema com repertório pertinente, porém com USO PARCIALMENTE PRODUTIVO ou sem desdobramento analítico aprofundado.
+• 120 pts → Desenvolve o tema recorrendo à cópia de trechos dos textos motivadores ou apresentando repertório baseado unicamente no senso comum, sem legitimação por áreas do saber.
+• 80 pts → Tangencia o tema ou desenvolve o tema com traços constantes de outros tipos textuais. Repertório frágil/ausente.
+• 40 pts → Desenvolve o tema de forma muito precária ou tangencia gravemente a proposta.
+• 0 pts → Fuga total ao tema ou não atendimento ao tipo dissertativo-argumentativo.`;
 
 const RUBRICA_C3 = `
-COMPETÊNCIA 3 — Seleção, Organização e Interpretação de Argumentos
-Avalie a qualidade, coerência e organização da argumentação.
+COMPETÊNCIA 3 — Seleção, Relação, Organização e Interpretação de Informações (Projeto de Texto)
+Avalie a coerência, a consistência do projeto de texto e a defesa do ponto de vista.
 
 O QUE ANALISAR:
-- Existe tese clara (ponto de vista defendido)?
-- Os argumentos sustentam a tese?
-- Há progressão argumentativa (os argumentos avançam, não repetem)?
-- Os parágrafos de desenvolvimento apresentam causas, consequências, dados, exemplos ou comparações?
-- Há contradições entre argumentos?
-- O texto é organizado em introdução, desenvolvimento e conclusão?
+- Projeto de texto estratégico: introdução contextualizada com tese explícita; desenvolvimentos planejados; conclusão articulada.
+- Desenvolvimento dos argumentos: cada argumento apresenta causas, consequências, dados explicativos ou desdobramentos lógicos?
+- Lacunas argumentativas: se o autor afirma algo relevante mas deixa sem explicação ("por que isso acontece?", "como isso se manifesta?"), há falha de desenvolvimento.
 
 ESCALA OFICIAL INEP:
-• 200 pts → Argumentação consistente, bem articulada e em defesa de ponto de vista. Argumentos variados e progressivos.
-• 160 pts → Argumentação satisfatória com poucas inadequações. Desenvolvimento suficiente com boa organização.
-• 120 pts → Argumentação mediana. Apresenta argumentos, mas com limitações no desenvolvimento ou na articulação.
-• 80 pts → Argumentação fraca. Argumentos insuficientes ou mal desenvolvidos.
-• 40 pts → Argumentação precária. Ausência de estrutura argumentativa reconhecível.
-• 0 pts → Não há argumentação ou fuga total ao tema.
-
-IMPORTANTE:
-- NÃO confundir "texto simples" com "texto ruim".
-- Um argumento simples mas coerente e desenvolvido não merece penalização exagerada.
-- Avalie a FUNÇÃO do argumento, não o nível de sofisticação.
-- Se os argumentos são claros, pertinentes e progressivos, reconheça isso mesmo que não sejam complexos.`;
+• 200 pts → Projeto de texto estratégico, sem falhas de desenvolvimento, com argumentos consistentes e progressão temática autônoma. Tese plenamente defendida em todas as partes.
+  FRONTEIRA 160 vs 200:
+  - Se a argumentação for clara e organizada, mas apresentar desenvolvimento sucinto, lacunas pontuais de aprofundamento ou argumentos que se sustentem de forma breve sem explorar detalhadamente causas/efeitos, a nota É 160 PTS.
+  - Para 200 pts, a argumentação deve ser consistente e sem lacunas em nenhum dos desenvolvimentos.
+  - DIRETRIZ OFICIAL: O INEP não exige aprofundamento ilimitado ou enciclopédico em cada argumento; a consistência argumentativa com defesa estratégica do ponto de vista, encadeamento lógico e sem lacunas substanciais atende ao nível 5 (200 pts).
+• 160 pts → Projeto de texto claro com poucos deslizes de organização ou com desenvolvimento satisfatório, mas apresentando pequenas lacunas argumentativas ou desdobramento sucinto de ideias.
+• 120 pts → Argumentação previsível, com projeto de texto com falhas visíveis (apenas expõe ideias sem aprofundar a relação com a tese, ou argumentos repetitivos).
+• 80 pts → Argumentação desorganizada, contraditória ou com muitas lacunas; projeto de texto muito embrionário.
+• 40 pts → Ideias desconexas, sem projeto de texto estruturado.
+• 0 pts → Ausência de argumentação ou defesa de ponto de vista.`;
 
 const RUBRICA_C4 = `
-COMPETÊNCIA 4 — Conhecimento dos Mecanismos Linguísticos de Coesão
-Avalie os recursos coesivos utilizados para construir a argumentação.
+COMPETÊNCIA 4 — Conhecimento dos Mecanismos Linguísticos (Coesão)
+Avalie a coesão interparágrafos (entre parágrafos) e intraparágrafos (dentro dos parágrafos).
 
 O QUE ANALISAR:
-- Uso de conectivos e operadores argumentativos (portanto, entretanto, ademais, visto que, logo, além disso, etc.)
-- Coesão entre frases e entre parágrafos
-- Retomadas (pronomes, sinônimos, elipses) adequadas
-- Progressão temática (cada parágrafo avança sobre o anterior)
-- Conectivos usados de forma artificial ou mecanicamente repetida
+- Diversidade de conectivos e operadores argumentativos (conjunções, preposições, advérbios relacionais).
+- Coesão interparágrafos: pelo menos 2 parágrafos com conectivo interparágrafo expressivo no início (ex: "Em primeiro lugar/plano", "Ademais", "Outrossim", "Portanto").
+- Coesão intraparágrafos: articulação fluida entre períodos no interior de cada parágrafo.
+- Repetição mecânica ou vocabulário coesivo restrito.
 
 ESCALA OFICIAL INEP:
-• 200 pts → Usa de forma diversificada e adequada os mecanismos coesivos. Progressão textual clara.
-• 160 pts → Usa adequadamente a maioria dos recursos. Poucos problemas de coesão isolados.
-• 120 pts → Usa mecanismos coesivos, mas com alguma repetição ou inadequação não dominante.
-• 80 pts → Uso limitado ou inadequado dos mecanismos de coesão, prejudicando a progressão.
-• 40 pts → Coesão precária. Mecanismos ausentes ou usados incorretamente na maior parte do texto.
-• 0 pts → Ausência de coesão.
-
-IMPORTANTE:
-- Conectivos simples bem usados NÃO devem receber nota baixa.
-- Avalie a FUNÇÃO dos conectivos no texto, não a sofisticação do vocabulário.
-- Se o texto flui logicamente entre parágrafos, mesmo com conectivos básicos, reconheça a coesão.`;
+• 200 pts → Emprega de forma expressiva e diversificada os mecanismos coesivos inter e intraparágrafos, com raras ou nenhuma repetição monótona e sem inadequação coesiva.
+  FRONTEIRA 160 vs 200:
+  - Se houver uso de conectivos adequados, mas com repertório coesivo restrito, ligeiramente mecânico ou com falta de variedade intraparágrafos, a nota É 160 PTS.
+  - DIRETRIZ OFICIAL: O INEP não proíbe qualquer repetição lexical natural nem exige variedade máxima em todos os períodos; exige recursos coesivos inter e intraparágrafos diversificados sem repetições mecânicas recorrentes.
+• 160 pts → Estrutura coesiva adequada com poucas inadequações ou pontuais repetições de recursos coesivos; conectores interparágrafos presentes.
+• 120 pts → Uso de mecanismos coesivos regular, mas com repetições visíveis ou inadequações não dominantes.
+• 80 pts → Conectivos insuficientes ou empregados de forma equivocada em trechos importantes do texto.
+• 40 pts → Coesão precária; frases justapostas sem articulação lógica.
+• 0 pts → Ausência de conectivos ou coesão totalmente caótica.`;
 
 const RUBRICA_C5 = `
-COMPETÊNCIA 5 — Proposta de Intervenção Respeitando os Direitos Humanos
-Avalie a qualidade da proposta de solução/intervenção apresentada pelo candidato.
+COMPETÊNCIA 5 — Proposta de Intervenção Social
+Avalie a solução proposta para o problema abordado, em conformidade com os direitos humanos.
 
-OS 5 ELEMENTOS DA PROPOSTA (análise individual):
-1. AGENTE: quem executa a ação? (ex: governo federal, escolas, ONGs, mídia)
-2. AÇÃO: o que será feito concretamente? (não pode ser vago como "conscientizar")
-3. MEIO/MODO: como será executado? (canais, instrumentos, métodos)
-4. FINALIDADE/EFEITO: qual o resultado esperado? qual problema resolve?
-5. DETALHAMENTO: há desdobramento explicativo ou especificação de ao menos UM dos elementos anteriores (ex: exemplificação da ação, especificação do meio/modo, esclarecimento sobre o agente ou efeito)?
-   ATENÇÃO: O INEP NÃO exige prazo, cronograma ou dotação orçamentária como requisito obrigatório de detalhamento. Qualquer elemento que agregue informação concreta suplementar é considerado detalhamento válido.
+OS 5 ELEMENTOS OBRIGATÓRIOS DO INEP:
+1. AGENTE: quem executará a medida proposta? (órgão público, ministério, escola, sociedade, etc.)
+2. AÇÃO: o que será realizado concretamente? (verbo de ação claro, não intenções genéricas)
+3. MEIO / MODO: de que maneira / por quais instrumentos a ação será viabilizada? (por meio de..., mediante..., com recursos...)
+4. EFEITO / FINALIDADE: com qual objetivo ou resultado prático? (a fim de..., para que...)
+5. DETALHAMENTO: acréscimo de uma informação explicativa, desdobramento específico ou justificativa sobre um dos outros 4 elementos.
 
 ESCALA OFICIAL INEP:
-• 200 pts → Proposta completa com os 5 elementos (agente, ação, meio, finalidade e 1 detalhamento válido), articulada à discussão.
-• 160 pts → Proposta com 4 elementos válidos, ou 5 elementos com detalhamento muito tênue.
+• 200 pts → Proposta completa contendo os CINCO elementos (agente, ação, meio, finalidade e 1 detalhamento claro e específico), plenamente articulada à discussão do texto.
+  FRONTEIRA 160 vs 200:
+  - Proposta com os 5 elementos em que o detalhamento seja vago, embrionário ou confunda-se superficialmente com o próprio meio sem adicionar informação substantiva clara DEVE RECEBER 160 PTS.
+  - Proposta com apenas 4 elementos válidos (faltando o detalhamento ou outro elemento) = 160 PTS.
+  - Para 200 pts, os 5 elementos devem ser identificáveis de forma autônoma e inequívoca no texto.
+• 160 pts → Elabora proposta com 4 elementos válidos OU com 5 elementos cujo detalhamento seja frágil/tênue.
 • 120 pts → Proposta com 3 elementos válidos.
 • 80 pts → Proposta com 2 elementos válidos.
-• 40 pts → Proposta com apenas 1 elemento ou intervenção extremamente vaga/genérica.
-• 0 pts → Ausência de proposta de intervenção ou proposta que desrespeita os direitos humanos de forma categórica.
+• 40 pts → Proposta com 1 elemento válido ou apenas esboço vago de intervenção.
+• 0 pts → Ausência de proposta de intervenção OU proposta que viola manifestamente os direitos humanos.
 
 IMPORTANTE:
-- Analise literalmente o trecho da proposta no texto.
-- NÃO presuma elementos que não estão escritos.
-- NÃO exija cronograma, prazos ou orçamento financeiro para validar o detalhamento na C5, pois a cartilha do INEP não os exige.
+- Analise estritamente o que está escrito no parágrafo conclusivo/propositivo.
+- NÃO invente elementos que o estudante não escreveu.
+- O INEP exige exatamente 5 elementos (agente, ação, meio, finalidade e 1 detalhamento). NÃO exija cronograma, prazos ou orçamento financeiro para validar o detalhamento na C5, nem monitoramento contínuo, pois a matriz oficial do INEP não os exige.
 - NÃO zere a competência por pequena imperfeição num texto que claramente tentou apresentar proposta.
 - Respeitando direitos humanos: verifique se a proposta não viola direitos fundamentais (ex: tortura, linchamento, censura prévia). Se violar, zere apenas a C5 (critério INEP).`;
 
@@ -492,13 +488,15 @@ ${regraEscala}
 7. EVIDÊNCIA OBRIGATÓRIA: cada nota deve ter ao menos 1 evidência textual (trecho real ou paráfrase do texto avaliado).
    Se não encontrar problema, diga explicitamente "nenhum desvio identificado nesta competência".
 
-8. ANTI-CONTRADIÇÃO OBRIGATÓRIA:
-   - Se a nota for máxima, a justificativa NÃO pode conter frases como:
-     "há problemas", "faltam elementos", "poderia ser melhor", "insuficiente",
-     "parcialmente", "limitado", "fraco", "desenvolvimento inadequado".
-   - Se encontrar conflito, revise a nota para baixo OU revise a justificativa.
+8. ANTI-CONTRADIÇÃO E COERÊNCIA OBRIGATÓRIAS:
+   - Se a nota de uma competência for máxima (200 no ENEM), a justificativa e os feedbacks NÃO podem conter críticas ou apontamentos de deficiência, tais como:
+     "há problemas", "faltam elementos", "poderia ser melhor", "insuficiente", "parcialmente", "limitado", "fraco",
+     "desenvolvimento inadequado", "pouco detalhamento", "detalhamento frágil", "detalhamento tênue", "repetições",
+     "ampliar vocabulário", "repetição excessiva", "truncamento", "repertório pouco aprofundado", "ausência de".
+   - Se houver recomendação pedagógica de melhoria substantiva para a competência (como enriquecer vocabulário na C1, aprofundar repertório na C2, expandir argumentos na C3, variar conectivos na C4 ou enriquecer detalhamento na C5), a pontuação DEVE SER 160 PTS ou inferior, e JAMAIS 200 PTS.
+   - Uma nota 200 PTS exige excelência demonstrada e justificativa que comprove o atendimento integral de todos os requisitos do nível máximo.
 
-9. NOTAS MÁXIMAS EXIGEM JUSTIFICATIVA FORTE com base no texto.
+9. NOTAS MÁXIMAS EXIGEM JUSTIFICATIVA FORTE com base no texto, sem elogios vazios ou clichês.
 ═══════════════════════════════════════════════════
 
 RUBRICAS OFICIAIS POR COMPETÊNCIA:
@@ -531,11 +529,12 @@ REGRA ABSOLUTA DE INTEGRIDADE:
 // CHAMADAS AOS PROVEDORES
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function chamarGroq(apiKey, prompt) {
+async function chamarGroq(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
   const modelo = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
   const url = 'https://api.groq.com/openai/v1/chat/completions';
+  const timeoutEfetivo = Math.max(1000, Number(timeoutMs) || TIMEOUT_MS);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutEfetivo);
 
   try {
     const body = {
@@ -563,7 +562,6 @@ async function chamarGroq(apiKey, prompt) {
       signal: controller.signal,
       body: JSON.stringify(body)
     });
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errBody = await response.text();
@@ -636,22 +634,24 @@ async function chamarGroq(apiKey, prompt) {
 
     return { rawText, modelo: `groq/${modelo}` };
   } catch (err) {
-    clearTimeout(timeoutId);
     if (err.name === 'AbortError') {
-      const erroTimeout = new Error('Tempo limite excedido ao aguardar resposta da IA (timeout de 28s).');
+      const erroTimeout = new Error(`Tempo limite excedido ao aguardar resposta da IA (timeout de ${timeoutEfetivo}ms).`);
       erroTimeout.statusCode = 504;
       erroTimeout.tipo = 'TIMEOUT_IA';
       throw erroTimeout;
     }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
-async function chamarGemini(apiKey, prompt) {
+async function chamarGemini(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
   const modelo = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`;
+  const timeoutEfetivo = Math.max(1000, Number(timeoutMs) || TIMEOUT_MS);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutEfetivo);
 
   try {
     const response = await fetch(url, {
@@ -665,7 +665,6 @@ async function chamarGemini(apiKey, prompt) {
         generationConfig: { temperature: 0, topP: 1.0, maxOutputTokens: 8192, responseMimeType: 'application/json' }
       })
     });
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errBody = await response.text();
@@ -690,17 +689,24 @@ async function chamarGemini(apiKey, prompt) {
     if (!rawText) throw new Error('O Gemini retornou uma resposta vazia.');
     return { rawText, modelo: `google/${modelo}` };
   } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') throw new Error('Tempo limite excedido ao aguardar resposta da IA (timeout de 28s).');
+    if (err.name === 'AbortError') {
+      const erroTimeout = new Error(`Tempo limite excedido ao aguardar resposta da IA (timeout de ${timeoutEfetivo}ms).`);
+      erroTimeout.statusCode = 504;
+      erroTimeout.tipo = 'TIMEOUT_IA';
+      throw erroTimeout;
+    }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
-async function chamarOpenAI(apiKey, prompt) {
+async function chamarOpenAI(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
   const modelo = process.env.OPENAI_MODEL || 'gpt-4o-mini';
   const url = 'https://api.openai.com/v1/chat/completions';
+  const timeoutEfetivo = Math.max(1000, Number(timeoutMs) || TIMEOUT_MS);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutEfetivo);
 
   try {
     const response = await fetch(url, {
@@ -719,7 +725,6 @@ async function chamarOpenAI(apiKey, prompt) {
         ]
       })
     });
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errBody = await response.text();
@@ -744,9 +749,15 @@ async function chamarOpenAI(apiKey, prompt) {
     if (!rawText) throw new Error('A OpenAI retornou uma resposta vazia.');
     return { rawText, modelo: `openai/${modelo}` };
   } catch (err) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError') throw new Error('Tempo limite excedido ao aguardar resposta da IA (timeout de 28s).');
+    if (err.name === 'AbortError') {
+      const erroTimeout = new Error(`Tempo limite excedido ao aguardar resposta da IA (timeout de ${timeoutEfetivo}ms).`);
+      erroTimeout.statusCode = 504;
+      erroTimeout.tipo = 'TIMEOUT_IA';
+      throw erroTimeout;
+    }
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -761,7 +772,9 @@ const TIPOS_APONTAMENTO_VALIDOS = ['ERRO', 'PONTO_DE_ATENCAO', 'SUGESTAO'];
 const FRASES_NEGATIVAS = [
   'há problemas', 'faltam elementos', 'poderia ser melhor', 'insuficiente',
   'parcialmente', 'limitado', 'fraco', 'desenvolvimento inadequado',
-  'pouco detalhamento', 'ausência de', 'ausente', 'não atende', 'precário'
+  'pouco detalhamento', 'detalhamento frágil', 'detalhamento tênue', 'detalhamento muito tênue',
+  'repetição excessiva', 'repetições excessivas', 'ampliar vocabulário', 'enriquecer vocabulário',
+  'repertório pouco aprofundado', 'ausência de', 'ausente', 'não atende', 'precário'
 ];
 
 /**
@@ -834,19 +847,36 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) 
   const competenciasNormalizadas = parsed.competencias.map((comp, idx) => {
     const oficial = competenciasOficiais[idx] || {};
     const pesoMax = Number(oficial.peso) || Number(comp.nota_maxima) || 200;
-    const notaBruta = Number(comp.nota);
     const numeroComp = Number(comp.numero) || oficial.numero || (idx + 1);
+    if (comp.nota === undefined || comp.nota === null || comp.nota === '' || typeof comp.nota === 'boolean') {
+      throw new Error(`Competência ${idx + 1} retornou nota não-numérica: ausente ou tipo inválido.`);
+    }
 
-    if (isNaN(notaBruta)) {
+    const notaBruta = Number(comp.nota);
+
+    if (isNaN(notaBruta) || !Number.isFinite(notaBruta)) {
       throw new Error(`Competência ${idx + 1} retornou nota não-numérica: "${comp.nota}".`);
     }
 
-    let notaClamped = Math.max(0, Math.min(pesoMax, Math.round(notaBruta)));
+    let notaClamped;
 
-    // Quantização ENEM: somente múltiplos de 40
+    // Regra ENEM: estrita, sem clamp ou quantização silenciosa de notas inválidas
     if (isEnem && pesoMax === 200) {
-      notaClamped = Math.round(notaClamped / 40) * 40;
-      notaClamped = Math.max(0, Math.min(200, notaClamped));
+      if (notaBruta < 0 || notaBruta > 200) {
+        throw new Error(
+          `Competência C${numeroComp} retornou nota fora da escala oficial do ENEM (0 a 200): ${comp.nota}. Valores fora da escala devem ser rejeitados.`
+        );
+      }
+      const INCREMENTOS_ENEM = [0, 40, 80, 120, 160, 200];
+      if (!INCREMENTOS_ENEM.includes(notaBruta)) {
+        throw new Error(
+          `Competência C${numeroComp} retornou nota fora dos incrementos válidos de 40 pontos do ENEM (0, 40, 80, 120, 160, 200): ${comp.nota}. Valores fora dos incrementos devem ser rejeitados.`
+        );
+      }
+      notaClamped = notaBruta;
+    } else {
+      // Demais bancas: comportamento existente preservado (clamp dentro do intervalo válido)
+      notaClamped = Math.max(0, Math.min(pesoMax, Math.round(notaBruta)));
     }
 
     const justificativa = String(comp.justificativa || '').trim();
@@ -923,17 +953,81 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) 
     };
 
     // ── Detecção de contradição nota/justificativa ───────────────────────────
-    // Nota 200 com justificativa contendo termos negativos indica possível superestimação.
+    // Considera a competência relacionada, a gravidade da limitação e a rubrica oficial.
+    // Sugestão pedagógica leve de refinamento estilístico NÃO gera contradição na nota 200.
+    // Fragilidades estruturais relevantes apontadas na justificativa geram nota_suspeita.
     let notaSuspeita = false;
     let avisoContradicao = null;
 
-    if (notaClamped >= 160) {
+    if (notaClamped === 200) {
       const justLower = justificativa.toLowerCase();
-      const conflito = FRASES_NEGATIVAS.find(f => justLower.includes(f));
-      if (conflito && notaClamped === 200) {
-        notaSuspeita = true;
-        avisoContradicao = `Nota 200 com justificativa que menciona "${conflito}". Nota pode estar superestimada.`;
-        console.warn(`[_ai-service] Contradição C${numeroComp}: nota 200 mas justificativa menciona "${conflito}"`);
+
+      // Verifica se é puramente uma sugestão pedagógica leve de estilo ou vocabulário futuro
+      const isSugestaoEstilisticaLeve =
+        (justLower.includes('como sugestão') || justLower.includes('sugestão pedagógica') ||
+         justLower.includes('refinamento futuro') || justLower.includes('como aprimoramento') ||
+         justLower.includes('sugestão estilística') || justLower.includes('aperfeiçoamento futuro') ||
+         justLower.includes('sugestão de aperfeiçoamento')) &&
+        !justLower.includes('excessiv') &&
+        !justLower.includes('recorrente') &&
+        !justLower.includes('grave') &&
+        !justLower.includes('inadequado') &&
+        !justLower.includes('inadequada') &&
+        !justLower.includes('insuficiente') &&
+        !justLower.includes('falha');
+
+      if (!isSugestaoEstilisticaLeve) {
+        // 1. Fragilidades estruturais gerais graves (incompatíveis com nível 5 em qualquer competência)
+        const termosGeraisGraves = [
+          'insuficiente', 'precário', 'desenvolvimento inadequado', 'não atende',
+          'muito fraco', 'ausência completa', 'compromete a leitura', 'incoerente',
+          'parcialmente', 'há problemas'
+        ];
+        const conflitoGeral = termosGeraisGraves.find(t => justLower.includes(t));
+
+        if (conflitoGeral) {
+          notaSuspeita = true;
+          avisoContradicao = `Nota 200 com justificativa que aponta fragilidade estrutural grave ("${conflitoGeral}"). Nota pode estar superestimada.`;
+          console.warn(`[_ai-service] Contradição geral C${numeroComp}: nota 200 mas menciona "${conflitoGeral}"`);
+        } else {
+          // 2. Fragilidades estruturais específicas por competência oficial do INEP
+          const limitacoesPorComp = {
+            1: [
+              'desvios frequentes', 'desvios recorrentes', 'desvios gramaticais recorrentes',
+              'problemas sintáticos', 'truncamento sintático recorrente', 'falhas gramaticais',
+              'repetições excessivas', 'repetição excessiva', 'vocabulário impreciso',
+              'enriquecer vocabulário', 'ampliar vocabulário'
+            ],
+            2: [
+              'repertório pouco produtivo', 'repertório não legitimado', 'repertório ausente',
+              'repertório pouco aprofundado', 'pouco aprofundado',
+              'tangenciamento', 'tangencial', 'fuga parcial', 'repertório desconectado', 'repertório frágil'
+            ],
+            3: [
+              'lacuna argumentativa', 'lacunas argumentativas', 'argumentação superficial',
+              'projeto de texto com falhas', 'argumentos contraditórios', 'incoerência argumentativa',
+              'falta de autoria', 'projeto falho'
+            ],
+            4: [
+              'repetições excessivas', 'repetição excessiva', 'ausência de conectivos',
+              'conectivos inadequados', 'problemas de coesão', 'problemas de articulação',
+              'falta de encadeamento', 'coesão precária'
+            ],
+            5: [
+              'proposta incompleta', 'detalhamento frágil', 'detalhamento tênue', 'detalhamento muito tênue',
+              'detalhamento ausente', 'pouco detalhamento', 'faltam elementos', 'menos de 5 elementos',
+              'ausência de agente', 'ausência de ação', 'ausência de meio', 'ausência de efeito'
+            ]
+          };
+
+          const listaComp = limitacoesPorComp[numeroComp] || [];
+          const conflitoComp = listaComp.find(t => justLower.includes(t));
+          if (conflitoComp) {
+            notaSuspeita = true;
+            avisoContradicao = `Nota 200 em C${numeroComp} com justificativa que menciona "${conflitoComp}". Nota pode estar superestimada.`;
+            console.warn(`[_ai-service] Contradição C${numeroComp}: nota 200 mas menciona "${conflitoComp}"`);
+          }
+        }
       }
     }
 
@@ -1080,7 +1174,12 @@ export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto, pro
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 
-  if (!groqKey && !geminiKey && !openaiKey) {
+  const provedoresElegiveis = [];
+  if (groqKey) provedoresElegiveis.push({ nome: 'groq', key: groqKey, fn: chamarGroq });
+  if (geminiKey) provedoresElegiveis.push({ nome: 'gemini', key: geminiKey, fn: chamarGemini });
+  if (openaiKey) provedoresElegiveis.push({ nome: 'openai', key: openaiKey, fn: chamarOpenAI });
+
+  if (provedoresElegiveis.length === 0) {
     const erroConfig = new Error(
       'Nenhum provedor de IA está configurado no servidor. Configure a variável GROQ_API_KEY (ou GEMINI_API_KEY) nas variáveis de ambiente da Vercel.'
     );
@@ -1091,17 +1190,102 @@ export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto, pro
 
   const prompt = construirPromptCorrecao({ tema, vestibular, matriz, texto, proposta });
 
-  let resultadoBruto = null;
+  const tempoInicio = Date.now();
+  const TETO_GLOBAL_MS = TIMEOUT_MS; // 28000ms
+  const MARGEM_MINIMA_MS = 4000;      // precisa de pelo menos 4s úteis para tentar outro provedor
 
-  if (groqKey) {
-    resultadoBruto = await chamarGroq(groqKey, prompt);
-  } else if (geminiKey) {
-    resultadoBruto = await chamarGemini(geminiKey, prompt);
-  } else if (openaiKey) {
-    resultadoBruto = await chamarOpenAI(openaiKey, prompt);
+  const errosAcumulados = [];
+
+  for (let i = 0; i < provedoresElegiveis.length; i++) {
+    const { nome, key, fn } = provedoresElegiveis[i];
+    const decorrido = Date.now() - tempoInicio;
+    const tempoRestante = TETO_GLOBAL_MS - decorrido;
+
+    if (tempoRestante < MARGEM_MINIMA_MS) {
+      console.warn(`[avaliarRedacaoComIA] Orçamento global de tempo esgotado (${decorrido}ms decorridos). Abortando tentativa no provedor "${nome}".`);
+      errosAcumulados.push({
+        provedor: nome,
+        categoria: 'ORCAMENTO_TEMPO_ESGOTADO',
+        mensagem: `Tempo restante insuficiente (${tempoRestante}ms < ${MARGEM_MINIMA_MS}ms).`
+      });
+      break;
+    }
+
+    console.info(`[avaliarRedacaoComIA] Tentativa ${i + 1}/${provedoresElegiveis.length}: acionando provedor "${nome}" (tempo restante: ${tempoRestante}ms)...`);
+
+    const timeoutChamada = Math.min(TIMEOUT_MS, tempoRestante);
+
+    try {
+      const resultadoBruto = await fn(key, prompt, timeoutChamada);
+      const resultado = validarENormalizarResposta(resultadoBruto.rawText, matriz, resultadoBruto.modelo, texto);
+      resultado.fingerprint = gerarFingerprintRedacao(texto, propostaId, vestibularId);
+
+      if (i > 0) {
+        console.info(`[avaliarRedacaoComIA] Sucesso via fallback no provedor "${nome}" após ${i} falha(s) anterior(es).`);
+      }
+
+      return resultado;
+    } catch (errProv) {
+      const duracao = Date.now() - tempoInicio;
+      const status = errProv?.statusCode || 500;
+      const tipo = errProv?.tipo || 'ERRO_DESCONHECIDO';
+
+      // Categorização do erro para fins de log seguro e decisão de fallback
+      let categoria = 'FALHA_GENERICA';
+      let elegivelFallback = true;
+
+      if (status === 401 || status === 403) {
+        categoria = 'AUTENTICACAO_INVALIDA';
+        elegivelFallback = true; // Chave inválida em um provedor deve permitir tentar o próximo configurado
+      } else if (errProv?.tipo === 'RESPOSTA_TRUNCADA_IA' || errProv?.message?.includes('limite de tokens')) {
+        categoria = 'RESPOSTA_TRUNCADA';
+        elegivelFallback = true;
+      } else if (status === 400 || errProv?.message?.includes('JSON') || errProv?.message?.includes('competências')) {
+        categoria = 'FORMATO_OU_VALIDACAO_JSON';
+        elegivelFallback = true;
+      } else if (status === 429) {
+        categoria = 'TAXA_LIMITE_IA';
+        elegivelFallback = true;
+      } else if (status === 504 || errProv?.tipo === 'TIMEOUT_IA' || errProv?.name === 'AbortError') {
+        categoria = 'TIMEOUT_PROVEDOR';
+        elegivelFallback = true;
+      } else if (status >= 500) {
+        categoria = 'ERRO_INTERNO_PROVEDOR';
+        elegivelFallback = true;
+      }
+
+      console.warn(`[avaliarRedacaoComIA] Falha no provedor "${nome}" (status: ${status}, categoria: ${categoria}, decorrido: ${duracao}ms):`, {
+        provedor: nome,
+        categoria,
+        statusCode: status,
+        tipo
+      });
+
+      errosAcumulados.push({
+        provedor: nome,
+        categoria,
+        statusCode: status,
+        mensagem: errProv?.message || 'Erro sem mensagem'
+      });
+
+      // Se for o último provedor elegível ou não for elegível a fallback, interrompe
+      if (!elegivelFallback || i === provedoresElegiveis.length - 1) {
+        break;
+      }
+
+      console.info(`[avaliarRedacaoComIA] Acionando fallback para o próximo provedor...`);
+    }
   }
 
-  const resultado = validarENormalizarResposta(resultadoBruto.rawText, matriz, resultadoBruto.modelo, texto);
-  resultado.fingerprint = gerarFingerprintRedacao(texto, propostaId, vestibularId);
-  return resultado;
+  // Se chegou aqui, todos os provedores elegíveis falharam ou o tempo acabou
+  const resumoErros = errosAcumulados.map(e => `${e.provedor} (${e.categoria})`).join('; ');
+  console.error('[avaliarRedacaoComIA] Todos os provedores de IA falharam:', resumoErros);
+
+  const erroAgregado = new Error(
+    `Todos os provedores de IA falharam ou não puderam validar a avaliação completa: ${resumoErros}. Tente novamente em instantes.`
+  );
+  erroAgregado.statusCode = 502;
+  erroAgregado.tipo = 'FALHA_TODOS_PROVEDORES_IA';
+  erroAgregado.erros = errosAcumulados;
+  throw erroAgregado;
 }

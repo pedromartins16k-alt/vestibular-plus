@@ -392,32 +392,53 @@ try {
     /nota não-numérica/i
   );
 
-  // 10b: Nota negativa é clampada em 0
-  const resNeg = validarENormalizarResposta(JSON.stringify({
-    competencias: [
-      { numero: 1, nota: -50, justificativa: 'Texto justificativa longo o bastante.' },
-      { numero: 2, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
-      { numero: 3, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
-      { numero: 4, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
-      { numero: 5, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' }
-    ]
-  }), matrizEnem, 'mock');
-  assert.equal(resNeg.competencias[0].nota, 0, 'Nota negativa clampada em 0');
+  // 10b: Nota negativa é rejeitada no ENEM
+  assert.throws(
+    () => validarENormalizarResposta(JSON.stringify({
+      competencias: [
+        { numero: 1, nota: -50, justificativa: 'Texto justificativa longo o bastante.' },
+        { numero: 2, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
+        { numero: 3, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
+        { numero: 4, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
+        { numero: 5, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' }
+      ]
+    }), matrizEnem, 'mock'),
+    /fora da escala oficial do ENEM/i,
+    'Nota negativa deve ser rejeitada no ENEM'
+  );
 
-  // 10c: Nota excedente é limitada ao teto
-  const resMax = validarENormalizarResposta(JSON.stringify({
-    competencias: [
-      { numero: 1, nota: 999, justificativa: 'Texto justificativa longo o bastante.' },
-      { numero: 2, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
-      { numero: 3, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
-      { numero: 4, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
-      { numero: 5, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' }
-    ]
-  }), matrizEnem, 'mock');
-  assert.equal(resMax.competencias[0].nota, 200, 'Nota excedente limitada ao pesoMax de 200');
+  // 10c: Nota excedente (>200) é rejeitada no ENEM
+  assert.throws(
+    () => validarENormalizarResposta(JSON.stringify({
+      competencias: [
+        { numero: 1, nota: 999, justificativa: 'Texto justificativa longo o bastante.' },
+        { numero: 2, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
+        { numero: 3, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
+        { numero: 4, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
+        { numero: 5, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' }
+      ]
+    }), matrizEnem, 'mock'),
+    /fora da escala oficial do ENEM/i,
+    'Nota excedente deve ser rejeitada no ENEM'
+  );
 
-  pass('ETAPA 26.4: Notas NaN rejeitadas, negativas clampadas em 0 e excedentes no teto');
-} catch (e) { fail('ETAPA 26.4: Casos de borda de pontuação', e); }
+  // 10d: Nota fora dos incrementos de 40 no ENEM é rejeitada
+  assert.throws(
+    () => validarENormalizarResposta(JSON.stringify({
+      competencias: [
+        { numero: 1, nota: 150, justificativa: 'Texto justificativa longo o bastante.' },
+        { numero: 2, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
+        { numero: 3, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
+        { numero: 4, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' },
+        { numero: 5, nota: 160, justificativa: 'Justificativa normal com tamanho adequado.' }
+      ]
+    }), matrizEnem, 'mock'),
+    /fora dos incrementos válidos de 40 pontos/i,
+    'Nota fora dos incrementos de 40 deve ser rejeitada no ENEM'
+  );
+
+  pass('ETAPA 26.7.1: Notas NaN, negativas, excedentes e fora de incrementos são rejeitadas com erro no ENEM');
+} catch (e) { fail('ETAPA 26.7.1: Casos de borda de pontuação ENEM', e); }
 
 // 11. ETAPA 26.4: Quantização em múltiplos de 40 restrita ao ENEM
 total++;

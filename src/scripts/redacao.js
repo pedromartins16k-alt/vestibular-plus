@@ -775,13 +775,30 @@ function renderizarHistorico() {
       const idx = avaliadas.findIndex(a => a.id === r.id);
       if (idx !== -1 && idx < avaliadas.length - 1) {
         const anterior = avaliadas[idx + 1];
-        const diff = notaTotal - anterior.avaliacao_ia.nota_total;
-        if (diff > 0) {
-          variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:#22c55e; background:rgba(34,197,94,0.12); padding:2px 8px; border-radius:var(--radius-full);">+${diff} pts ↑</span>`;
-        } else if (diff < 0) {
-          variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:#ef4444; background:rgba(239,68,68,0.12); padding:2px 8px; border-radius:var(--radius-full);">${diff} pts ↓</span>`;
+        const textoAtual = (r.texto || '').trim();
+        const textoAnt = (anterior.texto || '').trim();
+        const fpAtual = r.avaliacao_ia?.fingerprint;
+        const fpAnt = anterior.avaliacao_ia?.fingerprint;
+        const mesmoTexto = (textoAtual.length > 0 && textoAnt.length > 0 && textoAtual === textoAnt) ||
+                           (Boolean(fpAtual) && Boolean(fpAnt) && fpAtual === fpAnt);
+
+        if (mesmoTexto) {
+          // Reavaliação do mesmo texto: explicita nova estimativa do modelo, não evolução do aluno
+          if (diff !== 0) {
+            const sinal = diff > 0 ? `+${diff}` : `${diff}`;
+            variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:#38bdf8; background:rgba(56,189,248,0.12); padding:2px 8px; border-radius:var(--radius-full);" title="Variação de estimativa do modelo sobre o mesmo texto">${sinal} pts (nova estimativa IA)</span>`;
+          } else {
+            variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:var(--text-secondary); background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:var(--radius-full);" title="Mesma estimativa sobre o mesmo texto">= estimativa estável</span>`;
+          }
         } else {
-          variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:var(--text-secondary); background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:var(--radius-full);">= manteve</span>`;
+          // Redações com textos distintos
+          if (diff > 0) {
+            variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:#22c55e; background:rgba(34,197,94,0.12); padding:2px 8px; border-radius:var(--radius-full);" title="Diferença de pontuação entre redações distintas">+${diff} pts ↑</span>`;
+          } else if (diff < 0) {
+            variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:#ef4444; background:rgba(239,68,68,0.12); padding:2px 8px; border-radius:var(--radius-full);" title="Diferença de pontuação entre redações distintas">${diff} pts ↓</span>`;
+          } else {
+            variacaoBadge = `<span style="font-size:0.7rem; font-weight:800; color:var(--text-secondary); background:rgba(255,255,255,0.06); padding:2px 8px; border-radius:var(--radius-full);" title="Mesma pontuação">= manteve</span>`;
+          }
         }
       }
     }
@@ -2138,15 +2155,33 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
           return '';
         })();
 
+        const textoAtualModal = (r.texto || '').trim();
+        const textoAntModal = (anterior.texto || '').trim();
+        const fpAtualModal = av.fingerprint;
+        const fpAntModal = anterior.fingerprint;
+        const isMesmoTextoModal = (textoAtualModal.length > 0 && textoAntModal.length > 0 && textoAtualModal === textoAntModal) ||
+                                  (Boolean(fpAtualModal) && Boolean(fpAntModal) && fpAtualModal === fpAntModal) ||
+                                  (!textoAntModal && !fpAntModal);
+
+        const tituloComparativo = isMesmoTextoModal
+          ? 'Comparativo de Avaliações IA (Mesmo Texto)'
+          : 'Comparativo de Avaliações IA (Versões Diferentes)';
+        const explicacaoComparativo = isMesmoTextoModal
+          ? '💡 <em>Nota sobre reavaliações:</em> Esta variação reflete uma nova estimativa pedagógica do modelo sobre o mesmo texto redigido, e não uma alteração textual.'
+          : '💡 <em>Comparativo entre versões:</em> Esta variação reflete avaliações entre versões distintas do texto. A pontuação pode refletir alterações no texto e estimativas da IA.';
+
         return `
           <div style="margin-bottom:20px; padding:14px 16px; border-radius:var(--radius-md); background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
               <strong style="font-size:0.88rem; color:#38bdf8; display:flex; align-items:center; gap:6px;">
-                <span>⚖️</span> Comparativo com a Avaliação Anterior
+                <span>⚖️</span> ${tituloComparativo}
               </strong>
               <span style="font-size:0.8rem; font-weight:800; color:${corDiff};">
                 Nota anterior: ${anterior.nota_total} → Nova: ${av.nota_total} (${diffSinal} pts)
               </span>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.4;">
+              ${explicacaoComparativo}
             </div>
             ${alerteDiscrepancia}
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px; font-size:0.78rem;">
@@ -2171,7 +2206,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         `;
       })()}
 
-      <!-- Evolução do Aluno (somente dados reais do histórico desta redação) -->
+      <!-- Evolução do Aluno / Histórico de Estimativas (somente dados reais do histórico desta redação) -->
       ${(() => {
         const hist = Array.isArray(r.historico_avaliacoes) ? r.historico_avaliacoes : [];
         if (hist.length < 1) return '';

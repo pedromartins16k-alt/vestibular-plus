@@ -217,10 +217,10 @@ async function runTests() {
     const raw = JSON.stringify({
       nota_total: 9999, nota_maxima: 1000,
       competencias: [
-        mockComp(1, 145, { justificativa: 'Bom domínio da norma culta com poucos desvios identificados no texto.' }),
-        mockComp(2, 75, { justificativa: 'Compreensão mediana do tema com repertório limitado presente.' }),
-        mockComp(3, 190, { justificativa: 'Argumentação excelente com progressão clara e bem articulada.' }),
-        mockComp(4, 30, { justificativa: 'Poucos conectivos, progressão textual comprometida em vários pontos.' }),
+        mockComp(1, 160, { justificativa: 'Bom domínio da norma culta com poucos desvios identificados no texto.' }),
+        mockComp(2, 80, { justificativa: 'Compreensão mediana do tema com repertório limitado presente.' }),
+        mockComp(3, 200, { justificativa: 'Argumentação excelente com progressão clara e bem articulada.' }),
+        mockComp(4, 40, { justificativa: 'Poucos conectivos, progressão textual comprometida em vários pontos.' }),
         mockComp(5, 0, { justificativa: 'Ausência completa de proposta de intervenção no texto avaliado.' })
       ],
       pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
@@ -234,7 +234,18 @@ async function runTests() {
     assert.equal(r.competencias[4].nota, 0);
     assert.equal(r.nota_total, 480);
     assert.notEqual(r.nota_total, 9999);
-    pass('12.1 — Quantização ENEM e soma pelo backend (9999 descartado → 480)');
+
+    // Validação estrita: nota fora dos incrementos de 40 no ENEM deve ser rejeitada
+    assert.throws(() => {
+      validarENormalizarResposta(JSON.stringify({
+        competencias: [
+          mockComp(1, 145, { justificativa: 'Nota fora dos incrementos de 40 pontos.' }),
+          mockComp(2, 80), mockComp(3, 200), mockComp(4, 40), mockComp(5, 0)
+        ]
+      }), matrizEnem, 'test');
+    }, /incrementos válidos de 40 pontos/i);
+
+    pass('12.1 — Soma pelo backend (9999 descartado → 480) e rejeição estrita de notas fora dos incrementos');
   } catch (e) { fail('12.1', e); }
 
   total++;
