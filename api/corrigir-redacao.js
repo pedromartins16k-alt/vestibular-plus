@@ -222,16 +222,16 @@ export default async function handler(req, res) {
           tipo: 'CONFIGURACAO_IA_PENDENTE'
         });
       }
-      if (errIA.statusCode === 429) {
+      if (errIA.isTimeout || errIA.statusCode === 504 || errIA.name === 'AbortError' || errIA.message?.includes('Tempo limite excedido')) {
+        return responderJson(res, 504, {
+          error: 'Tempo limite excedido ao aguardar resposta do corretor de IA. Por favor, tente novamente em alguns instantes.',
+          tipo: 'TIMEOUT_IA'
+        });
+      }
+      if (errIA.status === 429 || errIA.statusCode === 429 || errIA.message?.includes('429')) {
         return responderJson(res, 429, {
           error: 'Limite temporário de requisições do serviço de IA atingido. Por favor, aguarde alguns instantes e tente novamente.',
           tipo: 'TAXA_LIMITE_IA'
-        });
-      }
-      if (errIA.statusCode === 504 || errIA.name === 'AbortError') {
-        return responderJson(res, 504, {
-          error: 'Tempo limite excedido ao aguardar resposta do corretor de IA. Tente novamente.',
-          tipo: 'TIMEOUT_IA'
         });
       }
       if (errIA.statusCode === 400) {
@@ -242,7 +242,7 @@ export default async function handler(req, res) {
         });
       }
       return responderJson(res, 502, {
-        error: `Não foi possível obter a correção do provedor de IA: ${errIA.message}`,
+        error: `Não foi possível obter uma avaliação completa e válida no momento. Detalhes: ${errIA.message}`,
         tipo: 'FALHA_PROVEDOR_IA'
       });
     }

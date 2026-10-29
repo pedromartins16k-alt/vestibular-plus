@@ -824,38 +824,84 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) 
   }
 
   // ETAPA 25.3: Validação estrita de integridade das competências
-  // Se for ENEM ou se houver matriz com competências definidas, todas devem estar presentes
-  const qtdEsperada = competenciasOficiais.length > 0 ? competenciasOficiais.length : (isEnem ? 5 : 0);
+  // Constrói o conjunto oficial de identificadores esperados a partir da matriz da banca
+  const identificadoresOficiais = competenciasOficiais.map(c => Number(c.numero)).filter(n => Number.isInteger(n) && n > 0);
+  const qtdEsperada = identificadoresOficiais.length > 0 ? identificadoresOficiais.length : (isEnem ? 5 : 0);
+
   if (qtdEsperada > 0 && parsed.competencias.length !== qtdEsperada) {
     throw new Error(
-      `A avaliação está incompleta: esperadas ${qtdEsperada} competências (${isEnem ? 'C1 a C5' : 'oficiais'}), mas a IA retornou apenas ${parsed.competencias.length}. Nenhuma nota parcial será atribuída.`
+      `A avaliação está incompleta: esperadas ${qtdEsperada} competências (${isEnem ? 'C1 a C5' : 'oficiais da banca'}), mas a IA retornou apenas ${parsed.competencias.length}. Nenhuma nota parcial será atribuída.`
     );
   }
 
-  // Verifica se todos os números de competência esperados estão presentes
+  // Validação estrita dos identificadores retornados pela IA (sem fallbacks silenciosos como `|| (i + 1)`)
   if (qtdEsperada > 0) {
-    const numerosPresentes = new Set(parsed.competencias.map((c, i) => Number(c.numero) || (i + 1)));
-    for (let cNum = 1; cNum <= qtdEsperada; cNum++) {
-      if (!numerosPresentes.has(cNum)) {
+    const conjuntoEsperado = new Set(identificadoresOficiais.length > 0 ? identificadoresOficiais : [1, 2, 3, 4, 5]);
+    const identificadoresRecebidos = [];
+
+    for (let i = 0; i < parsed.competencias.length; i++) {
+      const c = parsed.competencias[i];
+      if (c === null || typeof c !== 'object') {
+        throw new Error(`A competência na posição ${i + 1} é inválida ou não é um objeto.`);
+      }
+
+      // Rejeita identificador ausente, nulo, booleano, string vazia ou não inteira
+      if (c.numero === undefined || c.numero === null || c.numero === '' || typeof c.numero === 'boolean') {
         throw new Error(
-          `A avaliação está incompleta: a competência C${cNum} não foi retornada pela IA. Nenhuma nota parcial será atribuída.`
+          `Identificador de competência ausente ou inválido na posição ${i + 1}. Valores nulos ou vazios não são aceitos.`
+        );
+      }
+
+      const numParsed = Number(c.numero);
+      if (!Number.isInteger(numParsed) || numParsed <= 0) {
+        throw new Error(
+          `Identificador de competência inválido na posição ${i + 1}: "${c.numero}". Deve ser um número inteiro positivo pertencente à matriz oficial.`
+        );
+      }
+
+      if (!conjuntoEsperado.has(numParsed)) {
+        throw new Error(
+          `Competência inesperada identificada: ${numParsed}. A matriz da banca reconhece apenas as competências: [${Array.from(conjuntoEsperado).join(', ')}].`
+        );
+      }
+
+      identificadoresRecebidos.push(numParsed);
+    }
+
+    // Rejeita duplicatas antes de validar faltantes
+    const conjuntoRecebidos = new Set(identificadoresRecebidos);
+    if (identificadoresRecebidos.length !== conjuntoRecebidos.size) {
+      throw new Error(
+        `A avaliação contém competências duplicadas: esperadas ${qtdEsperada} competências distintas. Nenhuma nota parcial será atribuída.`
+      );
+    }
+
+    // Confirma que todas as competências da matriz estão presentes
+    for (const esperado of conjuntoEsperado) {
+      if (!conjuntoRecebidos.has(esperado)) {
+        throw new Error(
+          `A avaliação está incompleta: a competência C${esperado} da matriz oficial não foi retornada pela IA. Nenhuma nota parcial será atribuída.`
         );
       }
     }
+
+    // Ordena as competências estritamente pelo número oficial da matriz após a validação
+    parsed.competencias.sort((a, b) => Number(a.numero) - Number(b.numero));
   }
 
   const competenciasNormalizadas = parsed.competencias.map((comp, idx) => {
-    const oficial = competenciasOficiais[idx] || {};
+    const numeroComp = Number(comp.numero);
+    // Pareia estritamente pelo número oficial na matriz
+    const oficial = competenciasOficiais.find(c => Number(c.numero) === numeroComp) || competenciasOficiais[idx] || {};
     const pesoMax = Number(oficial.peso) || Number(comp.nota_maxima) || 200;
-    const numeroComp = Number(comp.numero) || oficial.numero || (idx + 1);
     if (comp.nota === undefined || comp.nota === null || comp.nota === '' || typeof comp.nota === 'boolean') {
-      throw new Error(`Competência ${idx + 1} retornou nota não-numérica: ausente ou tipo inválido.`);
+      throw new Error(`Competência ${numeroComp} retornou nota não-numérica: ausente ou tipo inválido.`);
     }
 
     const notaBruta = Number(comp.nota);
 
     if (isNaN(notaBruta) || !Number.isFinite(notaBruta)) {
-      throw new Error(`Competência ${idx + 1} retornou nota não-numérica: "${comp.nota}".`);
+      throw new Error(`Competência ${numeroComp} retornou nota não-numérica: "${comp.nota}".`);
     }
 
     let notaClamped;
@@ -1033,7 +1079,7 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) 
 
     const resultado = {
       numero: numeroComp,
-      nome: String(comp.nome || oficial.nome || `Competência ${idx + 1}`),
+      nome: String(comp.nome || oficial.nome || `Competência ${numeroComp}`),
       nota: notaClamped,
       nota_maxima: pesoMax,
       nivel,

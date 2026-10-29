@@ -110,7 +110,7 @@ function mockRespostaIA(notas, opts = {}) {
 
 async function runTests() {
   console.log('🧪 Iniciando suíte de testes — ETAPA 22: Estabilidade e Consistência Real\n');
-  let passados = 0, total = 0;
+  let passados = 0, total = 0, skipped = 0;
 
   function pass(label) { console.log(`✅ ${label}`); passados++; }
   function fail(label, err) { console.error(`❌ ${label}:`, err?.message || err); }
@@ -2168,11 +2168,241 @@ async function runTests() {
     pass('99 — ETAPA 25.4: Suíte completa de regressão e integridade de persistência validada');
   } catch (e) { fail('99', e); }
 
-  // ── TESTE REAL (opcional) ─────────────────────────────────────────────────
+  // ── ETAPA 25.5: AUDITORIA DE DUPLICATAS, FALLBACK E ERROS AMIGÁVEIS ────────
+
+  // Teste 100 — Rejeição estrita de competências duplicadas no ENEM (ex: duas C1s)
   total++;
-  if (process.env.GROQ_API_KEY) {
+  try {
+    const rawDuplicada = JSON.stringify({
+      nota_total: 400,
+      competencias: [
+        { numero: 1, nota: 200, justificativa: "Primeira C1 com excelente domínio da norma culta." },
+        { numero: 1, nota: 200, justificativa: "Segunda C1 duplicada pela IA." },
+        { numero: 2, nota: 160, justificativa: "C2 presente." },
+        { numero: 3, nota: 160, justificativa: "C3 presente." },
+        { numero: 4, nota: 160, justificativa: "C4 presente." }
+      ]
+    });
+    assert.throws(
+      () => validarENormalizarResposta(rawDuplicada, matrizEnem, 'mock'),
+      /duplicadas|incompleta/i,
+      'Deve rejeitar JSON com competências duplicadas'
+    );
+    pass('100 — ETAPA 25.5: Backend rejeita estritamente competências duplicadas');
+  } catch (e) { fail('100', e); }
+
+  // Teste 101 — Ordenação automática estrita de competências desordenadas (C3, C1, C5, C2, C4)
+  total++;
+  try {
+    const rawDesordenada = JSON.stringify({
+      nota_total: 800,
+      competencias: [
+        { numero: 3, nota: 160, justificativa: "Projeto de texto consistente e tese bem articulada." },
+        { numero: 1, nota: 160, justificativa: "Poucos desvios gramaticais identificados no texto dissertativo." },
+        { numero: 5, nota: 160, justificativa: "Proposta completa de intervenção respeitando os direitos humanos." },
+        { numero: 2, nota: 160, justificativa: "Repertório legitimado, pertinente e produtivo na discussão." },
+        { numero: 4, nota: 160, justificativa: "Mecanismos coesivos diversificados e conectivos bem utilizados." }
+      ]
+    });
+    const res = validarENormalizarResposta(rawDesordenada, matrizEnem, 'mock');
+    assert.equal(res.competencias[0].numero, 1, 'Primeira competência normalizada é C1');
+    assert.ok(res.competencias[0].justificativa.includes('desvios gramaticais'), 'C1 mantém justificativa de gramática');
+    assert.equal(res.competencias[1].numero, 2, 'Segunda competência normalizada é C2');
+    assert.ok(res.competencias[1].justificativa.includes('Repertório legitimado'), 'C2 mantém justificativa de repertório');
+    assert.equal(res.competencias[2].numero, 3, 'Terceira competência normalizada é C3');
+    assert.ok(res.competencias[2].justificativa.includes('Projeto de texto'), 'C3 mantém justificativa de projeto de texto');
+    assert.equal(res.competencias[3].numero, 4, 'Quarta competência normalizada é C4');
+    assert.ok(res.competencias[3].justificativa.includes('Mecanismos coesivos'), 'C4 mantém justificativa de coesão');
+    assert.equal(res.competencias[4].numero, 5, 'Quinta competência normalizada é C5');
+    assert.ok(res.competencias[4].justificativa.includes('Proposta completa'), 'C5 mantém justificativa de proposta');
+    pass('101 — ETAPA 25.5: Backend reordena C1-C5 preservando notas, justificativas e nomes oficiais');
+  } catch (e) { fail('101', e); }
+
+  // Teste 102 — Categorização de erros no endpoint (504 Timeout e 429 Rate-Limit)
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const apiSrc = fs.readFileSync('api/corrigir-redacao.js', 'utf8');
+    assert.ok(apiSrc.includes('TIMEOUT_IA'), 'Tipo TIMEOUT_IA registrado no endpoint');
+    assert.ok(apiSrc.includes('FALHA_PROVEDOR_IA'), 'Tipo FALHA_PROVEDOR_IA registrado no endpoint');
+    assert.ok(apiSrc.includes('504'), 'Status 504 mapeado no endpoint');
+    assert.ok(apiSrc.includes('429'), 'Status 429 mapeado no endpoint');
+    pass('102 — ETAPA 25.5: Categorização tipada de erros de IA no endpoint (504, 429, 502, 503)');
+  } catch (e) { fail('102', e); }
+
+  // Teste 103 — Mensagens claras e pedagógicas no frontend redacao.js
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const redacaoSrc = fs.readFileSync('src/scripts/redacao.js', 'utf8');
+    assert.ok(redacaoSrc.includes('response.status === 504'), 'Frontend intercepta 504');
+    assert.ok(redacaoSrc.includes('response.status === 429'), 'Frontend intercepta 429');
+    assert.ok(redacaoSrc.includes('tempo limite excedido'), 'Mensagem amigável de timeout ao aluno');
+    assert.ok(redacaoSrc.includes('Limite de requisições por minuto'), 'Mensagem amigável de rate limit ao aluno');
+    pass('103 — ETAPA 25.5: Mensagens pedagógicas amigáveis exibidas no cliente para 504 e 429');
+  } catch (e) { fail('103', e); }
+
+  // Teste 104 — Fallback sequencial com orçamento de tempo implementado no _ai-service.js
+  total++;
+  try {
+    const { default: fs } = await import('fs');
+    const aiSrc = fs.readFileSync('api/_ai-service.js', 'utf8');
+    assert.ok(aiSrc.includes('errosAcumulados'), 'Rastreamento de erros acumulados por tentativa');
+    assert.ok(aiSrc.includes('TETO_GLOBAL_MS'), 'Orçamento global de tempo teto definido');
+    assert.ok(aiSrc.includes('MARGEM_MINIMA_MS'), 'Guarda de margem mínima útil definida');
+    assert.ok(aiSrc.includes('tempoRestante < MARGEM_MINIMA_MS'), 'Interrupção preventiva por tempo insuficiente');
+    pass('104 — ETAPA 25.5: Orçamento de tempo global (TETO_GLOBAL_MS) e guarda preventiva de fallback');
+  } catch (e) { fail('104', e); }
+
+  // ── ETAPA 25.6: VALIDAÇÃO ESTRITA DE IDENTIFICADORES E DEMAIS BANCAS ──────
+
+  // Teste 105 — Rejeição estrita de competência com identificador null, ausente ou booleano
+  total++;
+  try {
+    const rawNumeroInvalido = JSON.stringify({
+      nota_total: 1000,
+      competencias: [
+        { numero: null, nota: 200, justificativa: "C1 válida em conteúdo porém com id nulo." },
+        { numero: 2, nota: 200, justificativa: "C2 válida com conteúdo pedagógico adequado." },
+        { numero: 3, nota: 200, justificativa: "C3 válida com conteúdo pedagógico adequado." },
+        { numero: 4, nota: 200, justificativa: "C4 válida com conteúdo pedagógico adequado." },
+        { numero: 5, nota: 200, justificativa: "C5 válida com conteúdo pedagógico adequado." }
+      ]
+    });
+    assert.throws(
+      () => validarENormalizarResposta(rawNumeroInvalido, matrizEnem, 'mock'),
+      /Identificador de competência ausente ou inválido/i,
+      'Deve rejeitar identificador nulo sem converter para sequência com fallback'
+    );
+    pass('105 — ETAPA 25.6: Backend rejeita identificador de competência null/ausente');
+  } catch (e) { fail('105', e); }
+
+  // Teste 106 — Rejeição de identificador zero ou negativo
+  total++;
+  try {
+    const rawNumeroZero = JSON.stringify({
+      nota_total: 1000,
+      competencias: [
+        { numero: 0, nota: 200, justificativa: "C0 inválida não existente no ENEM." },
+        { numero: 2, nota: 200, justificativa: "C2 válida." },
+        { numero: 3, nota: 200, justificativa: "C3 válida." },
+        { numero: 4, nota: 200, justificativa: "C4 válida." },
+        { numero: 5, nota: 200, justificativa: "C5 válida." }
+      ]
+    });
+    assert.throws(
+      () => validarENormalizarResposta(rawNumeroZero, matrizEnem, 'mock'),
+      /Identificador de competência inválido/i,
+      'Deve rejeitar identificador 0'
+    );
+    pass('106 — ETAPA 25.6: Backend rejeita identificador de competência zero ou negativo');
+  } catch (e) { fail('106', e); }
+
+  // Teste 107 — Rejeição de identificador string não-numérica (ex: "C1" ou "foo")
+  total++;
+  try {
+    const rawTextoId = JSON.stringify({
+      nota_total: 1000,
+      competencias: [
+        { numero: "C1", nota: 200, justificativa: "C1 em texto não inteiro." },
+        { numero: 2, nota: 200, justificativa: "C2 válida." },
+        { numero: 3, nota: 200, justificativa: "C3 válida." },
+        { numero: 4, nota: 200, justificativa: "C4 válida." },
+        { numero: 5, nota: 200, justificativa: "C5 válida." }
+      ]
+    });
+    assert.throws(
+      () => validarENormalizarResposta(rawTextoId, matrizEnem, 'mock'),
+      /Identificador de competência inválido/i,
+      'Deve rejeitar identificador que não converte para inteiro positivo'
+    );
+    pass('107 — ETAPA 25.6: Backend rejeita identificador alfanumérico não-inteiro');
+  } catch (e) { fail('107', e); }
+
+  // Teste 108 — Rejeição de competência inesperada fora do escopo da matriz
+  total++;
+  try {
+    const rawCompetenciaInesperada = JSON.stringify({
+      nota_total: 1000,
+      competencias: [
+        { numero: 1, nota: 200, justificativa: "C1 válida." },
+        { numero: 2, nota: 200, justificativa: "C2 válida." },
+        { numero: 3, nota: 200, justificativa: "C3 válida." },
+        { numero: 4, nota: 200, justificativa: "C4 válida." },
+        { numero: 99, nota: 200, justificativa: "C99 inesperada." }
+      ]
+    });
+    assert.throws(
+      () => validarENormalizarResposta(rawCompetenciaInesperada, matrizEnem, 'mock'),
+      /Competência inesperada identificada/i,
+      'Deve rejeitar identificador fora do conjunto da matriz ativa'
+    );
+    pass('108 — ETAPA 25.6: Backend rejeita competência inesperada fora da matriz ativa');
+  } catch (e) { fail('108', e); }
+
+  // Teste 109 — Validação para FUVEST (3 competências com pesos 20, 15, 15 = 50 pts)
+  total++;
+  try {
+    const matrizFuvest = {
+      nome: 'FUVEST — Universidade de São Paulo (USP)',
+      pontuacao_maxima: 50,
+      competencias: [
+        { numero: 1, nome: 'Abordagem do tema e capacidade de reflexão crítica', peso: 20 },
+        { numero: 2, nome: 'Estrutura argumentativa e coesão textual', peso: 15 },
+        { numero: 3, nome: 'Domínio da expressão escrita e precisão vocabular', peso: 15 }
+      ]
+    };
+    const rawFuvest = JSON.stringify({
+      nota_total: 44,
+      competencias: [
+        { numero: 2, nota: 14, justificativa: "Estrutura e coerência consistentes entre parágrafos." },
+        { numero: 1, nota: 18, justificativa: "Reflexão crítica aprofundada com boa tese autoral." },
+        { numero: 3, nota: 12, justificativa: "Norma culta adequada com pontuação precisa." }
+      ]
+    });
+    const resFuvest = validarENormalizarResposta(rawFuvest, matrizFuvest, 'mock');
+    assert.equal(resFuvest.competencias.length, 3, 'FUVEST possui exatamente 3 competências');
+    assert.equal(resFuvest.competencias[0].numero, 1, 'C1 é reordenada');
+    assert.equal(resFuvest.competencias[0].nota_maxima, 20, 'C1 FUVEST peso 20');
+    assert.equal(resFuvest.competencias[1].numero, 2, 'C2 é reordenada');
+    assert.equal(resFuvest.competencias[1].nota_maxima, 15, 'C2 FUVEST peso 15');
+    assert.equal(resFuvest.nota_total, 44, 'Soma total calculada pelo backend');
+    pass('109 — ETAPA 25.6: Suporte correto à matriz FUVEST com reordenação e pesos oficiais');
+  } catch (e) { fail('109', e); }
+
+  // Teste 110 — Rejeição de notas fora dos limites na FUVEST (ex: C1 peso 20 recebendo nota 25)
+  total++;
+  try {
+    const matrizFuvest = {
+      nome: 'FUVEST — Universidade de São Paulo (USP)',
+      pontuacao_maxima: 50,
+      competencias: [
+        { numero: 1, nome: 'Abordagem do tema', peso: 20 },
+        { numero: 2, nome: 'Estrutura argumentativa', peso: 15 },
+        { numero: 3, nome: 'Domínio da expressão', peso: 15 }
+      ]
+    };
+    const rawFuvestEstourada = JSON.stringify({
+      competencias: [
+        { numero: 1, nota: 99, justificativa: "Nota 99 excede o teto de 20 da competência 1." },
+        { numero: 2, nota: 15, justificativa: "Adequado." },
+        { numero: 3, nota: 15, justificativa: "Adequado." }
+      ]
+    });
+    const resClamped = validarENormalizarResposta(rawFuvestEstourada, matrizFuvest, 'mock');
+    // Para bancas não-ENEM, o sistema aplica clamp protetivo dentro do teto
+    assert.equal(resClamped.competencias[0].nota, 20, 'Nota com clamp no pesoMax de 20');
+    pass('110 — ETAPA 25.6: Clamp seguro dentro dos limites da banca não-ENEM');
+  } catch (e) { fail('110', e); }
+
+  // ── TESTE REAL (opcional e estritamente opt-in) ───────────────────────────
+  // A suíte padrão usa apenas mocks. Chamadas reais a provedores externos são
+  // bloqueadas por padrão e exigem opt-in explícito via RUN_REAL_AI_TEST=true.
+  total++;
+  const executarTesteReal = process.env.RUN_REAL_AI_TEST === 'true' && Boolean(process.env.GROQ_API_KEY);
+  if (executarTesteReal) {
     try {
-      console.log('🔄 Executando chamada real à API do Groq...');
+      console.log('🔄 Executando chamada real opt-in à API do Groq...');
       const resultado = await avaliarRedacaoComIA({
         tema: 'Desafios para a valorização da herança africana no Brasil',
         vestibular: 'enem',
@@ -2206,14 +2436,16 @@ Portanto, para superar esses desafios, é necessário que o Ministério da Educa
       pass(`REAL — Groq: ${resultado.nota_total}/1000, FP: ${resultado.fingerprint}`);
     } catch (e) { fail('REAL', e); }
   } else {
-    console.log('ℹ️  REAL — GROQ_API_KEY ausente. Chamada real ignorada com segurança.');
-    passados++;
+    console.log('⏭️  REAL — SKIP: Suíte segura padrão (100% mocks). Teste real ignorado por padrão (habilite com RUN_REAL_AI_TEST=true).');
+    total--;    // Não conta o teste real no total — não foi executado
+    skipped++;  // Rastreia separadamente para o relatório
   }
 
   // ── RELATÓRIO FINAL ───────────────────────────────────────────────────────
 
+  const skipStr = skipped > 0 ? ` (${skipped} ignorado${skipped > 1 ? 's' : ''})` : '';
   const icone = passados === total ? '✅' : '⚠️';
-  console.log(`\n${icone} Relatório: ${passados}/${total} testes aprovados.`);
+  console.log(`\n${icone} Relatório: ${passados}/${total} testes aprovados${skipStr}.`);
   if (passados !== total) {
     console.error(`\n❌ ${total - passados} teste(s) falharam.`);
     process.exit(1);

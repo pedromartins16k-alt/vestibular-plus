@@ -2555,6 +2555,16 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
           '🔑 Provedor de IA não configurado no servidor. Configure a variável GROQ_API_KEY (ou GEMINI_API_KEY) no painel da Vercel para habilitar a correção.'
         );
       }
+      if (response.status === 504) {
+        throw new Error(
+          '⏱️ O serviço de correção demorou para responder (tempo limite excedido). Por favor, aguarde alguns instantes e tente novamente.'
+        );
+      }
+      if (response.status === 429) {
+        throw new Error(
+          '⏳ Limite de requisições por minuto atingido no provedor de IA. Aguarde cerca de 1 minuto antes de solicitar uma nova avaliação.'
+        );
+      }
       throw new Error(data?.error || `Falha na requisição (${response.status})`);
     }
 
