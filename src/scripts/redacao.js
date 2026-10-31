@@ -782,6 +782,9 @@ function renderizarHistorico() {
         const mesmoTexto = (textoAtual.length > 0 && textoAnt.length > 0 && textoAtual === textoAnt) ||
                            (Boolean(fpAtual) && Boolean(fpAnt) && fpAtual === fpAnt);
 
+        // Diferença de pontuação entre a redação atual e a avaliação imediatamente anterior
+        const diff = notaTotal - anterior.avaliacao_ia.nota_total;
+
         if (mesmoTexto) {
           // Reavaliação do mesmo texto: explicita nova estimativa do modelo, não evolução do aluno
           if (diff !== 0) {
