@@ -2042,9 +2042,23 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
        </div>`
     : '';
 
+  // Banner para extensão do texto
+  const ext = av.extensao || (r.total_palavras ? {
+    total_palavras: r.total_palavras,
+    status: r.total_palavras < 320 ? 'abaixo_do_recomendado' : (r.total_palavras > 650 ? 'acima_do_recomendado' : 'adequado'),
+    faixa_recomendada: 'Entre 350 e 600 palavras (25 a 30 linhas)'
+  } : null);
+
+  const bannerExtensao = (ext && ext.status === 'abaixo_do_recomendado')
+    ? `<div style="margin-bottom:16px; padding:10px 14px; border-radius:var(--radius-md); background:rgba(234,179,8,0.08); border:1px solid rgba(234,179,8,0.3); color:#eab308; font-size:0.82rem;">
+        📏 <strong>Extensão reduzida:</strong> O texto contém ${ext.total_palavras} palavras, abaixo da faixa recomendada (${escapeHtml(ext.faixa_recomendada || '350 a 600 palavras')}). Textos breves tendem a restringir o aprofundamento argumentativo e a diversidade coesiva.
+       </div>`
+    : '';
+
   return `
     <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:var(--radius-xl); padding:22px; margin-bottom:24px; box-shadow:var(--shadow-soft);">
       ${bannerSuspeita}
+      ${bannerExtensao}
       ${bannerInconsistente}
       <!-- Topo da Avaliação -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; border-bottom:1px solid var(--border-color); padding-bottom:16px; margin-bottom:18px;">
@@ -2116,7 +2130,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         ${av.persistido_no_banco ? `
           <span>✓ <strong>Avaliação gravada no banco</strong> (vinculada ao seu perfil).${av.fingerprint ? ` <span style="font-size:0.7rem; opacity:0.7;">ID: ${escapeHtml(av.fingerprint)}</span>` : ''}</span>
         ` : `
-          <span>⚠️ <strong>Avaliação calculada</strong>: Correção concluída pela IA${av.fingerprint ? ` (ID: ${escapeHtml(av.fingerprint)})` : ''}. A gravação definitiva não foi confirmada — pode ser necessário repetir a correção.</span>
+          <span>⚠️ <strong>Avaliação concluída</strong>: Parecer pedagógico gerado pela IA${av.fingerprint ? ` (ID: ${escapeHtml(av.fingerprint)})` : ''} e salvo com segurança no seu histórico local. A gravação definitiva não foi confirmada no servidor — seus dados locais estão preservados.</span>
         `}
       </div>
 

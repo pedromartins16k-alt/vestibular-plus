@@ -226,3 +226,28 @@ RETURNING id;
 | Rastrear versão da rubrica por avaliação | ❌ | ✅ |
 | INSERT de avaliação sempre funciona | ⚠️ (falha silenciosa ocasional) | ✅ (após fix de RLS) |
 | Comparar avaliações de diferentes versões de rubrica | ❌ | ✅ |
+
+---
+
+## ATUALIZAÇÃO ETAPA 37 — DIAGNÓSTICO DOS TESTES A E B EM PRODUÇÃO
+
+### 1. Evidências Observadas em Produção
+- **Teste A (Redação forte):** Banner `A gravação definitiva não foi confirmada — pode ser necessário repetir a correção`.
+- **Teste B (Redação mediana):** Mesmo banner de gravação não confirmada.
+
+### 2. Causa Raiz Identificada no Backend (`api/corrigir-redacao.js`)
+O backend possui três caminhos para persistência:
+1. `supabaseServiceKey` presente: utiliza cliente admin com bypass de RLS.
+2. `supabaseServiceKey` ausente: faz fallback para `supabaseUser` (token JWT do estudante).
+3. O código captura explicitamente o `CASO 2: SILENT_REJECTION`:
+   O PostgREST executa o INSERT mas retorna 0 linhas sem erro quando:
+   - A política RLS `WITH CHECK` da tabela `public.redacao_avaliacoes` bloqueia a gravação para o role `authenticated`; ou
+   - A variável `SUPABASE_SERVICE_ROLE_KEY` não está configurada no painel da Vercel (fazendo o backend operar sob RLS do usuário).
+
+### 3. Solução Segura Recomendada (Ação Externa / Sem alterar código local)
+1. **Configuração da Vercel:**
+   Adicionar a variável de ambiente:
+   `SUPABASE_SERVICE_ROLE_KEY=<service_role_secret_do_supabase>`
+   no projeto Vestibular+ na Vercel (Settings → Environment Variables → Production & Preview).
+2. **Caso a chave já esteja configurada:**
+   Executar a verificação de política RLS descrita na `ALTERAÇÃO 3` deste documento em janela segura de manutenção, garantindo que o role `authenticated` possua permissão de `INSERT` com verificação estrita de `user_id = auth.uid()`.

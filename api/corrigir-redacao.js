@@ -12,8 +12,32 @@
  *  - Retorna relatório completo com transparência pedagógica e de persistência.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { avaliarRedacaoComIA, classificarDiscrepancia } from './_ai-service.js';
+
+// Catálogo de propostas estáticas para enriquecer propostas salvas no banco
+let PROPOSTAS_CATALOGO = null;
+function obterPropostaDoCatalogo(propostaId) {
+  if (!propostaId) return null;
+  if (!PROPOSTAS_CATALOGO) {
+    try {
+      const caminho = path.resolve(process.cwd(), 'src/data/propostas-redacao.json');
+      if (fs.existsSync(caminho)) {
+        const conteudo = fs.readFileSync(caminho, 'utf8');
+        const parsed = JSON.parse(conteudo);
+        if (Array.isArray(parsed?.propostas)) {
+          PROPOSTAS_CATALOGO = new Map(parsed.propostas.map(p => [p.id, p]));
+        }
+      }
+    } catch (err) {
+      console.warn('[corrigir-redacao] Não foi possível carregar src/data/propostas-redacao.json:', err.message);
+      PROPOSTAS_CATALOGO = new Map();
+    }
+  }
+  return PROPOSTAS_CATALOGO?.get(propostaId) || null;
+}
 
 // Matrizes de bancas oficiais para servir de referência no servidor
 const CRITERIOS_BANCAS = {
@@ -185,17 +209,21 @@ export default async function handler(req, res) {
     const matriz = CRITERIOS_BANCAS[bancaId] || CRITERIOS_BANCAS.enem;
     const tema = redacao.titulo || redacao.titulo_proposta || 'Tema de vestibular';
 
-    // Contexto da proposta — inclui textos motivadores e instruções se presentes na linha da redação
-    // Campos opcionais: instrucoes, enunciado, textos_motivadores (JSON array), exigencias, limite_palavras, genero
+    // Contexto da proposta — enriquece dados da linha da redação com o catálogo estático
+    const propostaCatalogo = obterPropostaDoCatalogo(redacao.proposta_id);
+
     const proposta = {
-      instrucoes: redacao.instrucoes || redacao.instrucoes_proposta || null,
-      enunciado: redacao.enunciado || redacao.enunciado_proposta || null,
-      textos_motivadores: Array.isArray(redacao.textos_motivadores)
+      instrucoes: redacao.instrucoes || redacao.instrucoes_proposta || propostaCatalogo?.instrucoes || null,
+      enunciado: redacao.enunciado || redacao.enunciado_proposta || propostaCatalogo?.enunciado || null,
+      textos_motivadores: Array.isArray(redacao.textos_motivadores) && redacao.textos_motivadores.length > 0
         ? redacao.textos_motivadores
-        : (redacao.textos_motivadores ? [String(redacao.textos_motivadores)] : []),
-      exigencias: redacao.exigencias || null,
-      limite_palavras: redacao.limite_palavras || redacao.limite_linhas || null,
-      genero: redacao.genero || redacao.tipo_genero || null
+        : (Array.isArray(propostaCatalogo?.textos_motivadores)
+            ? propostaCatalogo.textos_motivadores.map(tm => (typeof tm === 'object' && tm.conteudo ? `${tm.titulo || ''}: ${tm.conteudo}` : String(tm)))
+            : (redacao.textos_motivadores ? [String(redacao.textos_motivadores)] : [])),
+      exigencias: redacao.exigencias || propostaCatalogo?.exigencias || null,
+      limite_palavras: redacao.limite_palavras || redacao.limite_linhas || propostaCatalogo?.palavras_recomendadas || null,
+      palavras_recomendadas: propostaCatalogo?.palavras_recomendadas || redacao.limite_palavras || null,
+      genero: redacao.genero || redacao.tipo_genero || propostaCatalogo?.tipo_genero || null
     };
     // Se todos os campos opcionais são nulos, passa proposta como null para economizar tokens no prompt
     const propostaCompleta = Object.values(proposta).some(v => v !== null && !(Array.isArray(v) && v.length === 0))

@@ -371,7 +371,7 @@ try {
   });
   assert.throws(
     () => validarENormalizarResposta(payloadDup, matrizEnem, 'mock'),
-    /competência C5 não foi retornada/i
+    /competências duplicadas/i
   );
   pass('8 — Resposta com competência duplicada (sem C5) rejeitada');
 } catch (e) { fail('8', e); }

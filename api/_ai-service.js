@@ -121,6 +121,48 @@ export function gerarFingerprintRedacao(texto, propostaId = '', vestibularId = '
   return hash.toString(16).padStart(8, '0');
 }
 
+/**
+ * Analisa a extensão de uma redação em termos de palavras e linhas.
+ * Retorna diagnóstico pedagógico objetivo para enriquecer a avaliação.
+ * @param {string} texto - Conteúdo da redação
+ * @param {object} [proposta] - Proposta vinculada
+ * @param {string} [vestibular] - Identificador da banca (padrão 'enem')
+ * @returns {object} { total_palavras, total_linhas_estimadas, faixa_recomendada, status, observacao_pedagogica }
+ */
+export function analisarExtensaoRedacao(texto, proposta = null, vestibular = 'enem') {
+  const textoLimpo = String(texto || '').trim();
+  const totalPalavras = textoLimpo ? textoLimpo.split(/\s+/).filter(Boolean).length : 0;
+  const linhasQuebras = textoLimpo ? textoLimpo.split('\n').filter(l => l.trim().length > 0).length : 0;
+  const linhasEstimadas = Math.max(linhasQuebras, Math.round(totalPalavras / 11));
+
+  const isEnem = (vestibular || '').toLowerCase() === 'enem';
+  const faixaTexto = proposta?.palavras_recomendadas || proposta?.limite_palavras || (isEnem ? 'Entre 350 e 600 palavras (25 a 30 linhas)' : 'Extensão adequada ao gênero');
+
+  let status = 'adequado';
+  let observacaoPedagogica = 'Extensão do texto adequada ao desenvolvimento dissertativo completo.';
+
+  if (linhasEstimadas < 7 || totalPalavras < 50) {
+    status = 'insuficiente_eliminatorio';
+    observacaoPedagogica = isEnem
+      ? 'Texto com menos de 7 linhas completas (critério eliminatório do ENEM: anulação/nota zero).'
+      : 'Texto com extensão insuficiente para avaliação de critérios dissertativos.';
+  } else if (isEnem && totalPalavras < 320) {
+    status = 'abaixo_do_recomendado';
+    observacaoPedagogica = `Texto com ${totalPalavras} palavras, abaixo da faixa recomendada (${faixaTexto}). Redações mais curtas tendem a apresentar menor densidade argumentativa, repertório mais sucinto e menor diversidade de recursos coesivos.`;
+  } else if (isEnem && totalPalavras > 650) {
+    status = 'acima_do_recomendado';
+    observacaoPedagogica = `Texto com ${totalPalavras} palavras, ligeiramente acima do limite recomendado (${faixaTexto}). Atente para a concisão e o espaço de 30 linhas da folha oficial.`;
+  }
+
+  return {
+    total_palavras: totalPalavras,
+    total_linhas_estimadas: linhasEstimadas,
+    faixa_recomendada: faixaTexto,
+    status,
+    observacao_pedagogica: observacaoPedagogica
+  };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // RUBRICAS POR NÍVEL INEP — usadas na construção do prompt
 // Cada nível descreve CONCRETAMENTE o que o texto deve apresentar/ausente.
@@ -133,9 +175,9 @@ Avalie: ortografia, acentuação, pontuação, concordância verbal e nominal,
 regência, crase, colocação pronominal, estrutura sintática e adequação vocabular ao registro formal.
 
 ESCALA OFICIAL INEP — use SOMENTE estes valores:
-• 200 pts → Excelente: estrutura sintática exemplar e no máximo dois desvios gramaticais/leves e isolados que não comprometam a leitura. Vocabulário preciso e adequado.
-  ATENÇÃO: Se o texto apresentar truncamentos recorrentes, desvios repetidos de pontuação/concordância ou vocabulário impreciso/repetitivo que demande recomendação substancial de revisão lexical, a nota DEVE ser 160 pts ou inferior. Nota 200 é INCOMPATÍVEL com críticas a desvios vocabulares ou repetições excessivas no feedback.
-• 160 pts → Bom: poucos desvios gramaticais e de convenções da escrita (2 a 4), ou estrutura sintática boa com pequenos deslizes locais. Vocabulário satisfatório com pontuais repetições.
+• 200 pts → Excelente: estrutura sintática exemplar e no máximo dois desvios gramaticais/leves e isolados que não comprometam a leitura. Vocabulário preciso, variado e adequado ao registro formal culto.
+  ATENÇÃO: Se o texto apresentar truncamentos recorrentes, desvios repetidos de pontuação/concordância, sintaxe excessivamente simples/elementar ou vocabulário impreciso/repetitivo que demande recomendação substancial de revisão lexical, a nota DEVE ser 160 pts ou inferior. Nota 200 é INCOMPATÍVEL com críticas a desvios vocabulares, construções repetitivas ou repetições excessivas no feedback.
+• 160 pts → Bom: poucos desvios gramaticais e de convenções da escrita (2 a 4), ou estrutura sintática boa com pequenos deslizes locais. Vocabulário satisfatório com pontuais repetições ou construções sintáticas mais simples.
 • 120 pts → Médio: desvios presentes com alguma frequência, não dominantes. O texto é compreensível, mas a norma culta não é plenamente dominada.
 • 80 pts → Insuficiente: muitos desvios, frequentes, que dificultam a leitura em alguns momentos. Estrutura sintática deficitária.
 • 40 pts → Precário: desvios graves e sistemáticos que prejudicam seriamente a compreensão.
@@ -211,7 +253,7 @@ O QUE ANALISAR:
 ESCALA OFICIAL INEP:
 • 200 pts → Emprega de forma expressiva e diversificada os mecanismos coesivos inter e intraparágrafos, com raras ou nenhuma repetição monótona e sem inadequação coesiva.
   FRONTEIRA 160 vs 200:
-  - Se houver uso de conectivos adequados, mas com repertório coesivo restrito, ligeiramente mecânico ou com falta de variedade intraparágrafos, a nota É 160 PTS.
+  - Se houver uso de conectivos adequados, mas com repertório coesivo restrito, ligeiramente mecânico ou com falta de variedade intraparágrafos (poucos conectivos ou conectivos excessivamente repetidos), a nota É 160 PTS.
   - DIRETRIZ OFICIAL: O INEP não proíbe qualquer repetição lexical natural nem exige variedade máxima em todos os períodos; exige recursos coesivos inter e intraparágrafos diversificados sem repetições mecânicas recorrentes.
 • 160 pts → Estrutura coesiva adequada com poucas inadequações ou pontuais repetições de recursos coesivos; conectores interparágrafos presentes.
 • 120 pts → Uso de mecanismos coesivos regular, mas com repetições visíveis ou inadequações não dominantes.
@@ -233,10 +275,10 @@ OS 5 ELEMENTOS OBRIGATÓRIOS DO INEP:
 ESCALA OFICIAL INEP:
 • 200 pts → Proposta completa contendo os CINCO elementos (agente, ação, meio, finalidade e 1 detalhamento claro e específico), plenamente articulada à discussão do texto.
   FRONTEIRA 160 vs 200:
-  - Proposta com os 5 elementos em que o detalhamento seja vago, embrionário ou confunda-se superficialmente com o próprio meio sem adicionar informação substantiva clara DEVE RECEBER 160 PTS.
-  - Proposta com apenas 4 elementos válidos (faltando o detalhamento ou outro elemento) = 160 PTS.
-  - Para 200 pts, os 5 elementos devem ser identificáveis de forma autônoma e inequívoca no texto.
-• 160 pts → Elabora proposta com 4 elementos válidos OU com 5 elementos cujo detalhamento seja frágil/tênue.
+  - Proposta com os 5 elementos em que o detalhamento seja vago, embrionário, genérico ou confunda-se superficialmente com o próprio meio sem adicionar informação substantiva clara DEVE RECEBER 160 PTS.
+  - Proposta com intervenção genérica, medidas vagas ou com apenas 4 elementos válidos (faltando o detalhamento ou outro elemento) = 160 PTS.
+  - Para 200 pts, os 5 elementos devem ser identificáveis de forma autônoma, inequívoca e com detalhamento específico no texto.
+• 160 pts → Elabora proposta com 4 elementos válidos OU com 5 elementos cujo detalhamento seja frágil/tênue/genérico.
 • 120 pts → Proposta com 3 elementos válidos.
 • 80 pts → Proposta com 2 elementos válidos.
 • 40 pts → Proposta com 1 elemento válido ou apenas esboço vago de intervenção.
@@ -439,6 +481,14 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto, proposta }) 
       "evidencias_textuais": ["<trecho real>"]
     }`).join(',\n');
 
+  const diagExtensao = analisarExtensaoRedacao(texto, proposta, vestibular);
+  let avisoExtensaoPrompt = `- Extensão do texto analisado: ${diagExtensao.total_palavras} palavras (${diagExtensao.total_linhas_estimadas} linhas estimadas). Faixa recomendada: ${diagExtensao.faixa_recomendada}.`;
+  if (diagExtensao.status === 'insuficiente_eliminatorio') {
+    avisoExtensaoPrompt += `\n   ATENÇÃO: Texto com menos de 7 linhas completas (critério eliminatório do ENEM). Todas as competências devem receber nota 0.`;
+  } else if (diagExtensao.status === 'abaixo_do_recomendado') {
+    avisoExtensaoPrompt += `\n   ATENÇÃO: Redação com extensão reduzida (< 320 palavras no ENEM). Avalie com rigor crítico se a brevidade limitou a amplitude do repertório (C2), o aprofundamento das justificativas (C3), a diversidade dos conectivos (C4) e o detalhamento específico da intervenção (C5). Textos curtos com argumentação sucinta ou intervenção genérica não atendem ao nível 5 (200 pts) nessas competências.`;
+  }
+
   const regraEscala = isEnem
     ? `3. ESCALA OBRIGATÓRIA DO ENEM: use SOMENTE 0, 40, 80, 120, 160 ou 200 para cada competência. Valores como 70, 90, 110, 130, 150, 170 ou 190 são PROIBIDOS.`
     : `3. ESCALA DA BANCA ${nomeBanca}: a nota de cada competência deve ser um número inteiro entre 0 e seu peso máximo oficial especificado na matriz.`;
@@ -481,7 +531,9 @@ ${regraEscala}
 4. FUGA AO TEMA: somente se o texto aborda assunto completamente diferente do tema proposto.
    Tangenciamento ≠ fuga. Tangenciamento limita os critérios temáticos mas não os zera automaticamente.
 
-5. EXTENSÃO MÍNIMA: texto com menos de 7 linhas completas → todas as competências recebem 0.
+5. EXTENSÃO E DENSIDADE TEXTUAL:
+   ${avisoExtensaoPrompt}
+   - Regra eliminatória: texto com menos de 7 linhas completas → todas as competências recebem 0.
 
 6. NOTA TOTAL: NÃO declare uma "nota geral" por impressão. O campo nota_total deve ser a SOMA EXATA das competências da banca.
 
@@ -492,7 +544,9 @@ ${regraEscala}
    - Se a nota de uma competência for máxima (200 no ENEM), a justificativa e os feedbacks NÃO podem conter críticas ou apontamentos de deficiência, tais como:
      "há problemas", "faltam elementos", "poderia ser melhor", "insuficiente", "parcialmente", "limitado", "fraco",
      "desenvolvimento inadequado", "pouco detalhamento", "detalhamento frágil", "detalhamento tênue", "repetições",
-     "ampliar vocabulário", "repetição excessiva", "truncamento", "repertório pouco aprofundado", "ausência de".
+     "ampliar vocabulário", "repetição excessiva", "truncamento", "repertório pouco aprofundado", "ausência de",
+     "construções repetitivas", "vocabulário básico", "pouca variedade de conectivos", "proposta genérica",
+     "ação vaga", "meio vago", "detalhamento genérico", "argumentos genéricos", "falta de aprofundamento".
    - Se houver recomendação pedagógica de melhoria substantiva para a competência (como enriquecer vocabulário na C1, aprofundar repertório na C2, expandir argumentos na C3, variar conectivos na C4 ou enriquecer detalhamento na C5), a pontuação DEVE SER 160 PTS ou inferior, e JAMAIS 200 PTS.
    - Uma nota 200 PTS exige excelência demonstrada e justificativa que comprove o atendimento integral de todos os requisitos do nível máximo.
 
@@ -581,6 +635,11 @@ async function chamarGroq(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
         }
       } catch (_) {}
 
+      // Sanitização estrita: remover apiKey se presente na mensagem
+      if (apiKey) {
+        msg = msg.split(apiKey).join('[REDACTED_API_KEY]');
+      }
+
       // Log estruturado e seguro no servidor (sem tokens, sem redação completa)
       console.warn('[chamarGroq] Falha na API Groq:', {
         status: response.status,
@@ -613,7 +672,13 @@ async function chamarGroq(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
     };
     console.log('[chamarGroq] Metadados de uso (sem dados sensíveis):', logUso);
 
-    if (!rawText) throw new Error('A Groq retornou uma resposta vazia.');
+    if (!rawText) {
+      const finishReason = choice?.finish_reason || 'ausente';
+      const erroVazio = new Error(`A Groq retornou uma resposta vazia (finish_reason: ${finishReason}).`);
+      erroVazio.statusCode = 502;
+      erroVazio.tipo = 'RESPOSTA_VAZIA_IA';
+      throw erroVazio;
+    }
 
     if (choice?.finish_reason === 'length') {
       const erroTruncado = new Error('A resposta da IA atingiu o limite de tokens antes de concluir todas as competências.');
@@ -669,8 +734,42 @@ async function chamarGemini(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
     if (!response.ok) {
       const errBody = await response.text();
       let msg = `Erro no serviço Gemini (${response.status})`;
-      try { const p = JSON.parse(errBody); if (p.error?.message) msg += `: ${p.error.message}`; } catch (_) {}
-      throw new Error(msg);
+      let erroCode = null;
+      let erroStatus = null;
+      let detalheTecnico = null;
+      try {
+        const p = JSON.parse(errBody);
+        if (p.error?.message) {
+          detalheTecnico = p.error.message;
+          msg += `: ${p.error.message}`;
+        }
+        if (p.error?.code) erroCode = p.error.code;
+        if (p.error?.status) erroStatus = p.error.status;
+      } catch (_) {
+        if (errBody) {
+          detalheTecnico = errBody.slice(0, 150).replace(/[\r\n\t]+/g, ' ').trim();
+          msg += `: ${detalheTecnico}`;
+        }
+      }
+
+      // Sanitização estrita: remover apiKey ou qualquer chave da mensagem se tiver vazado na resposta/URL
+      if (apiKey) {
+        msg = msg.split(apiKey).join('[REDACTED_API_KEY]');
+        if (detalheTecnico) detalheTecnico = detalheTecnico.split(apiKey).join('[REDACTED_API_KEY]');
+      }
+
+      console.warn('[chamarGemini] Falha na API Gemini:', {
+        status: response.status,
+        code: erroCode || erroStatus,
+        modelo,
+        detalhe: detalheTecnico ? `[amostra: "${detalheTecnico.slice(0, 120)}"]` : null
+      });
+
+      const erroIA = new Error(msg);
+      erroIA.statusCode = response.status;
+      erroIA.errorCode = erroCode || erroStatus;
+      erroIA.tipo = 'ERRO_PROVEDOR_IA';
+      throw erroIA;
     }
 
     const data = await response.json();
@@ -686,7 +785,13 @@ async function chamarGemini(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
     });
 
     const rawText = candidate?.content?.parts?.[0]?.text;
-    if (!rawText) throw new Error('O Gemini retornou uma resposta vazia.');
+    if (!rawText) {
+      const finishReason = candidate?.finishReason || 'SEM_CONTEUDO';
+      const erroVazio = new Error(`O Gemini retornou uma resposta vazia (finishReason: ${finishReason}).`);
+      erroVazio.statusCode = 502;
+      erroVazio.tipo = finishReason === 'SAFETY' ? 'BLOQUEIO_SEGURANCA_IA' : 'RESPOSTA_VAZIA_IA';
+      throw erroVazio;
+    }
     return { rawText, modelo: `google/${modelo}` };
   } catch (err) {
     if (err.name === 'AbortError') {
@@ -729,8 +834,26 @@ async function chamarOpenAI(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
     if (!response.ok) {
       const errBody = await response.text();
       let msg = `Erro no serviço OpenAI (${response.status})`;
-      try { const p = JSON.parse(errBody); if (p.error?.message) msg += `: ${p.error.message}`; } catch (_) {}
-      throw new Error(msg);
+      let detalheTecnico = null;
+      try {
+        const p = JSON.parse(errBody);
+        if (p.error?.message) { msg += `: ${p.error.message}`; detalheTecnico = p.error.message; }
+      } catch (_) {}
+      if (apiKey && msg.includes(apiKey)) msg = msg.split(apiKey).join('[REDACTED_API_KEY]');
+      if (apiKey && detalheTecnico && detalheTecnico.includes(apiKey)) {
+        detalheTecnico = detalheTecnico.split(apiKey).join('[REDACTED_API_KEY]');
+      }
+
+      console.warn('[chamarOpenAI] Falha na API OpenAI:', {
+        status: response.status,
+        modelo,
+        detalhe: detalheTecnico ? `[amostra: "${detalheTecnico.slice(0, 120)}"]` : null
+      });
+
+      const erroIA = new Error(msg);
+      erroIA.statusCode = response.status;
+      erroIA.tipo = 'ERRO_PROVEDOR_IA';
+      throw erroIA;
     }
 
     const data = await response.json();
@@ -746,7 +869,13 @@ async function chamarOpenAI(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
     });
 
     const rawText = choiceOAI?.message?.content;
-    if (!rawText) throw new Error('A OpenAI retornou uma resposta vazia.');
+    if (!rawText) {
+      const finishReason = choiceOAI?.finish_reason || 'SEM_CONTEUDO';
+      const erroVazio = new Error(`A OpenAI retornou uma resposta vazia (finish_reason: ${finishReason}).`);
+      erroVazio.statusCode = 502;
+      erroVazio.tipo = 'RESPOSTA_VAZIA_IA';
+      throw erroVazio;
+    }
     return { rawText, modelo: `openai/${modelo}` };
   } catch (err) {
     if (err.name === 'AbortError') {
@@ -794,9 +923,11 @@ const FRASES_NEGATIVAS = [
  * @param {object} matriz - Matriz de critérios da banca
  * @param {string} modeloUsado - Identificador do modelo utilizado
  * @param {string} [texto] - Texto original da redação (usado para verificação de evidências)
+ * @param {object} [proposta] - Objeto da proposta vinculada (para contexto de extensão)
+ * @param {string} [vestibularId] - Identificador da banca examinadora
  * @returns {object} Resultado normalizado e validado
  */
-export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) {
+export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, proposta = null, vestibularId = 'enem') {
   let cleaned = (rawText || '').trim();
 
   // Remove markdown codeblock ```json ... ``` se presente
@@ -1042,27 +1173,36 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) 
               'desvios frequentes', 'desvios recorrentes', 'desvios gramaticais recorrentes',
               'problemas sintáticos', 'truncamento sintático recorrente', 'falhas gramaticais',
               'repetições excessivas', 'repetição excessiva', 'vocabulário impreciso',
-              'enriquecer vocabulário', 'ampliar vocabulário'
+              'enriquecer vocabulário', 'ampliar vocabulário', 'construções repetitivas',
+              'construção repetitiva', 'vocabulário básico', 'vocabulário restrito',
+              'pouca variedade vocabular', 'sintaxe elementar', 'sintaxe simples'
             ],
             2: [
               'repertório pouco produtivo', 'repertório não legitimado', 'repertório ausente',
               'repertório pouco aprofundado', 'pouco aprofundado',
-              'tangenciamento', 'tangencial', 'fuga parcial', 'repertório desconectado', 'repertório frágil'
+              'tangenciamento', 'tangencial', 'fuga parcial', 'repertório desconectado',
+              'repertório frágil', 'repertório restrito', 'repertório limitado', 'argumentos genéricos',
+              'falta de repertório'
             ],
             3: [
               'lacuna argumentativa', 'lacunas argumentativas', 'argumentação superficial',
               'projeto de texto com falhas', 'argumentos contraditórios', 'incoerência argumentativa',
-              'falta de autoria', 'projeto falho'
+              'falta de autoria', 'projeto falho', 'argumentos genéricos', 'desenvolvimento sucinto',
+              'pouco aprofundamento', 'falta de aprofundamento', 'argumentação rasa'
             ],
             4: [
               'repetições excessivas', 'repetição excessiva', 'ausência de conectivos',
               'conectivos inadequados', 'problemas de coesão', 'problemas de articulação',
-              'falta de encadeamento', 'coesão precária'
+              'falta de encadeamento', 'coesão precária', 'pouca variedade de conectivos',
+              'conectivos repetitivos', 'repertório coesivo restrito', 'poucos conectivos',
+              'conectivos básicos', 'coesão simples', 'conectivos escassos'
             ],
             5: [
               'proposta incompleta', 'detalhamento frágil', 'detalhamento tênue', 'detalhamento muito tênue',
               'detalhamento ausente', 'pouco detalhamento', 'faltam elementos', 'menos de 5 elementos',
-              'ausência de agente', 'ausência de ação', 'ausência de meio', 'ausência de efeito'
+              'ausência de agente', 'ausência de ação', 'ausência de meio', 'ausência de efeito',
+              'proposta genérica', 'intervenção genérica', 'ação vaga', 'meio vago',
+              'detalhamento genérico', 'pouco específico', 'medida superficial', 'intervenção superficial'
             ]
           };
 
@@ -1155,6 +1295,7 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto) 
     ),
     modelo_utilizado: modeloUsado || 'ia',
     rubrica_versao: VERSAO_RUBRICA,
+    extensao: analisarExtensaoRedacao(texto, proposta, vestibularId || (matriz?.nome?.toLowerCase()?.includes('enem') ? 'enem' : 'outro')),
     corrigido_em: new Date().toISOString()
   };
 }
@@ -1263,7 +1404,7 @@ export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto, pro
 
     try {
       const resultadoBruto = await fn(key, prompt, timeoutChamada);
-      const resultado = validarENormalizarResposta(resultadoBruto.rawText, matriz, resultadoBruto.modelo, texto);
+      const resultado = validarENormalizarResposta(resultadoBruto.rawText, matriz, resultadoBruto.modelo, texto, proposta, vestibularId);
       resultado.fingerprint = gerarFingerprintRedacao(texto, propostaId, vestibularId);
 
       if (i > 0) {
@@ -1295,6 +1436,12 @@ export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto, pro
       } else if (status === 504 || errProv?.tipo === 'TIMEOUT_IA' || errProv?.name === 'AbortError') {
         categoria = 'TIMEOUT_PROVEDOR';
         elegivelFallback = true;
+      } else if (status === 404) {
+        categoria = 'MODELO_NAO_ENCONTRADO';
+        elegivelFallback = true;
+      } else if (status === 422) {
+        categoria = 'PARAMETRO_INVALIDO';
+        elegivelFallback = true;
       } else if (status >= 500) {
         categoria = 'ERRO_INTERNO_PROVEDOR';
         elegivelFallback = true;
@@ -1324,8 +1471,13 @@ export async function avaliarRedacaoComIA({ tema, vestibular, matriz, texto, pro
   }
 
   // Se chegou aqui, todos os provedores elegíveis falharam ou o tempo acabou
-  const resumoErros = errosAcumulados.map(e => `${e.provedor} (${e.categoria})`).join('; ');
+  const resumoErros = errosAcumulados.map(e =>
+    `${e.provedor} (${e.categoria}${e.statusCode ? `/${e.statusCode}` : ''})`
+  ).join('; ');
   console.error('[avaliarRedacaoComIA] Todos os provedores de IA falharam:', resumoErros);
+  console.error('[avaliarRedacaoComIA] Detalhes técnicos:', errosAcumulados.map(e =>
+    ({ provedor: e.provedor, categoria: e.categoria, status: e.statusCode, msg: e.mensagem })
+  ));
 
   const erroAgregado = new Error(
     `Todos os provedores de IA falharam ou não puderam validar a avaliação completa: ${resumoErros}. Tente novamente em instantes.`
