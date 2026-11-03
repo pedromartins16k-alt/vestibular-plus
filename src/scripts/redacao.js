@@ -2130,7 +2130,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
         ${av.persistido_no_banco ? `
           <span>✓ <strong>Avaliação gravada no banco</strong> (vinculada ao seu perfil).${av.fingerprint ? ` <span style="font-size:0.7rem; opacity:0.7;">ID: ${escapeHtml(av.fingerprint)}</span>` : ''}</span>
         ` : `
-          <span>⚠️ <strong>Avaliação concluída</strong>: Parecer pedagógico gerado pela IA${av.fingerprint ? ` (ID: ${escapeHtml(av.fingerprint)})` : ''} e salvo com segurança no seu histórico local. A gravação definitiva não foi confirmada no servidor — seus dados locais estão preservados.</span>
+          <span>⚠️ <strong>Avaliação concluída</strong>: Parecer pedagógico gerado pela IA${av.fingerprint ? ` (ID: ${escapeHtml(av.fingerprint)})` : ''}. A gravação definitiva não foi confirmada no servidor — o resultado está disponível temporariamente neste navegador. Guarde ou exporte este parecer para não perdê-lo; você também pode repetir a correção para sincronizar com a nuvem.</span>
         `}
       </div>
 

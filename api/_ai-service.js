@@ -141,11 +141,16 @@ export function analisarExtensaoRedacao(texto, proposta = null, vestibular = 'en
   let status = 'adequado';
   let observacaoPedagogica = 'Extensão do texto adequada ao desenvolvimento dissertativo completo.';
 
-  if (linhasEstimadas < 7 || totalPalavras < 50) {
-    status = 'insuficiente_eliminatorio';
+  if (totalPalavras < 20) {
+    status = 'embrionario_insuficiente';
     observacaoPedagogica = isEnem
-      ? 'Texto com menos de 7 linhas completas (critério eliminatório do ENEM: anulação/nota zero).'
-      : 'Texto com extensão insuficiente para avaliação de critérios dissertativos.';
+      ? `Texto com extensão embrionária (${totalPalavras} palavra${totalPalavras === 1 ? '' : 's'}), insuficiente para avaliação e progressão argumentativa.`
+      : `Texto com extensão embrionária insuficiente para avaliação de critérios dissertativos (${totalPalavras} palavras).`;
+  } else if (linhasQuebras < 7 && linhasEstimadas < 7) {
+    status = 'potencialmente_insuficiente';
+    observacaoPedagogica = isEnem
+      ? `Texto com estimativa digital inferior a 7 linhas (${linhasEstimadas} linha${linhasEstimadas === 1 ? '' : 's'} estimada${linhasEstimadas === 1 ? '' : 's'}). No ENEM impresso, até 7 linhas manuscritas configuram texto insuficiente (anulação); em digitação, a contagem física real pode variar.`
+      : `Texto com extensão estimada inferior a 7 linhas, potencialmente insuficiente para desenvolvimento completo dos critérios.`;
   } else if (isEnem && totalPalavras < 320) {
     status = 'abaixo_do_recomendado';
     observacaoPedagogica = `Texto com ${totalPalavras} palavras, abaixo da faixa recomendada (${faixaTexto}). Redações mais curtas tendem a apresentar menor densidade argumentativa, repertório mais sucinto e menor diversidade de recursos coesivos.`;
@@ -483,10 +488,12 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto, proposta }) 
 
   const diagExtensao = analisarExtensaoRedacao(texto, proposta, vestibular);
   let avisoExtensaoPrompt = `- Extensão do texto analisado: ${diagExtensao.total_palavras} palavras (${diagExtensao.total_linhas_estimadas} linhas estimadas). Faixa recomendada: ${diagExtensao.faixa_recomendada}.`;
-  if (diagExtensao.status === 'insuficiente_eliminatorio') {
-    avisoExtensaoPrompt += `\n   ATENÇÃO: Texto com menos de 7 linhas completas (critério eliminatório do ENEM). Todas as competências devem receber nota 0.`;
+  if (diagExtensao.status === 'embrionario_insuficiente') {
+    avisoExtensaoPrompt += `\n   ATENÇÃO: Texto com extensão embrionária (< 20 palavras). Avalie com rigor se há conteúdo textual suficiente para sustentar uma análise dissertativa.`;
+  } else if (diagExtensao.status === 'potencialmente_insuficiente') {
+    avisoExtensaoPrompt += `\n   ATENÇÃO: Estimativa de texto curto (< 7 linhas estimadas). No ENEM, apenas textos com até 7 linhas manuscritas comprovadas recebem nota zero. Como a contagem digital é aproximada, avalie o conteúdo real e aplique anulação apenas se for evidente a insuficiência completa do texto.`;
   } else if (diagExtensao.status === 'abaixo_do_recomendado') {
-    avisoExtensaoPrompt += `\n   ATENÇÃO: Redação com extensão reduzida (< 320 palavras no ENEM). Avalie com rigor crítico se a brevidade limitou a amplitude do repertório (C2), o aprofundamento das justificativas (C3), a diversidade dos conectivos (C4) e o detalhamento específico da intervenção (C5). Textos curtos com argumentação sucinta ou intervenção genérica não atendem ao nível 5 (200 pts) nessas competências.`;
+    avisoExtensaoPrompt += `\n   ORIENTAÇÃO PEDAGÓGICA (EXTENSÃO REDUZIDA): O texto possui ${diagExtensao.total_palavras} palavras (abaixo da faixa recomendada de 350-600 palavras). Avalie cuidadosamente se a extensão reduzida comprometeu o desenvolvimento argumentativo, a progressão das ideias, a fundamentação e o atendimento à proposta. Considere a qualidade efetiva do texto, sem aplicar penalização automática baseada exclusivamente na quantidade de palavras. Redações concisas que atendam plenamente aos requisitos de uma competência não devem ser impedidas de receber a pontuação correspondente.`;
   }
 
   const regraEscala = isEnem
@@ -533,7 +540,7 @@ ${regraEscala}
 
 5. EXTENSÃO E DENSIDADE TEXTUAL:
    ${avisoExtensaoPrompt}
-   - Regra eliminatória: texto com menos de 7 linhas completas → todas as competências recebem 0.
+   - Regra eliminatória oficial do ENEM: aplicável somente a textos com até 7 linhas manuscritas comprovadas (ou texto em branco). Não aplique anulação mecânica baseada apenas em estimativa de palavras.
 
 6. NOTA TOTAL: NÃO declare uma "nota geral" por impressão. O campo nota_total deve ser a SOMA EXATA das competências da banca.
 

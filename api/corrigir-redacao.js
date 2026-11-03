@@ -221,7 +221,8 @@ export default async function handler(req, res) {
             ? propostaCatalogo.textos_motivadores.map(tm => (typeof tm === 'object' && tm.conteudo ? `${tm.titulo || ''}: ${tm.conteudo}` : String(tm)))
             : (redacao.textos_motivadores ? [String(redacao.textos_motivadores)] : [])),
       exigencias: redacao.exigencias || propostaCatalogo?.exigencias || null,
-      limite_palavras: redacao.limite_palavras || redacao.limite_linhas || propostaCatalogo?.palavras_recomendadas || null,
+      limite_palavras: redacao.limite_palavras || propostaCatalogo?.palavras_recomendadas || null,
+      limite_linhas: redacao.limite_linhas || null,
       palavras_recomendadas: propostaCatalogo?.palavras_recomendadas || redacao.limite_palavras || null,
       genero: redacao.genero || redacao.tipo_genero || propostaCatalogo?.tipo_genero || null
     };
