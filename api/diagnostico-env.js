@@ -34,8 +34,46 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Token de autenticação obrigatório.' });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  function obterConfiguracaoSupabase() {
+    const viteUrl = (process.env.VITE_SUPABASE_URL || '').trim();
+    const serverUrl = (process.env.SUPABASE_URL || '').trim();
+    const viteAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+    const serverAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+
+    const extrairRef = (key) => {
+      try {
+        if (!key || typeof key !== 'string' || !key.startsWith('eyJ')) return null;
+        const p = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8'));
+        return p.ref || null;
+      } catch (_) { return null; }
+    };
+
+    const extrairHost = (u) => {
+      try { return u ? new URL(u).host : null; } catch (_) { return null; }
+    };
+
+    const viteRef = extrairRef(viteAnonKey);
+    const serverRef = extrairRef(serverAnonKey);
+    const viteHost = extrairHost(viteUrl);
+    const serverHost = extrairHost(serverUrl);
+
+    let url = serverUrl;
+    let anonKey = serverAnonKey;
+
+    // Se serverUrl estiver ausente ou divergir do frontend ativo, prioriza o projeto do frontend
+    if (!url || (viteHost && serverHost && viteHost !== serverHost)) {
+      url = viteUrl || serverUrl;
+    }
+
+    // Se serverAnonKey não for do projeto ativo, prioriza viteAnonKey
+    if (!anonKey || (viteRef && serverRef && viteRef !== serverRef) || (viteRef && !serverRef)) {
+      anonKey = viteAnonKey || serverAnonKey;
+    }
+
+    return { supabaseUrl: url, supabaseAnonKey: anonKey };
+  }
+
+  const { supabaseUrl, supabaseAnonKey } = obterConfiguracaoSupabase();
 
   // Se variáveis Supabase ausentes — reportar sem validar token
   if (!supabaseUrl || !supabaseAnonKey) {

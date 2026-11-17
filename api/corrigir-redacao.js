@@ -112,9 +112,45 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3. Validação das variáveis do Supabase no ambiente
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+    // 3. Validação das variáveis do Supabase no ambiente com alinhamento ao frontend ativo
+    function obterConfiguracaoSupabase() {
+      const viteUrl = (process.env.VITE_SUPABASE_URL || '').trim();
+      const serverUrl = (process.env.SUPABASE_URL || '').trim();
+      const viteAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+      const serverAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+
+      const extrairRef = (key) => {
+        try {
+          if (!key || typeof key !== 'string' || !key.startsWith('eyJ')) return null;
+          const p = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8'));
+          return p.ref || null;
+        } catch (_) { return null; }
+      };
+
+      const extrairHost = (u) => {
+        try { return u ? new URL(u).host : null; } catch (_) { return null; }
+      };
+
+      const viteRef = extrairRef(viteAnonKey);
+      const serverRef = extrairRef(serverAnonKey);
+      const viteHost = extrairHost(viteUrl);
+      const serverHost = extrairHost(serverUrl);
+
+      let url = serverUrl;
+      let anonKey = serverAnonKey;
+
+      if (!url || (viteHost && serverHost && viteHost !== serverHost)) {
+        url = viteUrl || serverUrl;
+      }
+
+      if (!anonKey || (viteRef && serverRef && viteRef !== serverRef) || (viteRef && !serverRef)) {
+        anonKey = viteAnonKey || serverAnonKey;
+      }
+
+      return { supabaseUrl: url, supabaseAnonKey: anonKey };
+    }
+
+    const { supabaseUrl, supabaseAnonKey } = obterConfiguracaoSupabase();
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseAnonKey) {
