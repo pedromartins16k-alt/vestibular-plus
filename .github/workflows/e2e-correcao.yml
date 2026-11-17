@@ -1,0 +1,49 @@
+name: E2E Correção de Redação com IA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  e2e-correcao:
+    name: Teste Ponta a Ponta — Correção de Redação IA
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Validar presença de credenciais obrigatórias
+        env:
+          TEST_USER_TOKEN: ${{ secrets.TEST_USER_TOKEN }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+        run: |
+          echo "Verificando configuração de credenciais para teste de integração..."
+          if [ -z "$TEST_USER_TOKEN" ] && [ -z "$TEST_USER_EMAIL" ]; then
+            echo "::error::Nenhuma credencial de teste configurada. Configure o secret TEST_USER_TOKEN ou o par TEST_USER_EMAIL e TEST_USER_PASSWORD nos Secrets do repositório."
+            exit 1
+          fi
+          if [ -n "$TEST_USER_EMAIL" ] && [ -z "$TEST_USER_PASSWORD" ]; then
+            echo "::error::TEST_USER_EMAIL está configurado, mas TEST_USER_PASSWORD está ausente nos Secrets do repositório."
+            exit 1
+          fi
+          echo "Credenciais de teste validadas com sucesso."
+
+      - name: Executar teste ponta a ponta
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEST_USER_TOKEN: ${{ secrets.TEST_USER_TOKEN }}
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+        run: node --experimental-vm-modules test/test-integracao-e2e-correcao.js
