@@ -198,10 +198,63 @@ async function runTests() {
 
   total++;
   try {
-    const { default: fs } = await import('fs');
-    const ai = fs.readFileSync('api/_ai-service.js', 'utf8');
-    assert.ok(ai.includes("reasoning_effort: 'medium'"));
-    pass("10.1 — reasoning_effort: 'medium' presente");
+    const originalFetch = globalThis.fetch;
+    const originalGroqKey = process.env.GROQ_API_KEY;
+    const originalGroqModel = process.env.GROQ_MODEL;
+    const originalReasoning = process.env.GROQ_REASONING_EFFORT;
+
+    process.env.GROQ_API_KEY = 'mock-key';
+
+    const testarCorpoGroq = async (modelo, envReasoning) => {
+      let bodyCapturado = null;
+      if (modelo) process.env.GROQ_MODEL = modelo; else delete process.env.GROQ_MODEL;
+      if (envReasoning !== undefined) process.env.GROQ_REASONING_EFFORT = envReasoning; else delete process.env.GROQ_REASONING_EFFORT;
+
+      globalThis.fetch = async (url, opts) => {
+        bodyCapturado = JSON.parse(opts.body);
+        throw new Error('MOCK_STOP');
+      };
+
+      try {
+        await avaliarRedacaoComIA({
+          tema: 'Tema teste',
+          vestibular: 'enem',
+          matriz: matrizEnem,
+          texto: 'Texto de teste com comprimento suficiente para avaliação da redação no sistema.'
+        });
+      } catch (_) {}
+
+      return bodyCapturado;
+    };
+
+    // 1. Modelo gpt-oss sem variável: parâmetro medium
+    const b1 = await testarCorpoGroq('openai/gpt-oss-120b', undefined);
+    assert.equal(b1?.reasoning_effort, 'medium', 'gpt-oss sem variável deve ter reasoning_effort: medium');
+    assert.equal(b1?.max_tokens, 16384, 'max_tokens preservado');
+    assert.equal(b1?.temperature, 0, 'temperature preservada');
+
+    // 2. Modelo geral sem variável: parâmetro ausente
+    const b2 = await testarCorpoGroq('llama-3.3-70b-versatile', undefined);
+    assert.equal(b2?.reasoning_effort, undefined, 'llama sem variável não deve ter reasoning_effort');
+
+    // 3. Modelo geral com variável low: parâmetro ausente (proteção contra HTTP 400)
+    const b3 = await testarCorpoGroq('llama-3.3-70b-versatile', 'low');
+    assert.equal(b3?.reasoning_effort, undefined, 'llama com GROQ_REASONING_EFFORT=low não deve ter reasoning_effort');
+
+    // 4. Modelo de raciocínio com variável low: parâmetro low
+    const b4 = await testarCorpoGroq('openai/gpt-oss-120b', 'low');
+    assert.equal(b4?.reasoning_effort, 'low', 'gpt-oss com GROQ_REASONING_EFFORT=low deve ter reasoning_effort: low');
+
+    // 5. Valor de variável inválido: fallback seguro para medium em modelo de raciocínio
+    const b5 = await testarCorpoGroq('openai/gpt-oss-120b', 'invalid_value');
+    assert.equal(b5?.reasoning_effort, 'medium', 'valor inválido deve fazer fallback seguro para medium');
+
+    globalThis.fetch = originalFetch;
+    if (originalGroqKey) process.env.GROQ_API_KEY = originalGroqKey; else delete process.env.GROQ_API_KEY;
+    if (originalGroqModel) process.env.GROQ_MODEL = originalGroqModel; else delete process.env.GROQ_MODEL;
+    if (originalReasoning) process.env.GROQ_REASONING_EFFORT = originalReasoning; else delete process.env.GROQ_REASONING_EFFORT;
+
+    pass("10.1 — Configuração dinâmica de reasoning_effort testada em todos os cenários");
   } catch (e) { fail('10.1', e); }
 
   total++;

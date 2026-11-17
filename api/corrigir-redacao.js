@@ -132,6 +132,12 @@ export default async function handler(req, res) {
     const { data: userData, error: userError } = await supabaseUser.auth.getUser(token);
 
     if (userError || !userData?.user?.id) {
+      console.warn('[corrigir-redacao] Falha na autenticação Supabase:', {
+        name: userError?.name,
+        status: userError?.status,
+        code: userError?.code,
+        message: userError?.message
+      });
       return responderJson(res, 401, {
         error: 'Sessão inválida ou expirada. Faça login novamente no Vestibular+.'
       });

@@ -64,10 +64,35 @@ export default async function handler(req, res) {
     });
     const { data: userData, error } = await supabase.auth.getUser(token);
     if (error || !userData?.user?.id) {
-      return res.status(401).json({ error: 'Token inválido ou expirado.' });
+      console.warn('[diagnostico-env] Falha na validação do token Supabase:', {
+        name: error?.name,
+        status: error?.status,
+        code: error?.code,
+        message: error?.message
+      });
+      return res.status(401).json({
+        error: 'Token inválido ou expirado.',
+        auth_error: {
+          name: error?.name || 'AuthError',
+          status: error?.status || 401,
+          code: error?.code || null,
+          message: error?.message || 'Token inválido ou expirado'
+        }
+      });
     }
-  } catch (_) {
-    return res.status(401).json({ error: 'Falha ao validar token.' });
+  } catch (err) {
+    console.warn('[diagnostico-env] Exceção na validação do token Supabase:', {
+      name: err?.name,
+      message: err?.message
+    });
+    return res.status(401).json({
+      error: 'Falha ao validar token.',
+      auth_error: {
+        name: err?.name || 'Exception',
+        status: 500,
+        message: err?.message || 'Erro inesperado ao validar token'
+      }
+    });
   }
 
   const serviceKeyPresente = !!process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -598,6 +598,19 @@ async function chamarGroq(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
   const timeoutId = setTimeout(() => controller.abort(), timeoutEfetivo);
 
   try {
+    const isReasoningModel = modelo.includes('gpt-oss') || modelo.includes('deepseek') || modelo.includes('o1') || modelo.includes('o3');
+    const VALORES_REASONING_VALIDOS = ['low', 'medium', 'high'];
+    let reasoningEffort = undefined;
+
+    if (isReasoningModel) {
+      const envVal = process.env.GROQ_REASONING_EFFORT ? String(process.env.GROQ_REASONING_EFFORT).toLowerCase().trim() : '';
+      if (VALORES_REASONING_VALIDOS.includes(envVal)) {
+        reasoningEffort = envVal;
+      } else {
+        reasoningEffort = 'medium';
+      }
+    }
+
     const body = {
       model: modelo,
       temperature: 0,
@@ -606,7 +619,6 @@ async function chamarGroq(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
       // se esgotava antes de completar as 5 competências ENEM (~1800-2500 tokens de JSON visível).
       // O modelo suporta até 65536 tokens de saída (documentação Groq, 2025).
       max_tokens: 16384,
-      reasoning_effort: 'medium',
       response_format: { type: 'json_object' },
       messages: [
         {
@@ -616,6 +628,10 @@ async function chamarGroq(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
         { role: 'user', content: prompt }
       ]
     };
+
+    if (reasoningEffort) {
+      body.reasoning_effort = reasoningEffort;
+    }
 
     const response = await fetch(url, {
       method: 'POST',
@@ -719,7 +735,7 @@ async function chamarGroq(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
 }
 
 async function chamarGemini(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
-  const modelo = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const modelo = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${apiKey}`;
   const timeoutEfetivo = Math.max(1000, Number(timeoutMs) || TIMEOUT_MS);
   const controller = new AbortController();
@@ -732,8 +748,7 @@ async function chamarGemini(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
       signal: controller.signal,
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        // maxOutputTokens aumentado de 4096 para 8192 (teto oficial do gemini-1.5-flash, Google AI docs).
-        // gemini-1.5-flash não suporta valores acima de 8192 via generationConfig.
+        // maxOutputTokens aumentado de 4096 para 8192 (teto oficial do gemini flash, Google AI docs).
         generationConfig: { temperature: 0, topP: 1.0, maxOutputTokens: 8192, responseMimeType: 'application/json' }
       })
     });
@@ -790,6 +805,13 @@ async function chamarGemini(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
       prompt_tokens: data.usageMetadata?.promptTokenCount ?? null,
       completion_tokens: data.usageMetadata?.candidatesTokenCount ?? null
     });
+
+    if (candidate?.finishReason === 'MAX_TOKENS') {
+      const erroTruncado = new Error('A resposta do Gemini atingiu o limite de tokens antes de concluir todas as competências.');
+      erroTruncado.statusCode = 502;
+      erroTruncado.tipo = 'RESPOSTA_TRUNCADA_IA';
+      throw erroTruncado;
+    }
 
     const rawText = candidate?.content?.parts?.[0]?.text;
     if (!rawText) {
@@ -874,6 +896,13 @@ async function chamarOpenAI(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
       prompt_tokens: data.usage?.prompt_tokens ?? null,
       completion_tokens: data.usage?.completion_tokens ?? null
     });
+
+    if (choiceOAI?.finish_reason === 'length') {
+      const erroTruncado = new Error('A resposta da OpenAI atingiu o limite de tokens antes de concluir todas as competências.');
+      erroTruncado.statusCode = 502;
+      erroTruncado.tipo = 'RESPOSTA_TRUNCADA_IA';
+      throw erroTruncado;
+    }
 
     const rawText = choiceOAI?.message?.content;
     if (!rawText) {

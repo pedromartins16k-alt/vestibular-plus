@@ -2523,8 +2523,17 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
     feedbackEl.textContent = '⏳ Verificando credenciais e iniciando análise com IA...';
   }
 
-  // Verifica autenticação
-  const { data: { session } } = await supabase.auth.getSession();
+  // Verifica autenticação e renova proativamente se expirada
+  let { data: { session } } = await supabase.auth.getSession();
+  if (session && session.expires_at && (session.expires_at * 1000 < Date.now() + 60000)) {
+    try {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (!refreshError && refreshData?.session) {
+        session = refreshData.session;
+      }
+    } catch (_) {}
+  }
+
   if (!session?.access_token) {
     if (feedbackEl) {
       feedbackEl.style.color = '#ef4444';
@@ -2999,7 +3008,14 @@ iniciar();
 window.__vpDiag = async function(redacaoId) {
   const PREFIXO = '[vpDiag]';
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    let { data: { session } } = await supabase.auth.getSession();
+    if (session && session.expires_at && (session.expires_at * 1000 < Date.now() + 60000)) {
+      try {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        if (refreshData?.session) session = refreshData.session;
+      } catch (_) {}
+    }
+
     if (!session?.access_token) {
       console.warn(PREFIXO, 'Nenhuma sessão ativa. Faça login no Vestibular+ primeiro.');
       return { erro: 'Sem sessão autenticada' };
@@ -3025,7 +3041,15 @@ window.__vpDiag = async function(redacaoId) {
         console.log('Cliente que será usado no INSERT:', d.cliente_insert_usara);
         if (d.GROQ_MODEL) console.log('Modelo Groq configurado:', d.GROQ_MODEL);
       } else {
-        console.warn(PREFIXO, 'Resposta inesperada do /api/diagnostico-env:', resultadoDiag);
+        if (resultadoDiag?.auth_error) {
+          console.group('⚠️ Detalhes da falha de autenticação Supabase (backend):');
+          console.log('name:', resultadoDiag.auth_error.name);
+          console.log('status:', resultadoDiag.auth_error.status);
+          console.log('code:', resultadoDiag.auth_error.code);
+          console.log('message:', resultadoDiag.auth_error.message);
+          console.groupEnd();
+        }
+        console.warn(PREFIXO, 'Resposta do /api/diagnostico-env:', resp.status, resultadoDiag);
       }
     } catch (e) {
       console.error(PREFIXO, 'Falha ao chamar /api/diagnostico-env:', e.message);
