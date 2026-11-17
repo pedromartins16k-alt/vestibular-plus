@@ -64,11 +64,27 @@ export default async function handler(req, res) {
     });
     const { data: userData, error } = await supabase.auth.getUser(token);
     if (error || !userData?.user?.id) {
+      let probe = null;
+      try {
+        const u = new URL(supabaseUrl);
+        const r = await fetch(`${u.origin}/auth/v1/health`, { headers: { apikey: supabaseAnonKey } });
+        probe = { ok: r.ok, status: r.status, host: u.host };
+      } catch (pErr) {
+        probe = {
+          error: pErr.message,
+          code: pErr.code || pErr.cause?.code || null,
+          syscall: pErr.cause?.syscall || null,
+          hostname: pErr.cause?.hostname || null,
+          host_informado: (() => { try { return new URL(supabaseUrl).host; } catch (_) { return '(url_invalida)'; } })()
+        };
+      }
+
       console.warn('[diagnostico-env] Falha na validação do token Supabase:', {
         name: error?.name,
         status: error?.status,
         code: error?.code,
-        message: error?.message
+        message: error?.message,
+        probe
       });
       return res.status(401).json({
         error: 'Token inválido ou expirado.',
@@ -76,7 +92,8 @@ export default async function handler(req, res) {
           name: error?.name || 'AuthError',
           status: error?.status || 401,
           code: error?.code || null,
-          message: error?.message || 'Token inválido ou expirado'
+          message: error?.message || 'Token inválido ou expirado',
+          rede: probe
         }
       });
     }
