@@ -308,17 +308,31 @@ async function executar() {
 
   // ── ETAPA 8: Limpeza Isolada de Dados Criados no Teste ─────────────────────
   console.log('\n📌 ETAPA 8 — Limpeza dos Dados de Teste');
-  try {
-    if (redacaoCriadaId) {
-      const { error: errDeleteAvaliacao } = await supabaseUser.from('redacao_avaliacoes').delete().eq('redacao_id', redacaoCriadaId);
-      if (errDeleteAvaliacao) throw errDeleteAvaliacao;
-      const { error: errDeleteRedacao } = await supabaseUser.from('redacoes').delete().eq('id', redacaoCriadaId);
-      if (errDeleteRedacao) throw errDeleteRedacao;
+  if (redacaoCriadaId) {
+    const errosLimpeza = [];
+
+    // Só haverá avaliação persistida quando a API confirmar explicitamente a gravação.
+    if (respostaApi?.persistido_no_banco === true) {
+      const { error: errDeleteAvaliacao } = await supabaseUser
+        .from('redacao_avaliacoes')
+        .delete()
+        .eq('redacao_id', redacaoCriadaId);
+      if (errDeleteAvaliacao) errosLimpeza.push(`redacao_avaliacoes: ${errDeleteAvaliacao.message}`);
+    }
+
+    // Sempre tentar remover a redação, mesmo se a exclusão da avaliação falhar.
+    const { error: errDeleteRedacao } = await supabaseUser
+      .from('redacoes')
+      .delete()
+      .eq('id', redacaoCriadaId);
+    if (errDeleteRedacao) errosLimpeza.push(`redacoes: ${errDeleteRedacao.message}`);
+
+    if (errosLimpeza.length) {
+      logFail('LIMPEZA', 'Falha ao remover dados criados pelo teste', new Error(errosLimpeza.join('; ')));
+      process.exitCode = 1;
+    } else {
       logPass('LIMPEZA', `Dados de teste (Redação ${redacaoCriadaId}) removidos com segurança.`);
     }
-  } catch (errLimpeza) {
-    logFail('LIMPEZA', 'Falha ao remover dados criados pelo teste', errLimpeza);
-    process.exitCode = 1;
   }
 
   if (process.exitCode === 1) {
