@@ -64,6 +64,18 @@ export default async function handler(req, res) {
     });
     const { data: userData, error } = await supabase.auth.getUser(token);
     if (error || !userData?.user?.id) {
+      const extrairRefJwt = (key) => {
+        try {
+          if (!key || typeof key !== 'string' || !key.startsWith('eyJ')) return null;
+          const p = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8'));
+          return p.ref || null;
+        } catch (_) { return null; }
+      };
+
+      const extrairHost = (u) => {
+        try { return u ? new URL(u).host : null; } catch (_) { return null; }
+      };
+
       let probe = null;
       try {
         const u = new URL(supabaseUrl);
@@ -75,7 +87,13 @@ export default async function handler(req, res) {
           code: pErr.code || pErr.cause?.code || null,
           syscall: pErr.cause?.syscall || null,
           hostname: pErr.cause?.hostname || null,
-          host_informado: (() => { try { return new URL(supabaseUrl).host; } catch (_) { return '(url_invalida)'; } })()
+          host_informado: extrairHost(supabaseUrl),
+          env_hosts: {
+            SUPABASE_URL_host: extrairHost(process.env.SUPABASE_URL),
+            VITE_SUPABASE_URL_host: extrairHost(process.env.VITE_SUPABASE_URL),
+            SUPABASE_ANON_KEY_ref: extrairRefJwt(process.env.SUPABASE_ANON_KEY),
+            VITE_SUPABASE_ANON_KEY_ref: extrairRefJwt(process.env.VITE_SUPABASE_ANON_KEY)
+          }
         };
       }
 
