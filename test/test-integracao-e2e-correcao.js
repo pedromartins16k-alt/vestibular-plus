@@ -133,6 +133,7 @@ async function executar() {
     console.log('   Executando testes de conectividade, conformidade de contratos e prontidão de infraestrutura...\n');
 
     await executarVerificacaoPreVoo(supabaseAuthClient);
+    process.exitCode = 1; // Pré-voo não substitui a execução E2E autenticada.
     return;
   }
 
@@ -174,6 +175,7 @@ async function executar() {
     logPass('ENVIO', `Redação fictícia criada com sucesso no banco (ID: ${redacaoCriadaId}).`);
   } catch (errEnvio) {
     logFail('ENVIO', 'Não foi possível inserir a redação de teste', errEnvio);
+    process.exitCode = 1;
     return;
   }
 
@@ -229,8 +231,15 @@ async function executar() {
     assert.equal(avaliacaoRecebida.nota_maxima, 1000, 'Nota máxima do ENEM deve ser 1000');
     logPass('NOTA_FINAL', `Cálculo da nota final íntegro: ${avaliacaoRecebida.nota_total}/1000 pontos.`);
 
+    const pendencia = bodyJson.pendencia_persistencia;
+    const detalhePersistencia = pendencia
+      ? `${pendencia.code || 'SEM_CODIGO'}: ${pendencia.message || 'Sem detalhe'}`
+      : 'A API não informou diagnóstico.';
+    assert.equal(bodyJson.persistido_no_banco, true, `API não confirmou a persistência (${detalhePersistencia})`);
+
   } catch (errApi) {
     logFail('API_IA', 'Falha ao executar ou validar a correção pela IA', errApi);
+    process.exitCode = 1;
   }
 
   // ── ETAPA 6: Persistência no Supabase ───────────────────────────────────────
@@ -264,6 +273,7 @@ async function executar() {
     }
   } catch (errPersist) {
     logFail('PERSISTENCIA', 'Falha ao verificar persistência da avaliação', errPersist);
+    process.exitCode = 1;
   }
 
   // ── ETAPA 7: Recuperação no Histórico do Aluno ──────────────────────────────
@@ -293,21 +303,29 @@ async function executar() {
     logPass('HISTORICO', 'Redação e avaliação recuperadas com sucesso na consulta do histórico.');
   } catch (errHist) {
     logFail('HISTORICO', 'Falha ao recuperar avaliação no histórico', errHist);
+    process.exitCode = 1;
   }
 
   // ── ETAPA 8: Limpeza Isolada de Dados Criados no Teste ─────────────────────
   console.log('\n📌 ETAPA 8 — Limpeza dos Dados de Teste');
   try {
     if (redacaoCriadaId) {
-      await supabaseUser.from('redacao_avaliacoes').delete().eq('redacao_id', redacaoCriadaId);
-      await supabaseUser.from('redacoes').delete().eq('id', redacaoCriadaId);
+      const { error: errDeleteAvaliacao } = await supabaseUser.from('redacao_avaliacoes').delete().eq('redacao_id', redacaoCriadaId);
+      if (errDeleteAvaliacao) throw errDeleteAvaliacao;
+      const { error: errDeleteRedacao } = await supabaseUser.from('redacoes').delete().eq('id', redacaoCriadaId);
+      if (errDeleteRedacao) throw errDeleteRedacao;
       logPass('LIMPEZA', `Dados de teste (Redação ${redacaoCriadaId}) removidos com segurança.`);
     }
   } catch (errLimpeza) {
-    logInfo('LIMPEZA', `Aviso durante limpeza: ${errLimpeza?.message || errLimpeza}`);
+    logFail('LIMPEZA', 'Falha ao remover dados criados pelo teste', errLimpeza);
+    process.exitCode = 1;
   }
 
-  console.log('\n🎉 TESTE DE INTEGRAÇÃO PONTA A PONTA CONCLUÍDO COM SUCESSO!');
+  if (process.exitCode === 1) {
+    console.error('\n❌ TESTE DE INTEGRAÇÃO PONTA A PONTA CONCLUÍDO COM FALHAS.');
+  } else {
+    console.log('\n🎉 TESTE DE INTEGRAÇÃO PONTA A PONTA CONCLUÍDO COM SUCESSO!');
+  }
 }
 
 // ─── Verificação Pré-Voo Segura (Sem Credenciais de Usuário) ─────────────────
