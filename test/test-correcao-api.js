@@ -249,12 +249,21 @@ async function runTests() {
     const b5 = await testarCorpoGroq('openai/gpt-oss-120b', 'invalid_value');
     assert.equal(b5?.reasoning_effort, 'medium', 'valor inválido deve fazer fallback seguro para medium');
 
+    // 6. deepseek-r1 (listado em MODELOS_REASONING_GROQ): deve receber reasoning_effort
+    const b6 = await testarCorpoGroq('deepseek-r1-distill-llama-70b', 'high');
+    assert.equal(b6?.reasoning_effort, 'high', 'deepseek-r1 (na lista explícita) deve receber reasoning_effort');
+
+    // 7. Modelo com 'o1' no nome mas NÃO listado explicitamente: não deve receber reasoning_effort
+    // Garante que a detecção é por Set.has() e não por substring
+    const b7 = await testarCorpoGroq('custom-o1-compat-model', 'medium');
+    assert.equal(b7?.reasoning_effort, undefined, 'modelo com "o1" no nome mas não na lista explícita NÃO deve receber reasoning_effort');
+
     globalThis.fetch = originalFetch;
     if (originalGroqKey) process.env.GROQ_API_KEY = originalGroqKey; else delete process.env.GROQ_API_KEY;
     if (originalGroqModel) process.env.GROQ_MODEL = originalGroqModel; else delete process.env.GROQ_MODEL;
     if (originalReasoning) process.env.GROQ_REASONING_EFFORT = originalReasoning; else delete process.env.GROQ_REASONING_EFFORT;
 
-    pass("10.1 — Configuração dinâmica de reasoning_effort testada em todos os cenários");
+    pass("10.1 — Configuração explícita de reasoning_effort por Set testada em todos os cenários (sem substring)");
   } catch (e) { fail('10.1', e); }
 
   total++;

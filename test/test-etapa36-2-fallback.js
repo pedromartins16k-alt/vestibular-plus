@@ -150,7 +150,7 @@ try {
     assert.equal(chamadasGroq, 1, 'Groq chamado 1 vez e falhou');
     assert.equal(chamadasGemini, 1, 'Gemini chamado via fallback');
     assert.equal(res.competencias.length, 5);
-    assert.equal(res.modelo_utilizado, 'google/gemini-1.5-flash');
+    assert.equal(res.modelo_utilizado, 'google/gemini-2.5-flash');
     pass('2 — Groq retorna 400 (falha de JSON) e Gemini assume com sucesso');
   } finally {
     globalThis.fetch = originalFetch;
@@ -198,7 +198,7 @@ try {
     });
 
     assert.equal(res.competencias.length, 5);
-    assert.equal(res.modelo_utilizado, 'google/gemini-1.5-flash');
+    assert.equal(res.modelo_utilizado, 'google/gemini-2.5-flash');
     pass('3 — Groq com finish_reason "length" aciona fallback para Gemini');
   } finally {
     globalThis.fetch = originalFetch;

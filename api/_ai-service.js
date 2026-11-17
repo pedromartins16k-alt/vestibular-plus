@@ -590,6 +590,23 @@ REGRA ABSOLUTA DE INTEGRIDADE:
 // CHAMADAS AOS PROVEDORES
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Conjunto explícito de IDs de modelos Groq que suportam o parâmetro `reasoning_effort`.
+ * Modelos gerais (llama, mixtral, etc.) NÃO devem receber este parâmetro — uso incorreto
+ * resulta em PARAMETRO_INVALIDO e interrompe o fallback.
+ *
+ * Fonte: documentação Groq (openai-compatible-apis), 2025.
+ * Para adicionar um novo modelo de raciocínio, insira o ID exato aqui.
+ */
+const MODELOS_REASONING_GROQ = new Set([
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'deepseek-r1-distill-llama-70b',
+  'deepseek-r1-distill-qwen-32b',
+]);
+
+const VALORES_REASONING_VALIDOS = ['low', 'medium', 'high'];
+
 async function chamarGroq(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
   const modelo = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
   const url = 'https://api.groq.com/openai/v1/chat/completions';
@@ -598,8 +615,9 @@ async function chamarGroq(apiKey, prompt, timeoutMs = TIMEOUT_MS) {
   const timeoutId = setTimeout(() => controller.abort(), timeoutEfetivo);
 
   try {
-    const isReasoningModel = modelo.includes('gpt-oss') || modelo.includes('deepseek') || modelo.includes('o1') || modelo.includes('o3');
-    const VALORES_REASONING_VALIDOS = ['low', 'medium', 'high'];
+    // Usa lookup explícito — nunca detecta por substring do nome do modelo.
+    // Modelos gerais nunca recebem reasoning_effort independente do nome.
+    const isReasoningModel = MODELOS_REASONING_GROQ.has(modelo);
     let reasoningEffort = undefined;
 
     if (isReasoningModel) {

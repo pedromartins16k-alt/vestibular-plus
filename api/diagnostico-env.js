@@ -135,6 +135,7 @@ export default async function handler(req, res) {
         };
       }
 
+      // Detalhes completos ficam exclusivamente nos logs protegidos da Vercel
       console.warn('[diagnostico-env] Falha na validação do token Supabase:', {
         name: error?.name,
         status: error?.status,
@@ -142,28 +143,28 @@ export default async function handler(req, res) {
         message: error?.message,
         probe
       });
+      // Resposta pública: apenas status e código — sem mensagem nem dados de rede
       return res.status(401).json({
         error: 'Token inválido ou expirado.',
         auth_error: {
           name: error?.name || 'AuthError',
           status: error?.status || 401,
-          code: error?.code || null,
-          message: error?.message || 'Token inválido ou expirado',
-          rede: probe
+          code: error?.code || null
         }
       });
     }
   } catch (err) {
+    // Detalhes completos ficam exclusivamente nos logs protegidos da Vercel
     console.warn('[diagnostico-env] Exceção na validação do token Supabase:', {
       name: err?.name,
       message: err?.message
     });
+    // Resposta pública: apenas status e código — sem mensagem nem dados de rede
     return res.status(401).json({
       error: 'Falha ao validar token.',
       auth_error: {
         name: err?.name || 'Exception',
-        status: 500,
-        message: err?.message || 'Erro inesperado ao validar token'
+        status: 500
       }
     });
   }

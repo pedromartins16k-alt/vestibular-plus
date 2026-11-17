@@ -34,6 +34,43 @@ let timerSegundos = 0;
 let timerInterval = null;
 let timerPausado = false;
 
+// ─── Renovação de sessão com proteção contra condições de corrida ─────────────
+// Se múltiplas chamadas simultâneas detectarem sessão prestes a expirar,
+// apenas uma emite refreshSession() — as demais aguardam a mesma Promise.
+let _refreshPromise = null;
+
+/**
+ * Retorna a sessão atual, renovando-a se estiver a < 60s do vencimento.
+ * Nunca envia token já expirado. Retorna null se não houver sessão válida.
+ * Seguro para chamadas concorrentes (sem race condition).
+ */
+async function getValidSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return null;
+
+  // Ainda tem margem suficiente — retorna sem renovar
+  const expMs = session.expires_at ? session.expires_at * 1000 : Infinity;
+  if (expMs - Date.now() > 60_000) return session;
+
+  // Precisa renovar — reutiliza uma Promise já em voo se existir
+  if (!_refreshPromise) {
+    _refreshPromise = supabase.auth.refreshSession()
+      .finally(() => { _refreshPromise = null; });
+  }
+
+  try {
+    const { data: refreshData, error: refreshError } = await _refreshPromise;
+    if (!refreshError && refreshData?.session?.access_token) {
+      return refreshData.session;
+    }
+  } catch (_) {}
+
+  // Renovação falhou — só retorna a sessão original se ainda não expirou
+  if (expMs > Date.now()) return session;
+  return null; // expirada e não renovada — força login
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Chaves de Armazenamento
 const STORAGE_PREFIX_HISTORICO = 'vestibular_redacoes_concluidas_';
 const STORAGE_PREFIX_DRAFT = 'redacao_draft_';
@@ -2523,16 +2560,8 @@ async function solicitarCorrecaoIA(redacaoId, btn) {
     feedbackEl.textContent = '⏳ Verificando credenciais e iniciando análise com IA...';
   }
 
-  // Verifica autenticação e renova proativamente se expirada
-  let { data: { session } } = await supabase.auth.getSession();
-  if (session && session.expires_at && (session.expires_at * 1000 < Date.now() + 60000)) {
-    try {
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      if (!refreshError && refreshData?.session) {
-        session = refreshData.session;
-      }
-    } catch (_) {}
-  }
+  // Verifica autenticação, renovando se necessário (sem condição de corrida)
+  const session = await getValidSession();
 
   if (!session?.access_token) {
     if (feedbackEl) {
