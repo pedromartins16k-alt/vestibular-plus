@@ -2072,10 +2072,11 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
     : '';
 
   // Banner para nota_suspeita / sinalização de consistência
-  const compSuspeitas = (av.competencias || []).filter(c => c.nota_suspeita);
-  const bannerSuspeita = compSuspeitas.length > 0
-    ? `<div style="margin-bottom:16px; padding:10px 14px; border-radius:var(--radius-md); background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.3); color:#c084fc; font-size:0.82rem;">
-        🔍 <strong>Sinalização pedagógica:</strong> Esta avaliação possui uma sinalização de consistência em ${compSuspeitas.map(c => `C${c.numero}`).join(', ')}. Isso não significa que sua redação esteja errada — confira as observações detalhadas.
+  const compSuspeitas = (av.competencias || []).filter(c => c.nota_suspeita || c.nota_confirmada === false);
+  const isSuspeitaGeral = Boolean(av.nota_suspeita || av.nota_confirmada === false || compSuspeitas.length > 0);
+  const bannerSuspeita = isSuspeitaGeral
+    ? `<div style="margin-bottom:16px; padding:12px 16px; border-radius:var(--radius-md); background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.35); color:#c084fc; font-size:0.83rem;">
+        🔍 <strong>Estimativa em Revisão Pedagógica (Nota Não Confirmada):</strong> ${compSuspeitas.length > 0 ? `Identificamos apontamentos de consistência em ${compSuspeitas.map(c => `C${c.numero}`).join(', ')}.` : 'Identificamos fragilidades ou divergências sob análise.'} ${av.aviso_contradicao ? `<div style="margin-top:4px; font-size:0.76rem; opacity:0.9;">${escapeHtml(av.aviso_contradicao)}</div>` : ''} Esta nota é uma estimativa preliminar em revisão e não deve ser considerada nota final consolidada.
        </div>`
     : '';
 
@@ -2083,12 +2084,12 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
   const ext = av.extensao || (r.total_palavras ? {
     total_palavras: r.total_palavras,
     status: r.total_palavras < 320 ? 'abaixo_do_recomendado' : (r.total_palavras > 650 ? 'acima_do_recomendado' : 'adequado'),
-    faixa_recomendada: 'Entre 350 e 600 palavras (25 a 30 linhas)'
+    faixa_recomendada: '350 a 600 palavras (25 a 30 linhas)'
   } : null);
 
   const bannerExtensao = (ext && ext.status === 'abaixo_do_recomendado')
     ? `<div style="margin-bottom:16px; padding:10px 14px; border-radius:var(--radius-md); background:rgba(234,179,8,0.08); border:1px solid rgba(234,179,8,0.3); color:#eab308; font-size:0.82rem;">
-        📏 <strong>Extensão reduzida:</strong> O texto contém ${ext.total_palavras} palavras, abaixo da faixa recomendada (${escapeHtml(ext.faixa_recomendada || '350 a 600 palavras')}). Textos breves tendem a restringir o aprofundamento argumentativo e a diversidade coesiva.
+        📏 <strong>Orientação Pedagógica da Plataforma (Extensão):</strong> O texto contém ${ext.total_palavras} palavras. A faixa de 350 a 600 palavras é uma recomendação didática interna da plataforma para desenvolvimento pleno das competências, NÃO uma regra oficial do ENEM (o exame oficial avalia a densidade do conteúdo no espaço de até 30 linhas manuscritas, sem contagem mínima formal de palavras). Redações concisas que cumpram as competências são avaliadas pelo conteúdo e não sofrem penalização automática por tamanho.
        </div>`
     : '';
 
@@ -2100,9 +2101,15 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
       <!-- Topo da Avaliação -->
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; border-bottom:1px solid var(--border-color); padding-bottom:16px; margin-bottom:18px;">
         <div>
-          <span style="font-size:0.74rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--color-primary-400); background:rgba(124,58,237,0.12); padding:3px 10px; border-radius:var(--radius-full);">
-            Estimativa Pedagógica (${escapeHtml(av.modelo_utilizado || 'IA')})
-          </span>
+          ${isSuspeitaGeral ? `
+            <span style="font-size:0.74rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#c084fc; background:rgba(168,85,247,0.18); border:1px solid rgba(168,85,247,0.4); padding:3px 10px; border-radius:var(--radius-full);">
+              ⚠️ Estimativa em Revisão Pedagógica (Não Confirmada)
+            </span>
+          ` : `
+            <span style="font-size:0.74rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:var(--color-primary-400); background:rgba(124,58,237,0.12); padding:3px 10px; border-radius:var(--radius-full);">
+              Estimativa Pedagógica (${escapeHtml(av.modelo_utilizado || 'IA')})
+            </span>
+          `}
           <h4 style="font-size:1.15rem; font-weight:800; font-family:var(--font-display); margin:8px 0 2px;">
             Resultado da Avaliação
           </h4>
@@ -2115,9 +2122,9 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
       <!-- Card Principal da Nota e Resumo -->
       <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:stretch; margin-bottom:20px;">
         <!-- Card Destaque da Nota -->
-        <div style="flex:1 1 200px; background:var(--bg-elevated); border:1px solid var(--border-color); border-radius:var(--radius-lg); padding:20px 24px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-          <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-secondary); margin-bottom:6px;">
-            SUA NOTA ESTIMADA
+        <div style="flex:1 1 200px; background:var(--bg-elevated); border:1px solid ${isSuspeitaGeral ? 'rgba(168,85,247,0.4)' : 'var(--border-color)'}; border-radius:var(--radius-lg); padding:20px 24px; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+          <div style="font-size:0.72rem; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; color:${isSuspeitaGeral ? '#c084fc' : 'var(--text-secondary)'}; margin-bottom:6px;">
+            ${isSuspeitaGeral ? 'NOTA ESTIMADA (EM REVISÃO)' : 'SUA NOTA ESTIMADA'}
           </div>
           <div style="font-size:3.2rem; font-weight:900; font-family:var(--font-display); color:${corNota}; line-height:1;">
             ${av.nota_total}
@@ -2125,8 +2132,8 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
           <div style="font-size:0.95rem; color:var(--text-secondary); font-weight:600; margin-bottom:8px;">
             / ${av.nota_maxima}
           </div>
-          <div style="font-size:0.72rem; color:var(--text-secondary); line-height:1.4;">
-            Estimativa pedagógica baseada na matriz oficial da banca ${escapeHtml(matriz?.nome || 'selecionada')}
+          <div style="font-size:0.72rem; color:${isSuspeitaGeral ? '#c084fc' : 'var(--text-secondary)'}; line-height:1.4;">
+            ${isSuspeitaGeral ? 'Sinalização de consistência pedagógica ativa — nota sob verificação' : `Estimativa pedagógica baseada na matriz oficial da banca ${escapeHtml(matriz?.nome || 'selecionada')}`}
           </div>
         </div>
 
@@ -2217,12 +2224,15 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
                                   (Boolean(fpAtualModal) && Boolean(fpAntModal) && fpAtualModal === fpAntModal) ||
                                   (!textoAntModal && !fpAntModal);
 
+        const dataAntStr = new Date(anterior.corrigido_em || anterior.criado_em || Date.now()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const dataAtualStr = new Date(av.corrigido_em || Date.now()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
         const tituloComparativo = isMesmoTextoModal
-          ? 'Comparativo de Avaliações IA (Mesmo Texto)'
+          ? 'Comparativo de Avaliações IA (Reavaliação do Mesmo Texto)'
           : 'Comparativo de Avaliações IA (Versões Diferentes)';
         const explicacaoComparativo = isMesmoTextoModal
-          ? '💡 <em>Nota sobre reavaliações:</em> Esta variação reflete uma nova estimativa pedagógica do modelo sobre o mesmo texto redigido, e não uma alteração textual.'
-          : '💡 <em>Comparativo entre versões:</em> Esta variação reflete avaliações entre versões distintas do texto. A pontuação pode refletir alterações no texto e estimativas da IA.';
+          ? `💡 <em>Nota sobre reavaliações:</em> Esta variação reflete uma nova estimativa pedagógica do modelo sobre o mesmo texto redigido (${anterior.nota_total} pts em ${dataAntStr} → ${av.nota_total} pts em ${dataAtualStr}), e não uma alteração textual.`
+          : `💡 <em>Comparativo entre versões:</em> Esta variação reflete avaliações entre versões distintas do texto (${anterior.nota_total} pts em ${dataAntStr} → ${av.nota_total} pts em ${dataAtualStr}). A pontuação reflete alterações no texto e estimativas da IA.`;
 
         return `
           <div style="margin-bottom:20px; padding:14px 16px; border-radius:var(--radius-md); background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25);">
@@ -2254,7 +2264,7 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
               }).join('')}
             </div>
             <div style="margin-top:10px; font-size:0.74rem; color:var(--text-secondary); text-align:right;">
-              Avaliação anterior realizada em ${new Date(anterior.corrigido_em || Date.now()).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              Avaliação anterior realizada em ${dataAntStr}
             </div>
           </div>
         `;
@@ -2264,28 +2274,72 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
       ${(() => {
         const hist = Array.isArray(r.historico_avaliacoes) ? r.historico_avaliacoes : [];
         if (hist.length < 1) return '';
-        const timeline = [...hist].reverse().map(h => ({ nota: h.nota_total, atual: false }));
-        timeline.push({ nota: av.nota_total, atual: true });
+        // Inverte para ter a ordem cronológica correta (da mais antiga para a mais recente)
+        const timeline = [...hist].reverse().map((h, i) => {
+          const dataIso = h.corrigido_em || h.criado_em;
+          const dataStr = dataIso ? new Date(dataIso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : `Registro ${i + 1}`;
+          const isMesmo = Boolean(h.fingerprint && av.fingerprint && h.fingerprint === av.fingerprint) ||
+                          Boolean(h.texto && r.texto && h.texto.trim() === r.texto.trim()) ||
+                          (!h.texto && !h.fingerprint);
+          return {
+            nota: h.nota_total,
+            atual: false,
+            dataStr,
+            isMesmoTexto: isMesmo,
+            tipo: isMesmo ? 'Reavaliação IA (mesmo texto)' : 'Versão anterior do texto'
+          };
+        });
+
+        const dataAtualIso = av.corrigido_em || av.criado_em;
+        const dataAtualStr = dataAtualIso ? new Date(dataAtualIso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Agora';
+        timeline.push({
+          nota: av.nota_total,
+          atual: true,
+          dataStr: dataAtualStr,
+          isMesmoTexto: true,
+          tipo: 'Avaliação atual ativa'
+        });
+
         const max = av.nota_maxima || 1000;
 
         return `
           <div style="margin-bottom:20px; padding:14px 18px; border-radius:var(--radius-md); background:rgba(124,58,237,0.05); border:1px solid rgba(124,58,237,0.2);">
-            <div style="font-size:0.86rem; font-weight:800; color:var(--color-primary-400); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
-              <span>📈</span> Minha Evolução Nesta Redação
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:6px;">
+              <div style="font-size:0.86rem; font-weight:800; color:var(--color-primary-400); display:flex; align-items:center; gap:6px;">
+                <span>📈</span> Linha do Tempo e Origem das Notas Desta Redação
+              </div>
+              <span style="font-size:0.72rem; color:var(--text-secondary);">
+                ${timeline.length} avaliaç${timeline.length === 1 ? 'ão' : 'ões'} registrada${timeline.length === 1 ? '' : 's'}
+              </span>
             </div>
-            <div style="display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; padding:6px 0;">
+            <div style="display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; padding:6px 0 12px; border-bottom:1px solid rgba(255,255,255,0.06);">
               ${timeline.map((item, idx) => {
                 const h = Math.max(14, Math.round((item.nota / max) * 75));
                 const cor = item.atual ? 'var(--color-primary-400)' : '#38bdf8';
-                const label = item.atual ? 'Atual' : `Versão ${idx + 1}`;
+                const label = item.atual ? 'Atual' : `Nota ${idx + 1}`;
                 return `
-                  <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:54px;">
-                    <span style="font-size:0.75rem; font-weight:800; color:${cor};">${item.nota}</span>
-                    <div style="width:36px; height:${h}px; background:${cor}${item.atual ? '' : '80'}; border-radius:4px 4px 0 0; transition:height 0.3s ease;"></div>
-                    <span style="font-size:0.65rem; color:var(--text-secondary); text-align:center;">${label}</span>
+                  <div style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:68px;">
+                    <span style="font-size:0.78rem; font-weight:800; color:${cor};">${item.nota} pts</span>
+                    <div style="width:40px; height:${h}px; background:${cor}${item.atual ? '' : '80'}; border-radius:4px 4px 0 0; transition:height 0.3s ease;"></div>
+                    <span style="font-size:0.68rem; font-weight:700; color:${cor}; text-align:center;">${label}</span>
+                    <span style="font-size:0.62rem; color:var(--text-secondary); text-align:center;">${item.dataStr.split(' ')[0]}</span>
                   </div>
                 `;
               }).join('')}
+            </div>
+            <!-- Detalhamento cronológico da origem de cada nota -->
+            <div style="margin-top:10px; font-size:0.74rem; color:var(--text-secondary); display:flex; flex-direction:column; gap:4px;">
+              ${timeline.map((item, idx) => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.03);">
+                  <span>
+                    <strong style="color:${item.atual ? 'var(--color-primary-400)' : 'var(--text-primary)'};">${item.atual ? '★ Nota Atual' : `• Nota ${idx + 1}`}:</strong>
+                    ${item.tipo} (${item.dataStr})
+                  </span>
+                  <span style="font-weight:800; color:${item.atual ? 'var(--color-primary-400)' : '#38bdf8'};">
+                    ${item.nota} pts
+                  </span>
+                </div>
+              `).join('')}
             </div>
           </div>
         `;
@@ -2378,16 +2432,16 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
               </div>`;
             })();
 
-            // Evidências textuais
+            // Evidências textuais (citações literais)
             const evidenciasHtml = (() => {
               const lista = Array.isArray(c.evidencias_textuais) && c.evidencias_textuais.length > 0
                 ? c.evidencias_textuais
                 : Array.isArray(c.evidencias) ? c.evidencias : [];
               if (lista.length === 0) return '';
               return `<div style="margin-top:6px; font-size:0.75rem; color:var(--text-secondary);">
-                <span style="font-weight:700; color:var(--text-primary);">📝 Evidências:</span>
+                <span style="font-weight:700; color:var(--text-primary);">📝 Citações literais da redação:</span>
                 <ul style="margin:2px 0 0; padding-left:16px; line-height:1.4;">
-                  ${lista.map(e => `<li style="font-style:italic;">${escapeHtml(String(e))}</li>`).join('')}
+                  ${lista.map(e => `<li style="font-style:italic;">"${escapeHtml(String(e))}"</li>`).join('')}
                 </ul>
               </div>`;
             })();
@@ -2406,7 +2460,13 @@ function renderizarBlocoAvaliacaoIA(r, matriz) {
                       const p = prioMap[prio];
                       return p ? `<span title="${escapeHtml(p.label)}" style="font-size:0.7rem; font-weight:700; color:${p.cor}; background:${p.cor}15; border:1px solid ${p.cor}40; border-radius:var(--radius-full); padding:2px 7px;">${p.emoji} ${escapeHtml(p.label)}</span>` : '';
                     })()}
-                    ${nivel ? `<span style="font-size:0.72rem; font-weight:800; color:${nivelCor}; background:${nivelCor}18; border:1px solid ${nivelCor}40; border-radius:var(--radius-full); padding:2px 8px;">${escapeHtml(nivel)}</span>` : ''}
+                    ${(() => {
+                      const isCompSuspeita = Boolean(c.nota_suspeita || c.nota_confirmada === false);
+                      if (isCompSuspeita) {
+                        return `<span title="Nota sob sinalização de consistência pedagógica" style="font-size:0.72rem; font-weight:800; color:#c084fc; background:rgba(168,85,247,0.18); border:1px solid rgba(168,85,247,0.4); border-radius:var(--radius-full); padding:2px 8px;">Pendente de Revisão</span>`;
+                      }
+                      return nivel ? `<span style="font-size:0.72rem; font-weight:800; color:${nivelCor}; background:${nivelCor}18; border:1px solid ${nivelCor}40; border-radius:var(--radius-full); padding:2px 8px;">${escapeHtml(nivel)}</span>` : '';
+                    })()}
                     <span style="font-weight:800; font-size:0.9rem; color:var(--color-primary-400);">${c.nota} / ${peso} pts</span>
                   </div>
                 </div>

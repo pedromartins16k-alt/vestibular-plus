@@ -136,7 +136,7 @@ export function analisarExtensaoRedacao(texto, proposta = null, vestibular = 'en
   const linhasEstimadas = Math.max(linhasQuebras, Math.round(totalPalavras / 11));
 
   const isEnem = (vestibular || '').toLowerCase() === 'enem';
-  const faixaTexto = proposta?.palavras_recomendadas || proposta?.limite_palavras || (isEnem ? 'Entre 350 e 600 palavras (25 a 30 linhas)' : 'Extensão adequada ao gênero');
+  const faixaTexto = proposta?.palavras_recomendadas || proposta?.limite_palavras || (isEnem ? '350 a 600 palavras (orientação pedagógica da plataforma — 25 a 30 linhas)' : 'Extensão adequada ao gênero');
 
   let status = 'adequado';
   let observacaoPedagogica = 'Extensão do texto adequada ao desenvolvimento dissertativo completo.';
@@ -153,10 +153,10 @@ export function analisarExtensaoRedacao(texto, proposta = null, vestibular = 'en
       : `Texto com extensão estimada inferior a 7 linhas, potencialmente insuficiente para desenvolvimento completo dos critérios.`;
   } else if (isEnem && totalPalavras < 320) {
     status = 'abaixo_do_recomendado';
-    observacaoPedagogica = `Texto com ${totalPalavras} palavras, abaixo da faixa recomendada (${faixaTexto}). Redações mais curtas tendem a apresentar menor densidade argumentativa, repertório mais sucinto e menor diversidade de recursos coesivos.`;
+    observacaoPedagogica = `Texto com ${totalPalavras} palavras (abaixo da faixa recomendada de 350-600 palavras). Esta faixa é uma recomendação didática interna da plataforma para desenvolvimento dissertativo completo, NÃO uma regra oficial do ENEM (o exame oficial não possui exigência mínima de palavras, avaliando o limite de até 30 linhas manuscritas e a densidade das competências). Redações concisas que cumpram os critérios são avaliadas pelo conteúdo e não sofrem desconto automático por tamanho.`;
   } else if (isEnem && totalPalavras > 650) {
     status = 'acima_do_recomendado';
-    observacaoPedagogica = `Texto com ${totalPalavras} palavras, ligeiramente acima do limite recomendado (${faixaTexto}). Atente para a concisão e o espaço de 30 linhas da folha oficial.`;
+    observacaoPedagogica = `Texto com ${totalPalavras} palavras, acima do limite e da faixa recomendada didaticamente pela plataforma (${faixaTexto}). Atente para a concisão e o espaço físico de 30 linhas da folha oficial.`;
   }
 
   return {
@@ -295,8 +295,9 @@ ESCALA OFICIAL INEP:
   FRONTEIRA 160 vs 200:
   - Proposta com os 5 elementos em que o detalhamento seja vago, embrionário, genérico ou confunda-se superficialmente com o próprio meio sem adicionar informação substantiva clara DEVE RECEBER 160 PTS.
   - Proposta com intervenção genérica, medidas vagas ou com apenas 4 elementos válidos (faltando o detalhamento ou outro elemento) = 160 PTS.
-  - Para 200 pts, os 5 elementos devem ser identificáveis de forma autônoma, inequívoca e com detalhamento específico no texto.
-• 160 pts → Elabora proposta com 4 elementos válidos OU com 5 elementos cujo detalhamento seja frágil/tênue/genérico.
+  - Ações genéricas somadas sem explicação prática de execução (ex.: dizer apenas que "escolas devem falar mais e organizar atividades" ou que "o governo deve fazer campanhas") NÃO constituem detalhamento substantivo e NÃO autorizam nota 200.
+  - Para 200 pts, os 5 elementos devem ser identificáveis de forma autônoma, inequívoca e com detalhamento específico que explique concretamente como a ação será viabilizada ou desdobrada.
+• 160 pts → Elabora proposta com 4 elementos válidos OU com 5 elementos cujo detalhamento seja frágil/tênue/genérico ou em que as ações sejam genéricas sem explicação concreta de execução.
 • 120 pts → Proposta com 3 elementos válidos.
 • 80 pts → Proposta com 2 elementos válidos.
 • 40 pts → Proposta com 1 elemento válido ou apenas esboço vago de intervenção.
@@ -309,6 +310,7 @@ IMPORTANTE:
 - NÃO zere a competência por pequena imperfeição num texto que claramente tentou apresentar proposta.
 - Respeitando direitos humanos: verifique se a proposta não viola direitos fundamentais (ex: tortura, linchamento, censura prévia). Se violar, zere apenas a C5 (critério INEP).
 - COERÊNCIA OBRIGATÓRIA ENTRE ELEMENTOS E NOTA: verifique se o "detalhamento" realmente está presente e é específico no texto, não apenas se o rótulo pode ser aplicado. Se classificar "detalhamento" como "insuficiente" ou "ausente" em "elementos_proposta", a nota DEVE ser 160 pts ou inferior, nunca 200. Não atribua 200 pts e ao mesmo tempo recomende detalhar mais a proposta.
+- Não declare detalhamento específico sem apontar qual elemento concreto cumpre essa função e qual trecho literal da redação o evidencia.
 - O campo "elementos_proposta" deve refletir o que está efetivamente escrito, não o que poderia estar; se a proposta não especifica o "meio" ou o "detalhamento" de forma autônoma e inequívoca, marque-os como "insuficiente", não "presente".`;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -475,6 +477,7 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto, proposta }) 
           "meio": "presente|ausente|insuficiente",
           "finalidade": "presente|ausente|insuficiente",
           "detalhamento": "presente|ausente|insuficiente",
+          "elemento_detalhado": "agente|acao|meio|finalidade|nenhum",
           "relacao_com_problema": "forte|media|fraca"
         }
       },
@@ -508,7 +511,7 @@ function construirPromptCorrecao({ tema, vestibular, matriz, texto, proposta }) 
   } else if (diagExtensao.status === 'potencialmente_insuficiente') {
     avisoExtensaoPrompt += `\n   ATENÇÃO: Estimativa de texto curto (< 7 linhas estimadas). No ENEM, apenas textos com até 7 linhas manuscritas comprovadas recebem nota zero. Como a contagem digital é aproximada, avalie o conteúdo real e aplique anulação apenas se for evidente a insuficiência completa do texto.`;
   } else if (diagExtensao.status === 'abaixo_do_recomendado') {
-    avisoExtensaoPrompt += `\n   ORIENTAÇÃO PEDAGÓGICA (EXTENSÃO REDUZIDA): O texto possui ${diagExtensao.total_palavras} palavras (abaixo da faixa recomendada de 350-600 palavras). Avalie cuidadosamente se a extensão reduzida comprometeu o desenvolvimento argumentativo, a progressão das ideias, a fundamentação e o atendimento à proposta. Considere a qualidade efetiva do texto, sem aplicar penalização automática baseada exclusivamente na quantidade de palavras. Redações concisas que atendam plenamente aos requisitos de uma competência não devem ser impedidas de receber a pontuação correspondente.`;
+    avisoExtensaoPrompt += `\n   ORIENTAÇÃO PEDAGÓGICA INTERNA DA PLATAFORMA (EXTENSÃO): O texto possui ${diagExtensao.total_palavras} palavras. ATENÇÃO: A faixa de 350-600 palavras é uma sugestão pedagógica exclusiva da plataforma para desenvolvimento completo, NÃO UMA REGRA OFICIAL DO ENEM (o ENEM oficial não possui contagem mínima de palavras, apenas o espaço de até 30 linhas manuscritas). É EXPRESSAMENTE PROIBIDO aplicar desconto automático ou penalizar a nota com base na contagem de palavras. Avalie estritamente a densidade e o cumprimento das competências no texto real. Redações concisas que cumpram os requisitos devem receber a pontuação correspondente.`;
   }
 
   const regraEscala = isEnem
@@ -544,6 +547,8 @@ REGRAS FUNDAMENTAIS (obrigatórias):
    - Penalizar por coisas que poderiam ser "mais bonitas" mas não são erros.
    - Nomes de disciplinas, matérias e áreas do saber com inicial maiúscula (ex: "História", "História da África", "Matemática") são grafias legítimas facultadas pelo Acordo Ortográfico; NÃO classifique como ERRO nem penalize em C1.
    - É PROIBIDO afirmar que conectivos são "recorrentes" ou "repetidos" se eles aparecerem apenas uma ou duas vezes no texto (duas ocorrências não constituem repetição excessiva). Conte as ocorrências reais antes de alegar repetição coesiva em C4; só aponte repetição quando houver ao menos 3 ocorrências reais do conectivo no texto.
+   - Apresentar trechos parafraseados ou inventados como evidência textual: evidencias_textuais deve conter EXCLUSIVAMENTE substrings literais exatas do texto da redação.
+   - Declarar detalhamento específico em C5 sem que haja desdobramento concreto de como a ação será executada. Ações genéricas somadas (como "falar mais", "organizar atividades", "fazer campanhas") NÃO contam como detalhamento.
 
 2. SEPARAR OBRIGATORIAMENTE:
    - ERRO: algo que realmente prejudica a competência avaliada.
@@ -561,8 +566,7 @@ ${regraEscala}
 
 6. NOTA TOTAL: NÃO declare uma "nota geral" por impressão. O campo nota_total deve ser a SOMA EXATA das competências da banca.
 
-7. EVIDÊNCIA OBRIGATÓRIA: cada nota deve ter ao menos 1 evidência textual (trecho real ou paráfrase do texto avaliado).
-   Se não encontrar problema, diga explicitamente "nenhum desvio identificado nesta competência".
+7. EVIDÊNCIA LITERAL OBRIGATÓRIA: toda evidência textual deve ser uma SUBSTRING LITERAL e exata do texto avaliado. É expressamente PROIBIDO parafrasear, reescrever ou inventar trechos. Se não encontrar desvio, cite trecho real que comprove o acerto e declare explicitamente "nenhum desvio identificado nesta competência".
 
 8. ANTI-CONTRADIÇÃO E COERÊNCIA OBRIGATÓRIAS:
    - Se a nota de uma competência for máxima (200 no ENEM), a justificativa e os feedbacks NÃO podem conter críticas ou apontamentos de deficiência, tais como:
@@ -979,6 +983,42 @@ const FRASES_NEGATIVAS = [
 ];
 
 /**
+ * Valida estritamente se uma evidência apresentada como citação é uma substring literal
+ * da redação enviada, preservando as palavras, acentos e ordem exata.
+ * Tolera exclusivamente diferenças seguras de espaçamento em branco e quebras de linha (\s+ -> ' ')
+ * e padronização de aspas e hífens tipográficos. NÃO permite paráfrases, palavras omitidas,
+ * palavras alteradas, inversão de termos ou pontuações que alterem o sentido.
+ *
+ * @param {string} evidencia - Trecho citado pela IA
+ * @param {string} texto - Redação real enviada
+ * @returns {boolean} True se for citação literal confirmada
+ */
+function _evidenciaExisteLiteralmente(evidencia, texto) {
+  if (!evidencia || typeof evidencia !== 'string' || !evidencia.trim()) return false;
+  if (!texto || typeof texto !== 'string' || !texto.trim()) return false;
+
+  const evLimpa = evidencia.trim();
+  // 1. Correspondência direta exata
+  if (texto.includes(evLimpa)) return true;
+
+  // 2. Normalização segura apenas de espaços/quebras de linha e aspas/hífens tipográficos
+  const normalizarEspacosEAspas = (str) => {
+    return str
+      .replace(/[\u2018\u2019\u201A\u201B']/g, "'")
+      .replace(/[\u201C\u201D\u201E\u201F"]/g, '"')
+      .replace(/[\u2013\u2014]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const evNorm = normalizarEspacosEAspas(evLimpa);
+  if (!evNorm || evNorm.length < 3) return false;
+  const textoNorm = normalizarEspacosEAspas(texto);
+
+  return textoNorm.includes(evNorm);
+}
+
+/**
  * Verifica se um trecho citado existe na redação recebida,
  * tolerando apenas diferenças seguras de espaços e pontuação.
  *
@@ -1250,12 +1290,41 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
       });
     }
 
-    // Normaliza evidencias_textuais (novo campo) com fallback para evidencias (legado)
-    const evidenciasTextuais = Array.isArray(comp.evidencias_textuais)
+    // Normaliza evidencias_textuais: toda evidência deve ser uma substring literal da redação
+    const rawEvidencias = Array.isArray(comp.evidencias_textuais)
       ? comp.evidencias_textuais.map(String)
       : Array.isArray(comp.evidencias)
         ? comp.evidencias.map(String)
         : [];
+
+    let evidenciasTextuais = [];
+    if (typeof texto === 'string' && texto.trim().length > 0) {
+      // 1. Filtra as evidências que existem literalmente na redação
+      evidenciasTextuais = rawEvidencias
+        .map(e => e.trim())
+        .filter(e => e.length > 0 && _evidenciaExisteLiteralmente(e, texto));
+
+      // 2. Se o modelo não forneceu nenhuma evidência literal válida (ou foram descartadas por paráfrase),
+      // busca trechos literais reais citados entre aspas na própria justificativa desta competência
+      if (evidenciasTextuais.length === 0 && comp.justificativa) {
+        const citacoesJust = [...comp.justificativa.matchAll(/["“«'‘]([^"”»'’]{5,})["”»'’]/g)]
+          .map(m => m[1].trim())
+          .filter(c => _evidenciaExisteLiteralmente(c, texto));
+
+        const vistas = new Set();
+        for (const cit of citacoesJust) {
+          const citNorm = cit.toLowerCase();
+          if (!vistas.has(citNorm)) {
+            vistas.add(citNorm);
+            evidenciasTextuais.push(cit);
+            if (evidenciasTextuais.length >= 3) break;
+          }
+        }
+      }
+      // Se não houver citação literal na redação, NÃO inventa: mantém lista vazia
+    } else {
+      evidenciasTextuais = rawEvidencias.map(e => e.trim()).filter(Boolean);
+    }
 
     // tipo_apontamento: derivado do pior tipo de problema nesta competência.
     // Prioridade: ERRO > PONTO_DE_ATENCAO > SUGESTAO.
@@ -1619,16 +1688,20 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
 
     // ── AJUSTE C5: Coerência entre status dos elementos e nota ───────────────
     // Se elementos_proposta indica detalhamento como 'insuficiente' ou 'ausente',
-    // ou se a análise contiver crítica substantiva e concreta apontando deficiência
-    // no detalhamento da redação, mas a nota for 200, ajusta para 160 (rubrica INEP:
-    // proposta com detalhamento insuficiente = nível 4, máx 160 pts).
+    // ou elemento_detalhado como 'nenhum', ou se a análise contiver crítica substantiva
+    // ou o texto apresentar apenas acúmulo de ações genéricas sem detalhamento executivo,
+    // mas a nota for 200, ajusta para 160 (rubrica INEP: proposta com detalhamento
+    // insuficiente = nível 4, máx 160 pts).
     // Recomendações pedagógicas opcionais ou de refinamento futuro (ex: "detalhar mais em revisões futuras")
     // NÃO reduzem a nota se os elementos estiverem completos e não houver crítica concreta.
     if (isEnem && numeroComp === 5 && notaClamped === 200) {
       const ep = analise.elementos_proposta;
       const detalhamentoInsuficiente = ep && (
         ep.detalhamento === 'insuficiente' ||
-        ep.detalhamento === 'ausente'
+        ep.detalhamento === 'ausente' ||
+        ep.elemento_detalhado === 'nenhum' ||
+        ep.elemento_detalhado === 'nenhuma' ||
+        ep.elemento_detalhado === 'ausente'
       );
 
       const justC5 = justificativa.toLowerCase();
@@ -1651,7 +1724,31 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
         justC5SemNegacoes.includes('sem detalhamento') ||
         justC5SemNegacoes.includes('não há detalhamento') ||
         justC5SemNegacoes.includes('não possui detalhamento') ||
-        justC5SemNegacoes.includes('não apresenta detalhamento');
+        justC5SemNegacoes.includes('não apresenta detalhamento') ||
+        justC5SemNegacoes.includes('detalhamento frágil') ||
+        justC5SemNegacoes.includes('detalhamento tênue') ||
+        justC5SemNegacoes.includes('detalhamento muito tênue') ||
+        justC5SemNegacoes.includes('pouco detalhamento') ||
+        justC5SemNegacoes.includes('detalhamento genérico') ||
+        justC5SemNegacoes.includes('proposta genérica') ||
+        justC5SemNegacoes.includes('intervenção genérica') ||
+        justC5SemNegacoes.includes('ações genéricas') ||
+        justC5SemNegacoes.includes('medidas genéricas') ||
+        justC5SemNegacoes.includes('ações vagas') ||
+        justC5SemNegacoes.includes('medidas vagas') ||
+        justC5SemNegacoes.includes('proposta vaga') ||
+        justC5SemNegacoes.includes('sem detalhamento concreto') ||
+        justC5SemNegacoes.includes('sem explicar concretamente') ||
+        justC5SemNegacoes.includes('sem explicar como') ||
+        justC5SemNegacoes.includes('falta explicar como') ||
+        justC5SemNegacoes.includes('sem desdobramento prático') ||
+        justC5SemNegacoes.includes('apenas intenções genéricas');
+
+      // Proposta que apenas acumula ações genéricas sem detalhamento executivo
+      // (ex.: escolas falarem mais do assunto e organizarem atividades, governo veicular campanhas)
+      const propostaApenasAcoesGenericas = typeof texto === 'string' &&
+        /(?:escolas?\s+(?:devem\s+)?falarem?\s+mais|organizar(?:\s+mais)?\s+atividades|veicular(?:\s+mais)?\s+campanhas)/i.test(texto) &&
+        !/(?:por meio de|mediante|a partir da criação de|através da implementação de|com o intuito de detalhar)/i.test(texto);
 
       // Expressões típicas de recomendação pedagógica opcional / estilo / revisões futuras
       const isSugestaoOpcionalOuFutura =
@@ -1666,19 +1763,25 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
         justC5.includes('aperfeiçoamento futuro') ||
         justC5.includes('para enriquecer');
 
-      const deveAjustarC5 = detalhamentoInsuficiente || (criticaSubstantivaDetalhamento && !isSugestaoOpcionalOuFutura);
+      const deveAjustarC5 = detalhamentoInsuficiente ||
+        propostaApenasAcoesGenericas ||
+        (criticaSubstantivaDetalhamento && !isSugestaoOpcionalOuFutura);
 
       if (deveAjustarC5) {
         notaClamped = 160;
         nivel = _inferirNivel(notaClamped, pesoMax);
         prioridade = _inferirPrioridade(notaClamped, pesoMax);
         tipoApontamento = 'PONTO_DE_ATENCAO';
+        notaSuspeita = true;
+        avisoContradicao = 'Nota de C5 ajustada de 200 para 160: proposta sem detalhamento concreto de execução (ações genéricas não substituem detalhamento autônomo).';
         const motivo = detalhamentoInsuficiente
-          ? `Elemento "detalhamento" da proposta marcado como "${ep.detalhamento}". Rubrica INEP: detalhamento insuficiente = 160 pts.`
-          : `Análise identifica deficiência substantiva no detalhamento da proposta. Rubrica INEP: proposta com detalhamento insuficiente = 160 pts.`;
+          ? `Elemento "detalhamento" da proposta classificado como insuficiente/ausente. Rubrica INEP: proposta com detalhamento insuficiente = 160 pts.`
+          : propostaApenasAcoesGenericas
+            ? `Proposta baseada em acúmulo de ações genéricas sem desdobramento executivo concreto. Rubrica INEP: detalhamento ausente/insuficiente = 160 pts.`
+            : `Análise identifica deficiência substantiva no detalhamento da proposta. Rubrica INEP: proposta com detalhamento insuficiente = 160 pts.`;
         problemasNormalizados.push({
           tipo: 'PONTO_DE_ATENCAO',
-          descricao: `C5: nota ajustada de 200 para 160 para manter coerência com a análise. ${motivo}`,
+          descricao: `C5: nota ajustada de 200 para 160 para manter coerência com a rubrica INEP. ${motivo}`,
           trecho_original: '',
           sugestao_reescrita: ''
         });
@@ -1758,7 +1861,9 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
               'detalhamento ausente', 'pouco detalhamento', 'faltam elementos', 'menos de 5 elementos',
               'ausência de agente', 'ausência de ação', 'ausência de meio', 'ausência de efeito',
               'proposta genérica', 'intervenção genérica', 'ação vaga', 'meio vago',
-              'detalhamento genérico', 'pouco específico', 'medida superficial', 'intervenção superficial'
+              'detalhamento genérico', 'pouco específico', 'medida superficial', 'intervenção superficial',
+              'ações genéricas', 'ações vagas', 'medidas genéricas', 'sem detalhamento concreto',
+              'sem explicar concretamente'
             ]
           };
 
@@ -1837,7 +1942,12 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
     });
   }
 
-  return {
+  const anySuspeita = competenciasNormalizadas.some(c => c.nota_suspeita === true || c.nota_confirmada === false);
+  const avisosSuspeitos = competenciasNormalizadas
+    .filter(c => c.aviso_contradicao)
+    .map(c => c.aviso_contradicao);
+
+  const resultadoFinal = {
     nota_total: notaCalculadaBackend,
     nota_maxima: pontuacaoMaximaOficial,
     competencias: competenciasNormalizadas,
@@ -1856,6 +1966,17 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
     extensao: analisarExtensaoRedacao(texto, proposta, vestibularId || (matriz?.nome?.toLowerCase()?.includes('enem') ? 'enem' : 'outro')),
     corrigido_em: new Date().toISOString()
   };
+
+  if (anySuspeita) {
+    resultadoFinal.nota_suspeita = true;
+    resultadoFinal.nota_confirmada = false;
+    resultadoFinal.necessita_reavaliacao = true;
+    resultadoFinal.aviso_contradicao = avisosSuspeitos.join(' | ');
+  } else {
+    resultadoFinal.nota_confirmada = true;
+  }
+
+  return resultadoFinal;
 }
 
 /**

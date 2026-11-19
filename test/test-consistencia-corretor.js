@@ -41,7 +41,7 @@
  */
 
 import assert from 'node:assert/strict';
-import { validarENormalizarResposta } from '../api/_ai-service.js';
+import { validarENormalizarResposta, analisarExtensaoRedacao } from '../api/_ai-service.js';
 
 let totalTestes = 0;
 let testesAprovados = 0;
@@ -1065,6 +1065,209 @@ try {
 
   pass('INTEGRACAO: C1 rebaixado + C3 suspeita + C5 ajustado simultaneamente');
 } catch (err) { fail('INTEGRACAO: Três inconsistências simultâneas', err); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GRUPO 6 — Regressão e Rigor Pedagógico: Caso "Herança Africana" (202 palavras, 920 pts)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const textoRegressao202 = `A valorização da herança africana no Brasil enfrenta obstáculos históricos que persistem na sociedade contemporânea e de fato exigem soluções urgentes e articuladas no atual cenário nacional. A marginalização da cultura afro-brasileira é reflexo direto de séculos de escravidão que moldaram as relações sociais e institucionais do país. Nesse contexto, torna-se imperativo analisar os entraves para a superação desse estigma e propor intervenções capazes de assegurar a igualdade e o respeito à diversidade cultural.
+
+Em primeiro lugar, a representatividade insuficiente nos espaços de decisão e nos currículos escolares limita o reconhecimento das contribuições dos povos africanos para a identidade nacional. Embora a legislação determine a obrigatoriedade dessa temática, observa-se resistência na sua efetiva consolidação prática no cotidiano educacional.
+
+Em segundo lugar, o preconceito estrutural reproduz desigualdades que restringem as oportunidades de ascensão social e visibilidade cultural. Sem iniciativas consistentes de conscientização, o silenciamento histórico se perpetua, inviabilizando a justiça social preconizada pela Constituição Federal de 1988.
+
+Portanto, medidas são urgentes para mitigar essa problemática. As escolas devem falar mais do assunto e organizar atividades pedagógicas sobre a cultura afro-brasileira, enquanto o governo deve veicular campanhas na mídia, a fim de conscientizar a população e valorizar a memória africana na construção do Brasil.`;
+
+totalTestes++;
+try {
+  // REG-1: Evidências literais são aceitas; evidências parafraseadas ou inventadas são descartadas
+  const payloadEvidencias = montarPayload({
+    competencias: [
+      {
+        numero: 1,
+        nota: 200,
+        justificativa: 'Excelente domínio formal demonstrado em "A valorização da herança africana no Brasil".',
+        evidencias_textuais: [
+          'A valorização da herança africana no Brasil', // LITERAL presente -> deve manter
+          'O preconceito no Brasil é um grande problema social' // PARÁFRASE ausente -> deve descartar
+        ]
+      },
+      {
+        numero: 2,
+        nota: 160,
+        justificativa: 'Repertório pertinente baseado na legislação.',
+        evidencias_textuais: [
+          'A marginalização da cultura afro-brasileira é reflexo direto de séculos de escravidão' // LITERAL presente -> deve manter
+        ]
+      },
+      {
+        numero: 3,
+        nota: 160,
+        justificativa: 'Projeto de texto claro ao citar "representatividade insuficiente nos espaços de decisão".',
+        evidencias_textuais: [
+          'Os alunos não aprendem sobre os negros' // INVENTADA ausente -> deve descartar
+        ]
+      }
+    ]
+  });
+
+  const res = validarENormalizarResposta(payloadEvidencias, matrizEnem, 'mock-ia', textoRegressao202);
+  const c1 = res.competencias[0];
+  const c2 = res.competencias[1];
+  const c3 = res.competencias[2];
+
+  assert.equal(c1.evidencias_textuais.length, 1, 'C1 deve manter apenas a evidência literal');
+  assert.equal(c1.evidencias_textuais[0], 'A valorização da herança africana no Brasil');
+
+  assert.equal(c2.evidencias_textuais.length, 1, 'C2 deve manter a evidência literal');
+  assert.equal(c2.evidencias_textuais[0], 'A marginalização da cultura afro-brasileira é reflexo direto de séculos de escravidão');
+
+  // C3 tinha apenas evidência inventada, mas cita entre aspas na justificativa
+  assert.equal(c3.evidencias_textuais.length, 1, 'C3 deve recuperar a citação literal entre aspas da justificativa');
+  assert.equal(c3.evidencias_textuais[0], 'representatividade insuficiente nos espaços de decisão');
+
+  pass('REG-1: Evidências literais preservadas, paráfrases descartadas e citações literais recuperadas');
+} catch (err) { fail('REG-1: Validação estrita de evidências textuais literais', err); }
+
+totalTestes++;
+try {
+  // REG-2: C5 nota 200 com proposta genérica ("escolas falarem mais", "organizar atividades", "governo veicular campanhas")
+  // sem explicação concreta de execução deve ser ajustada para 160 pts com nota_suspeita = true
+  const payloadC5Generica = montarPayload({
+    competencias: [
+      { numero: 1, nota: 200, justificativa: 'Excelente domínio da norma culta formal.' },
+      { numero: 2, nota: 160, justificativa: 'Repertório pertinente com uso produtivo satisfatório.' },
+      { numero: 3, nota: 160, justificativa: 'Projeto de texto organizado com pequenos deslizes de aprofundamento.' },
+      { numero: 4, nota: 200, justificativa: 'Coesão diversificada inter e intraparágrafos.' },
+      {
+        numero: 5,
+        nota: 200,
+        justificativa: 'Proposta com agentes múltiplos e declaração de detalhamento específico nas ações.',
+        analise: {
+          criterios_atendidos: ['Agente presente', 'Ação presente', 'Meio presente', 'Efeito presente'],
+          criterios_parciais: [],
+          criterios_ausentes: [],
+          elementos_proposta: {
+            agente: 'presente',
+            acao: 'presente',
+            meio: 'presente',
+            finalidade: 'presente',
+            detalhamento: 'presente',
+            elemento_detalhado: 'nenhum' // explicitamente sem detalhamento de execução autônomo
+          }
+        }
+      }
+    ]
+  });
+
+  const res = validarENormalizarResposta(payloadC5Generica, matrizEnem, 'mock-ia', textoRegressao202);
+  const c5 = res.competencias[4];
+
+  assert.equal(c5.nota, 160, 'C5 com ações genéricas sem detalhamento executivo deve ser ajustada para 160');
+  assert.equal(c5.nota_suspeita, true, 'C5 deve ser marcada como nota_suspeita');
+  assert.equal(c5.nota_confirmada, false, 'C5 deve ter nota_confirmada = false');
+  assert.ok(c5.problemas.some(p => p.descricao.includes('160 pts')), 'Deve haver apontamento explicativo da rubrica INEP');
+
+  pass('REG-2: C5 com ações genéricas e sem detalhamento executivo ajustada de 200 para 160 pts');
+} catch (err) { fail('REG-2: C5 proposta genérica sem detalhamento concreto', err); }
+
+totalTestes++;
+try {
+  // REG-3: C5 com proposta completa e detalhamento executivo autônomo comprovado mantém 200 pts
+  const textoComDetalhamento = textoRegressao202.replace(
+    'As escolas devem falar mais do assunto e organizar atividades pedagógicas sobre a cultura afro-brasileira, enquanto o governo deve veicular campanhas na mídia, a fim de conscientizar a população e valorizar a memória africana na construção do Brasil.',
+    'Portanto, cabe ao Ministério da Educação implementar diretrizes curriculares integradas, por meio da capacitação continuada de professores em convênio com universidades públicas — mediante módulos específicos de história afro-brasileira no contraturno —, com o intuito de consolidar uma formação antirracista.'
+  );
+
+  const payloadC5Completa = montarPayload({
+    competencias: [
+      {
+        numero: 5,
+        nota: 200,
+        justificativa: 'Proposta de intervenção completa, detalhada e plenamente articulada ao tema, com especificação autônoma do meio de capacitação docente.',
+        analise: {
+          criterios_atendidos: ['Agente', 'Ação', 'Meio', 'Efeito', 'Detalhamento autônomo'],
+          criterios_parciais: [],
+          criterios_ausentes: [],
+          elementos_proposta: {
+            agente: 'presente',
+            acao: 'presente',
+            meio: 'presente',
+            finalidade: 'presente',
+            detalhamento: 'presente',
+            elemento_detalhado: 'meio'
+          }
+        }
+      }
+    ]
+  });
+
+  const res = validarENormalizarResposta(payloadC5Completa, matrizEnem, 'mock-ia', textoComDetalhamento);
+  const c5 = res.competencias[4];
+
+  assert.equal(c5.nota, 200, 'C5 com proposta detalhada comprovada deve manter 200 pts');
+  assert.equal(c5.nota_suspeita, undefined, 'C5 detalhada não deve ter nota_suspeita');
+
+  pass('REG-3: C5 com detalhamento autônomo demonstrado preserva 200 pts');
+} catch (err) { fail('REG-3: C5 proposta detalhada mantém 200 pts', err); }
+
+totalTestes++;
+try {
+  // REG-4: Análise de extensão do texto de 202 palavras: esclarecimento pedagógico da plataforma vs ENEM
+  const diag = analisarExtensaoRedacao(textoRegressao202, null, 'enem');
+
+  assert.equal(diag.status, 'abaixo_do_recomendado', 'Texto de 202 palavras deve ter status abaixo_do_recomendado');
+  assert.ok(diag.total_palavras >= 195 && diag.total_palavras <= 210, `Contagem esperada ~202 palavras, obteve ${diag.total_palavras}`);
+  assert.ok(diag.observacao_pedagogica.includes('abaixo da faixa recomendada'), 'Observação deve orientar sobre a faixa recomendada');
+  assert.ok(diag.observacao_pedagogica.includes('NÃO uma regra oficial do ENEM') || diag.observacao_pedagogica.includes('não uma exigência oficial'), 'Observação deve esclarecer que é recomendação pedagógica interna');
+  assert.ok(!diag.observacao_pedagogica.includes('nota zero'), 'Não deve indicar nota zero');
+
+  pass('REG-4: Diagnóstico de extensão com esclarecimento de orientação pedagógica interna sem penalidade');
+} catch (err) { fail('REG-4: Diagnóstico de extensão pedagógica', err); }
+
+totalTestes++;
+try {
+  // REG-5: Caso de regressão 920 pts (C1 200, C2 160, C3 160, C4 200, C5 200 com C5 genérica)
+  // Backend recalcula C5 para 160 e nota_total para 880 (200+160+160+200+160)
+  const payload920 = montarPayload({
+    nota_total: 920, // IA enviou 920
+    competencias: [
+      { numero: 1, nota: 200, justificativa: 'Excelente domínio formal da língua culta.' },
+      { numero: 2, nota: 160, justificativa: 'Repertório sociocultural legitimado e pertinente.' },
+      { numero: 3, nota: 160, justificativa: 'Projeto de texto satisfatório com pequenas lacunas.' },
+      { numero: 4, nota: 200, justificativa: 'Excelente repertório de conectivos inter e intraparágrafos.' },
+      {
+        numero: 5,
+        nota: 200, // C5 declarou 200 mas proposta no texto só tem ações genéricas
+        justificativa: 'Proposta genérica com intervenções múltiplas.',
+        analise: {
+          criterios_atendidos: ['Agente', 'Ação', 'Meio', 'Efeito'],
+          criterios_parciais: [],
+          criterios_ausentes: [],
+          elementos_proposta: {
+            agente: 'presente',
+            acao: 'presente',
+            meio: 'presente',
+            finalidade: 'presente',
+            detalhamento: 'insuficiente'
+          }
+        }
+      }
+    ]
+  });
+
+  const res = validarENormalizarResposta(payload920, matrizEnem, 'mock-ia', textoRegressao202);
+
+  // Invariante estrita: nota_total é calculada pelo backend como soma exata
+  const somaReal = res.competencias.reduce((acc, c) => acc + c.nota, 0);
+  assert.equal(res.nota_total, somaReal, 'Invariante: nota_total DEVE ser a soma exata das competências');
+  assert.equal(res.nota_total, 880, '920 pts ajustado para 880 com clamp de C5 em 160');
+  assert.equal(res.competencias[4].nota, 160, 'C5 ajustada para 160');
+  assert.equal(res.nota_suspeita, true, 'Objeto raiz de avaliação sinaliza nota_suspeita = true');
+  assert.equal(res.nota_confirmada, false, 'Objeto raiz de avaliação sinaliza nota_confirmada = false');
+
+  pass('REG-5: Invariante de soma estrita do backend e propagação de nota_suspeita no caso de 920 pts');
+} catch (err) { fail('REG-5: Invariante de soma e propagação de suspeita', err); }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Relatório Final
