@@ -19,12 +19,16 @@
  *   C3-A — Justificativa nega tese mas descreve argumentos presentes → nota_suspeita
  *   C3-B — Justificativa coerente (tese presente, sem negação) → sem nota_suspeita
  *   C3-C — Justificativa coerente de ausência de tese → sem nota_suspeita
+ *   C3-D — Justificativa afirma tese ausente por não haver argumentos identificáveis → sem nota_suspeita
+ *   C3-E — Justificativa nega tese mas afirma positivamente dois argumentos bem desenvolvidos → nota_suspeita
  *   C5-A — detalhamento: 'insuficiente' + nota 200 → ajustado para 160
  *   C5-B — detalhamento: 'ausente' + nota 200 → ajustado para 160
  *   C5-C — Elementos completos + sugestão de refinamento futuro → mantém nota 200
  *   C5-D — detalhamento: 'presente' + nota 200, sem recomendação → mantido 200
  *   C5-E — detalhamento: 'insuficiente' + nota 160 → não altera (já 160)
  *   C5-F — crítica substantiva de detalhamento insuficiente + nota 200 → ajustado para 160
+ *   C5-G — frase negativa "não há falta de detalhamento" + nota 200 → mantém nota 200
+ *   C5-H — crítica afirmativa de "falta de detalhamento" + nota 200 → ajustado para 160
  *   INTEGRACAO — Avaliação com C1/C3/C5 incoerentes ao mesmo tempo: todos corrigidos
  */
 
@@ -334,6 +338,72 @@ try {
   pass('C3-C: Justificativa coerente de ausência de tese não gera nota_suspeita');
 } catch (err) { fail('C3-C: Ausência coerente de tese sem nota_suspeita', err); }
 
+totalTestes++;
+try {
+  // C3-D: Justificativa afirma que a tese está ausente porque não há argumentos identificáveis
+  // (incluindo a construção "não há dois argumentos")
+  // A negação deve prevalecer: não pode interpretar "não há argumentos" ou "não há dois argumentos"
+  // como prova positiva de argumentos, nem gerar nota_suspeita.
+  const payload1 = montarPayload({
+    competencias: [{
+      numero: 3,
+      nota: 40,
+      justificativa: 'A tese está ausente porque não há argumentos identificáveis na redação.',
+      problemas: [{ tipo: 'ERRO', descricao: 'Ausência de tese e argumentos', trecho_original: '', sugestao_reescrita: '' }],
+      analise: { criterios_atendidos: [], criterios_parciais: [], criterios_ausentes: ['Tese', 'Argumentos'] }
+    }]
+  });
+  const res1 = validarENormalizarResposta(payload1, matrizEnem, 'mock-ia', textoSintetico);
+  const c3_1 = res1.competencias[2];
+  assert.ok(!c3_1.nota_suspeita,
+    'Justificativa afirmando tese ausente por falta de argumentos identificáveis não deve gerar nota_suspeita');
+  assert.notEqual(c3_1.nota_suspeita, true,
+    'nota_suspeita não deve ser true');
+  assert.equal(c3_1.nota, 40,
+    'Nota da redação sem tese deve permanecer 40');
+
+  // Variação explícita com "não há dois argumentos":
+  const payload2 = montarPayload({
+    competencias: [{
+      numero: 3,
+      nota: 40,
+      justificativa: 'A tese está ausente porque não há dois argumentos identificáveis na estrutura dissertativa.',
+      problemas: [],
+      analise: { criterios_atendidos: [], criterios_parciais: [], criterios_ausentes: [] }
+    }]
+  });
+  const res2 = validarENormalizarResposta(payload2, matrizEnem, 'mock-ia', textoSintetico);
+  const c3_2 = res2.competencias[2];
+  assert.ok(!c3_2.nota_suspeita,
+    'Construção "não há dois argumentos identificáveis" não deve gerar falso positivo de argumentos');
+  assert.notEqual(c3_2.nota_suspeita, true,
+    'nota_suspeita não deve ser true quando argumentos são negados');
+
+  pass('C3-D: Tese ausente por não haver argumentos identificáveis → sem nota_suspeita');
+} catch (err) { fail('C3-D: Tese ausente por falta de argumentos sem nota_suspeita', err); }
+
+totalTestes++;
+try {
+  // C3-E: Justificativa afirma ausência de tese mas afirma positivamente que há dois argumentos bem desenvolvidos
+  // Contradição real mantida: nega tese e simultaneamente afirma que há dois argumentos bem desenvolvidos → nota_suspeita = true
+  const payload = montarPayload({
+    competencias: [{
+      numero: 3,
+      nota: 120,
+      justificativa: 'A tese está ausente na introdução, mas há dois argumentos bem desenvolvidos ao longo do texto.',
+      problemas: [],
+      analise: { criterios_atendidos: ['Desenvolvimento'], criterios_parciais: ['Tese ausente'], criterios_ausentes: [] }
+    }]
+  });
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
+  const c3 = res.competencias[2];
+  assert.equal(c3.nota_suspeita, true,
+    'Afirmação positiva de dois argumentos bem desenvolvidos combinada com tese ausente deve gerar nota_suspeita');
+  assert.ok(c3.aviso_contradicao && c3.aviso_contradicao.includes('C3'),
+    'aviso_contradicao deve mencionar C3');
+  pass('C3-E: Tese ausente mas com dois argumentos bem desenvolvidos → nota_suspeita = true');
+} catch (err) { fail('C3-E: Contradição C3 preservada com afirmação positiva de dois argumentos', err); }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GRUPO 3 — C5: Coerência entre status dos elementos e nota
 // ─────────────────────────────────────────────────────────────────────────────
@@ -522,6 +592,65 @@ try {
     `Nota já em 160 com detalhamento insuficiente não deve subir; obteve ${c5.nota}`);
   pass('C5-E: Ajuste C5 não aplica quando nota já é 160 (apenas 200 → 160)');
 } catch (err) { fail('C5-E: Sem ajuste quando nota já é 160', err); }
+
+totalTestes++;
+try {
+  // C5-G: Frase negativa "não há falta de detalhamento; a proposta está completa" + nota 200
+  // Distinção de negação: a frase nega a existência da deficiência, portanto a nota 200 é legítima
+  // e NÃO deve ser reduzida para 160.
+  const payload = montarPayload({
+    competencias: [{
+      numero: 5,
+      nota: 200,
+      justificativa: 'Não há falta de detalhamento; a proposta está completa com todos os elementos articulados ao problema.',
+      problemas: [],
+      analise: {
+        criterios_atendidos: ['Agente', 'Ação', 'Meio', 'Finalidade', 'Detalhamento'],
+        criterios_parciais: [],
+        criterios_ausentes: [],
+        elementos_proposta: {
+          agente: 'presente',
+          acao: 'presente',
+          meio: 'presente',
+          finalidade: 'presente',
+          detalhamento: 'presente',
+          relacao_com_problema: 'forte'
+        }
+      }
+    }]
+  });
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
+  const c5 = res.competencias[4];
+  assert.equal(c5.nota, 200,
+    `Frase negativa "não há falta de detalhamento" não deve reduzir nota 200; obteve ${c5.nota}`);
+  pass('C5-G: Frase negativa "não há falta de detalhamento" mantém nota 200');
+} catch (err) { fail('C5-G: Negação de falta de detalhamento mantém nota 200', err); }
+
+totalTestes++;
+try {
+  // C5-H: Crítica afirmativa com "há falta de detalhamento" + nota 200 → ajustado para 160
+  // Quando há crítica substantiva afirmativa de falta de detalhamento, a nota 200 deve ser reduzida para 160.
+  const payload = montarPayload({
+    competencias: [{
+      numero: 5,
+      nota: 200,
+      justificativa: 'A proposta apresenta agente e ação, porém há falta de detalhamento no modo de implementação da intervenção.',
+      problemas: [],
+      analise: {
+        criterios_atendidos: ['Agente', 'Ação', 'Meio', 'Finalidade'],
+        criterios_parciais: [],
+        criterios_ausentes: []
+      }
+    }]
+  });
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
+  const c5 = res.competencias[4];
+  assert.equal(c5.nota, 160,
+    `Crítica afirmativa de "há falta de detalhamento" com nota 200 deve ajustar para 160; obteve ${c5.nota}`);
+  assert.equal(c5.tipo_apontamento, 'PONTO_DE_ATENCAO',
+    'tipo_apontamento de C5 deve ser PONTO_DE_ATENCAO após ajuste');
+  pass('C5-H: Crítica afirmativa de "falta de detalhamento" + nota 200 → ajustado para 160');
+} catch (err) { fail('C5-H: Crítica afirmativa de falta de detalhamento ajustada para 160', err); }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GRUPO 4 — Integração: C1 + C3 + C5 incoerentes ao mesmo tempo

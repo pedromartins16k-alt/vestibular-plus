@@ -1319,15 +1319,21 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
         justC3.includes('ausência de tese') ||
         justC3.includes('sem tese') ||
         justC3.includes('tese ausente') ||
+        justC3.includes('tese está ausente') ||
         justC3.includes('não apresenta tese') ||
         justC3.includes('tese implícita') ||
-        justC3.includes('falta de tese');
+        justC3.includes('falta de tese') ||
+        /(?:ausência|falta)\s+de\s+tese|sem\s+tese|não\s+apresenta\s+tese|tese\s+(?:está\s+|é\s+)?(?:ausente|implícita)/.test(justC3);
 
       if (afirmaTeseAusente) {
         // Distingue afirmação positiva de negação:
         // Remove negações conhecidas para evitar falsos positivos
+        // Garante que construções como "não há dois argumentos" ou "não há argumentos identificáveis"
+        // tenham a negação prevalecendo e não deixem "dois argumentos" como falso positivo.
+        const regexNegacoesC3 = /(?:não\s+(?:há|existe|existem|se\s+identifica|se\s+identificam|se\s+encontra|se\s+encontram|se\s+observa|se\s+nota|apresenta|apresentam|traz|trazem|possui|conta\s+com|desenvolve|desenvolvem|foram\s+identificados?|foram\s+encontrados?|são\s+identificados?|é\s+identificado)?|sem|nem|ausência\s+de|falta\s+de|nenhum|nenhuma|inexistência\s+de)\s+(?:sequer\s+)?(?:qualquer\s+|nenhum\s+|nenhuma\s+|defesa\s+de\s+)?(?:duas?|dois|\d+)?\s*(?:ponto\s+de\s+vista|argumentos?|causas?|tese)(?:\s+(?:identificáveis|identificável|claros?|claras?|válidos?|válidas?|consistentes?|suficientes?|relevantes?|(?:bem\s+)?desenvolvidos?|(?:bem\s+)?desenvolvidas?))?/g;
+
         const textoSemNegacoes = justC3
-          .replace(/(?:sem|não|ausência de|falta de|nenhuma?)\s+(?:defesa de\s+|qualquer\s+)?(?:ponto de vista|argumentos?|causas?|tese)/g, ' ')
+          .replace(regexNegacoesC3, ' ')
           .replace(/apresenta apenas (?:citações|dados|fatos|alusões)/g, ' ')
           .replace(/apenas (?:citações|dados|fatos|alusões)/g, ' ')
           .replace(/sem encadeamento/g, ' ')
@@ -1371,14 +1377,25 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
 
       const justC5 = justificativa.toLowerCase();
 
+      // Remove negações de deficiência em C5 (ex: "não há falta de detalhamento", "sem falta de detalhamento")
+      // para evitar falsos positivos quando a justificativa afirma que o detalhamento NÃO está deficiente.
+      const regexNegacoesDeficienciaC5 = /(?:não\s+(?:há|existe|existem|se\s+trata\s+de|se\s+observa|se\s+nota|se\s+verifica|se\s+constata|se\s+identifica|apresenta|ocorre)?|sem|nem)\s+(?:qualquer\s+)?(?:falta\s+de\s+detalhamento|ausência\s+de\s+detalhamento|detalhamento\s+(?:insuficiente|ausente|deficiente|incompleto))/g;
+
+      const justC5SemNegacoes = justC5
+        .replace(regexNegacoesDeficienciaC5, ' ')
+        .replace(/detalhamento\s+não\s+(?:é|está|foi|parece)\s+(?:insuficiente|ausente|deficiente|incompleto)/g, ' ');
+
       // Crítica explícita e substantiva à ausência ou insuficiência concreta do detalhamento na redação
       const criticaSubstantivaDetalhamento =
-        justC5.includes('detalhamento insuficiente') ||
-        justC5.includes('detalhamento é insuficiente') ||
-        justC5.includes('falta de detalhamento') ||
-        justC5.includes('ausência de detalhamento') ||
-        justC5.includes('detalhamento ausente') ||
-        justC5.includes('sem detalhamento');
+        justC5SemNegacoes.includes('detalhamento insuficiente') ||
+        justC5SemNegacoes.includes('detalhamento é insuficiente') ||
+        justC5SemNegacoes.includes('falta de detalhamento') ||
+        justC5SemNegacoes.includes('ausência de detalhamento') ||
+        justC5SemNegacoes.includes('detalhamento ausente') ||
+        justC5SemNegacoes.includes('sem detalhamento') ||
+        justC5SemNegacoes.includes('não há detalhamento') ||
+        justC5SemNegacoes.includes('não possui detalhamento') ||
+        justC5SemNegacoes.includes('não apresenta detalhamento');
 
       // Expressões típicas de recomendação pedagógica opcional / estilo / revisões futuras
       const isSugestaoOpcionalOuFutura =
