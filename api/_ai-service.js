@@ -1524,80 +1524,94 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
       problemasNormalizados = problemasAposC4;
       tipoApontamento = _inferirTipoApontamento(problemasNormalizados);
 
-      // Sana a justificativa apenas se havia algum conectivo verificado como
-      // insuficiente (< 3 ocorrências) e a justificativa menciona recorrência
-      // especificamente para esses conectivos identificados.
+      // Sana a justificativa e os critérios apenas se havia algum conectivo verificado como
+      // insuficiente (< 3 ocorrências).
       if (algumConectivoCitadoFalhou) {
         const justC4Lower = (justificativa || '').toLowerCase();
         // Verifica se a justificativa menciona algum dos conectivos que falharam
         const justMenciona = [...conectivosComFalhaDeContagem].some(c => justC4Lower.includes(c));
 
         if (justMenciona) {
-          let justAjustada = justificativa
-            .replace(/(?:são\s+)?termos\s+recorrentes/gi, 'conectivos com ocorrência não excessiva')
-            .replace(/(?:são\s+)?conectivos\s+recorrentes/gi, 'conectivos com ocorrência não excessiva')
-            .replace(/são\s+recorrentes/gi, 'apresentam ocorrência não excessiva')
-            .replace(/conectivos\s+(?:excessivamente\s+)?repetidos/gi, 'conectivos sem repetição excessiva')
-            .replace(/repetição\s+(?:excessiva|frequente|recorrente)\s+de\s+conectivos/gi, 'emprego de conectivos inter e intraparágrafos');
+          let justAjustada = justificativa;
 
-          // Remove frases residuais com "recorrente" que referenciem os conectivos falhados
-          if (/recorrente/i.test(justAjustada)) {
-            for (const c of conectivosComFalhaDeContagem) {
-              const escapado = c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-              // Remove o trecho da sentença que menciona o conectivo + recorrente
-              justAjustada = justAjustada.replace(
-                new RegExp(`[^.!?;\\n]*${escapado}[^.!?;\\n]*recorrente[^.!?;\\n]*[.!?]?`, 'gi'),
-                ' '
-              );
-              justAjustada = justAjustada.replace(
-                new RegExp(`[^.!?;\\n]*recorrente[^.!?;\\n]*${escapado}[^.!?;\\n]*[.!?]?`, 'gi'),
-                ' '
-              );
+          for (const c of conectivosComFalhaDeContagem) {
+            const esc = c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+            // 1. Caso: conectivo no início ou meio coordenado com observação independente
+            // (ex: 'Uso recorrente de "Portanto" e repetição vocabular de "educação"...')
+            // Remove como prefixo apenas se o que segue for uma observação independente (não um predicado órfão do mesmo conectivo)
+            const regexPrefixoIndependente = new RegExp(
+              `(?:(?:o\\s+)?(?:uso|emprego)\\s+(?:excessivo|recorrente|repetido|frequente)?\\s*(?:de\\s+)?(?:termos?|conectivos?)?\\s*)?["“«'‘]?${esc}["”»'’]?(?:\\s+(?:é|são)\\s+(?:termos?|conectivos?)?\\s*(?:recorrentes?|repetid[oa]s?))?\\s*(?:,\\s*|\\s+e\\s+|\\s+mas\\s+|\\s+porém\\s+)(?=[^.!?;\n]*(?:vocabular|vocabulário|léxic|gramat|sint|argument|parágraf|propost|desenvolv|introduç))`,
+              'gi'
+            );
+            justAjustada = justAjustada.replace(regexPrefixoIndependente, '');
+
+            // 2. Caso: observação independente antes e o conectivo depois
+            // (ex: 'repetição vocabular de "educação" e uso recorrente de "Portanto"')
+            const regexSufixo = new RegExp(
+              `(?:,\\s*|\\s+e\\s+|\\s+mas\\s+|\\s+porém\\s+)(?:(?:o\\s+)?(?:uso|emprego)\\s+(?:excessivo|recorrente|repetido|frequente)?\\s*(?:de\\s+)?(?:termos?|conectivos?)?\\s*)?["“«'‘]?${esc}["”»'’]?(?:\\s+(?:é|são)\\s+(?:termos?|conectivos?)?\\s*(?:recorrentes?|repetid[oa]s?))?[^.!?;\n]*`,
+              'gi'
+            );
+            justAjustada = justAjustada.replace(regexSufixo, '');
+
+            // 3. Caso: oração/frase inteira onde o conectivo falhado é o foco (sem observação independente)
+            const regexFrase = new RegExp(
+              `[^.!?;\\n]*["“«'‘]?${esc}["”»'’]?[^.!?;\\n]*(?:recorrente|repetid[oa])[^.!?;\\n]*[.!?]?`,
+              'gi'
+            );
+            justAjustada = justAjustada.replace(regexFrase, ' ');
+          }
+
+          justAjustada = justAjustada
+            .replace(/\s{2,}/g, ' ')
+            .replace(/^[\s,;.:-]+|[\s,;.:-]+$/g, '')
+            .trim();
+
+          if (justAjustada.length > 0) {
+            justAjustada = justAjustada.charAt(0).toUpperCase() + justAjustada.slice(1);
+            if (!/[.!?]$/.test(justAjustada)) {
+              justAjustada += '.';
             }
           }
-          justAjustada = justAjustada.replace(/\s{2,}/g, ' ').trim();
+
           if (!justAjustada || justAjustada.length < 20) {
             justAjustada = 'Estrutura coesiva com emprego de conectivos inter e intraparágrafos sem repetição mecânica excessiva.';
           }
           justificativa = justAjustada;
         }
 
-        // Atualiza critérios em analise removendo critérios sobre falsa recorrência.
-        // Um critério é removido se:
-        //   (a) menciona "recorrente/repetição" E
-        //   (b) não menciona nenhum conectivo que tenha atingido 3+ ocorrências.
-        // Critérios sobre repetição de outra natureza (sem conectivos do catálogo) são
-        // preservados desde que não estejam associados à falsa alegação verificada.
+        // Atualiza critérios em analise removendo APENAS critérios associados ao conectivo
+        // cuja contagem ficou abaixo de três, com base em evidência textual.
+        // Critérios independentes (ex: repetição vocabular, repetição lexical, termos gerais)
+        // são estritamente preservados, inclusive se não citarem conectivos do catálogo.
         if (analise && Array.isArray(analise.criterios_parciais)) {
-          // Monta o conjunto de conectivos que passaram no limiar (≥ 3 ocorrências)
-          // para não remover critérios que se refiram a eles legitimamente.
-          const conectivosComSucessoDeContagem = new Set(
-            [...conectivosComFalhaDeContagem].length > 0
-              ? [] // será preenchido abaixo com os que NÃO falharam
-              : []
-          );
-          // Reutilizamos candidatos implicitamente: se algum conectivo falhou,
-          // nenhum deles atingiu 3+, portanto não há conectivos de sucesso neste bloco.
-          // Se houvesse algum com 3+, `algumConectivoCitadoFalhou` poderia ainda ser true
-          // (outros conectivos falharam). Precisamos identificar os que passaram:
-          // para fazer isso corretamente, coletamos todos os candidatos vistos nos problemas removidos.
-          // Por simplicidade (e segurança), tratamos: se o critério menciona "recorrente/repetid"
-          // e menciona um dos conectivos FALHADOS, remove. Se menciona "recorrente/repetid" mas
-          // NÃO menciona nenhum conectivo do catálogo (critério genérico como "Termos recorrentes"),
-          // também remove — porque a falsa alegação foi confirmada. Preserva apenas se mencionar
-          // um conectivo NÃO presente em conectivosComFalhaDeContagem (ou seja, não verificado).
           analise.criterios_parciais = analise.criterios_parciais.filter(c => {
             const cStr = String(c).toLowerCase();
-            if (!/(?:recorrente|repetiç|repetid)/i.test(cStr)) return true; // sem menção → preserva
-            // Verifica se o critério menciona algum conectivo do catálogo que NÃO falhou
-            const mencionaConectivoSalvo = catalogoConectivos.some(cv =>
-              cStr.includes(cv) && !conectivosComFalhaDeContagem.has(cv)
-            );
-            if (mencionaConectivoSalvo) return true; // critério salvo por conectivo legítimo
-            // Critério genérico ou que menciona apenas conectivos falhados → remove
-            return false;
+            // Sem menção a repetição/recorrência → preserva
+            if (!/(?:recorrente|repetiç|repetid)/i.test(cStr)) return true;
+
+            // Se for expressamente sobre vocabulário, léxico, palavras ou outro aspecto independente, preserva sempre
+            if (/(?:vocabular|vocabulário|léxic|palavras?|ideias?|argument)/i.test(cStr)) return true;
+
+            // 1. Cita diretamente algum dos conectivos com contagem insuficiente (< 3) → remove
+            const citaConectivoFalhado = [...conectivosComFalhaDeContagem].some(cv => cStr.includes(cv));
+            if (citaConectivoFalhado) return false;
+
+            // 2. Critério que alega conectivos recorrentes explicitamente (ex: 'Termos recorrentes', 'Repetição de conectivos')
+            const ehAlegacaoConectivoRecorrente = /(?:termos?\s+recorrentes?|conectivos?\s+recorrentes?|repetição\s+de\s+conectivos?)/i.test(cStr);
+            if (ehAlegacaoConectivoRecorrente) return false;
+
+            // Preserva qualquer outro critério independente
+            return true;
           });
         }
+
+        // A remoção de uma justificativa inválida não comprova que a nota de C4 está correta.
+        // Não aumenta a nota automaticamente sem fundamento.
+        // Garante que a saída sinalize a necessidade de reavaliar a nota quando uma crítica
+        // descartada pode ter influenciado a pontuação.
+        notaSuspeita = true;
+        avisoContradicao = `C4: alegação de recorrência de conectivos (${[...conectivosComFalhaDeContagem].join(', ')}) foi descartada por contagem factual insuficiente (< 3 ocorrências). A nota ${notaClamped} pode ter sido influenciada por esse apontamento e requer reavaliação.`;
 
         console.warn(`[_ai-service] Ajuste C4: alegação de recorrência removida para conectivos com < 3 ocorrências: ${[...conectivosComFalhaDeContagem].join(', ')}`);
       }
@@ -1776,10 +1790,12 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
       evidencias: evidenciasTextuais,
     };
 
-    // Adiciona campos de contradição somente quando detectados
+    // Adiciona campos de contradição e status de confirmação da nota
     if (notaSuspeita) {
       resultado.nota_suspeita = true;
       resultado.aviso_contradicao = avisoContradicao;
+      resultado.nota_confirmada = false;
+      resultado.necessita_reavaliacao = true;
     }
 
     return resultado;

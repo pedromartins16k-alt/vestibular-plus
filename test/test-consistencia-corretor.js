@@ -667,14 +667,37 @@ A educação de qualidade é um direito de todos.`;
   const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoC4Misto);
   const c4 = res.competencias[3];
 
-  // O problema de "Portanto" recorrente deve ser removido (aparece 1×)
-  assert.equal(c4.problemas.filter(p => /portanto/i.test(p.descricao || '')).length, 0,
-    'Problema de "Portanto" recorrente (1 ocorrência) deve ser removido');
-  // O problema de repetição vocabular de "educação" deve ser PRESERVADO
+  // 1. O problema independente de repetição vocabular permanece
   assert.ok(c4.problemas.some(p => /educação/i.test(p.descricao || '') && /vocabular|palavra/i.test(p.descricao || '')),
     'Problema independente de repetição vocabular de "educação" deve ser preservado');
 
-  pass('C4-D: Problema independente de repetição vocabular preservado ao lado de remoção de falsa recorrência de conectivo');
+  // 2. A justificativa ainda contém a observação válida sobre o vocabulário
+  assert.ok(/repetição\s+vocabular|educação/i.test(c4.justificativa),
+    `A justificativa deve preservar a observação válida sobre o vocabulário; obteve: "${c4.justificativa}"`);
+
+  // 3. O critério parcial sobre repetição vocabular permanece
+  assert.ok(c4.analise?.criterios_parciais?.some(c => /vocabular|educação/i.test(String(c))),
+    'O critério parcial sobre repetição vocabular deve ser preservado em analise.criterios_parciais');
+
+  // 4. A falsa crítica de recorrência de "Portanto" é removida
+  assert.equal(c4.problemas.filter(p => /portanto/i.test(p.descricao || '')).length, 0,
+    'Problema de "Portanto" recorrente (1 ocorrência) deve ser removido');
+  assert.ok(!c4.justificativa.toLowerCase().includes('portanto'),
+    `A justificativa não deve mais acusar recorrência de "Portanto"; obteve: "${c4.justificativa}"`);
+  assert.ok(!c4.analise?.criterios_parciais?.some(c => /portanto/i.test(String(c))),
+    'O critério parcial sobre recorrência de "Portanto" deve ter sido removido');
+
+  // 5. A saída não apresenta a nota como confirmada sem tratar a possível influência da crítica inválida
+  assert.ok(c4.nota_suspeita === true || c4.nota_confirmada === false || c4.necessita_reavaliacao === true,
+    'A saída deve sinalizar que a nota não está confirmada e requer reavaliação');
+  assert.equal(c4.nota_confirmada, false,
+    'A nota de C4 não deve ser apresentada como confirmada após descarte de crítica influente');
+  assert.ok(typeof c4.aviso_contradicao === 'string' && c4.aviso_contradicao.length > 0,
+    'Deve haver aviso explicando que a pontuação pode ter sido influenciada pela crítica descartada');
+  assert.equal(c4.nota, 120,
+    'A nota não deve ser alterada automaticamente sem fundamentação explícita');
+
+  pass('C4-D: Problema independente de repetição vocabular, observação na justificativa e critério parcial preservados; falsa crítica removida e nota sinalizada para reavaliação');
 } catch (err) { fail('C4-D: Problema de repetição vocabular preservado ao remover falsa recorrência', err); }
 
 totalTestes++;
