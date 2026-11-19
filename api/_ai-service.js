@@ -558,6 +558,7 @@ ${regraEscala}
    - Uma nota 200 PTS exige excelência demonstrada e justificativa que comprove o atendimento integral de todos os requisitos do nível máximo.
 
 9. NOTAS MÁXIMAS EXIGEM JUSTIFICATIVA FORTE com base no texto, sem elogios vazios ou clichês.
+10. CONSISTÊNCIA ESTRUTURADA: para uma competência ENEM receber 200, "analise.criterios_parciais" e "analise.criterios_ausentes" devem estar vazios. Se houver qualquer critério substantivo parcial ou ausente, use no máximo 160. Sugestões opcionais de estilo devem ser registradas em "pontos_melhoria" ou "SUGESTAO", nunca como critério parcial/ausente.
 ═══════════════════════════════════════════════════
 
 RUBRICAS OFICIAIS POR COMPETÊNCIA:
@@ -1117,7 +1118,7 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
 
     // Normaliza nivel
     const nivelRaw = String(comp.nivel || '').trim();
-    const nivel = NIVEIS_VALIDOS.includes(nivelRaw) ? nivelRaw : _inferirNivel(notaClamped, pesoMax);
+    let nivel = NIVEIS_VALIDOS.includes(nivelRaw) ? nivelRaw : _inferirNivel(notaClamped, pesoMax);
 
     // Normaliza pontos_positivos (novo campo)
     const pontosPositivos = Array.isArray(comp.pontos_positivos)
@@ -1152,13 +1153,13 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
     // Prioridade: ERRO > PONTO_DE_ATENCAO > SUGESTAO.
     // Se a IA retornar explicitamente, valida. Caso contrário, inferimos dos problemas.
     const tipoApontamentoExplicito = String(comp.tipo_apontamento || '').trim().toUpperCase();
-    const tipoApontamento = TIPOS_APONTAMENTO_VALIDOS.includes(tipoApontamentoExplicito)
+    let tipoApontamento = TIPOS_APONTAMENTO_VALIDOS.includes(tipoApontamentoExplicito)
       ? tipoApontamentoExplicito
       : _inferirTipoApontamento(problemasNormalizados);
 
     // prioridade: alta (nota < 120), media (= 120), baixa (> 120)
     const prioridadeExplicita = String(comp.prioridade || '').trim().toLowerCase();
-    const prioridade = ['alta', 'media', 'baixa'].includes(prioridadeExplicita)
+    let prioridade = ['alta', 'media', 'baixa'].includes(prioridadeExplicita)
       ? prioridadeExplicita
       : _inferirPrioridade(notaClamped, pesoMax);
 
@@ -1182,6 +1183,25 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
       criterios_parciais: [],
       criterios_ausentes: []
     };
+
+    // Consistência determinística: nota máxima exige análise sem critérios parciais ou ausentes.
+    // Sugestões estilísticas devem ficar fora dessas listas e não reduzem a nota.
+    const criteriosNaoPlenos = [
+      ...analise.criterios_parciais,
+      ...analise.criterios_ausentes
+    ].map(item => String(item).trim()).filter(Boolean);
+    if (isEnem && notaClamped === 200 && criteriosNaoPlenos.length > 0) {
+      notaClamped = 160;
+      nivel = _inferirNivel(notaClamped, pesoMax);
+      prioridade = _inferirPrioridade(notaClamped, pesoMax);
+      tipoApontamento = 'PONTO_DE_ATENCAO';
+      problemasNormalizados.push({
+        tipo: 'PONTO_DE_ATENCAO',
+        descricao: 'A análise registrou critérios parciais ou ausentes. Para manter coerência com a rubrica, a nota máxima foi ajustada para 160.',
+        trecho_original: '',
+        sugestao_reescrita: ''
+      });
+    }
 
     // ── Detecção de contradição nota/justificativa ───────────────────────────
     // Considera a competência relacionada, a gravidade da limitação e a rubrica oficial.
