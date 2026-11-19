@@ -1,0 +1,121 @@
+{
+  "versao_schema": "1.0.0",
+  "eh_demonstracao": true,
+  "aviso_privacidade": "CONJUNTO DE DADOS DE DEMONSTRAÇÃO PURAMENTE SINTÉTICO. Estes registros foram gerados artificialmente para testes técnicos de schema, validação e cálculo de métricas. NÃO contêm textos reais de estudantes nem notas de especialistas.",
+  "banca": "enem",
+  "descricao": "Dataset de validação técnica com casos de teste sintéticos para verificação de cálculos do benchmark offline.",
+  "casos": [
+    {
+      "id": "demo-caso-01-consenso-alto",
+      "tema": "Desafios para a valorização de comunidades e povos tradicionais no Brasil",
+      "texto": "O corpo social brasileiro enfrenta graves entraves históricos na preservação da dignidade e dos territórios pertencentes às comunidades e povos tradicionais.\n\nEm primeiro plano, convém ressaltar que a lentidão dos processos de demarcação fundiária perpetua conflitos agrários e a vulnerabilidade dessas populações. Como apontou Sérgio Buarque de Holanda, raízes patrimonialistas ainda orientam a apropriação indevida dos recursos comuns.\n\nAdemais, a invisibilidade institucional e o preconceito cultural restringem o acesso a serviços públicos básicos, enfraquecendo a transmissão de saberes ancestrais para as novas gerações.\n\nPortanto, urge que a Fundação Nacional dos Povos Indígenas (FUNAI), em parceria com o Ministério do Desenvolvimento Agrário, acelere a titulação das terras demarcadas, por meio de mutirões fiscalizatórios e investimentos em segurança territorial, a fim de garantir a cidadania plena e a preservação dessa herança identitária.",
+      "avaliacoes_humanas": [
+        {
+          "avaliador_id": "avaliador-humano-sintetico-A",
+          "tipo": "corretor_1",
+          "competencias": { "c1": 160, "c2": 160, "c3": 160, "c4": 160, "c5": 160 },
+          "nota_total": 800
+        },
+        {
+          "avaliador_id": "avaliador-humano-sintetico-B",
+          "tipo": "corretor_2",
+          "competencias": { "c1": 160, "c2": 160, "c3": 160, "c4": 160, "c5": 160 },
+          "nota_total": 800
+        }
+      ],
+      "correcao_ia": {
+        "modelo": "simulado-ia-acurada",
+        "competencias": { "c1": 160, "c2": 160, "c3": 160, "c4": 160, "c5": 160 },
+        "nota_total": 800
+      }
+    },
+    {
+      "id": "demo-caso-02-media-harmoniosa",
+      "tema": "Invisibilidade e registro civil: garantia de acesso à cidadania no Brasil",
+      "texto": "A ausência de certidão de nascimento configura uma barreira intransponível para o pleno exercício da cidadania no cenário contemporâneo brasileiro.\n\nDe início, observa-se que milhares de indivíduos permanecem à margem das garantias constitucionais básicas, destituídos de documentos que viabilizem a matrícula escolar e a assistência à saúde pública.\n\nOutrossim, a burocracia excessiva e a carência de cartórios em regiões interioranas aprofundam a segregação socioeconômica.\n\nLogo, o Ministério dos Direitos Humanos deve ampliar as unidades móveis de registro civil gratuito nos municípios com menores índices de IDH, mediante alocação orçamentária prioritária, assegurando a inclusão de todos os brasileiros.",
+      "avaliacoes_humanas": [
+        {
+          "avaliador_id": "avaliador-humano-sintetico-A",
+          "tipo": "corretor_1",
+          "competencias": { "c1": 160, "c2": 160, "c3": 120, "c4": 160, "c5": 120 },
+          "nota_total": 720
+        },
+        {
+          "avaliador_id": "avaliador-humano-sintetico-B",
+          "tipo": "corretor_2",
+          "competencias": { "c1": 160, "c2": 120, "c3": 120, "c4": 160, "c5": 160 },
+          "nota_total": 720
+        }
+      ],
+      "correcao_ia": {
+        "modelo": "simulado-ia-leve-desvio",
+        "competencias": { "c1": 160, "c2": 160, "c3": 120, "c4": 160, "c5": 160 },
+        "nota_total": 760
+      }
+    },
+    {
+      "id": "demo-caso-03-adjudicada-declarada",
+      "tema": "O estigma associado às doenças mentais na sociedade brasileira",
+      "texto": "O preconceito enraizado contra os transtornos psíquicos no Brasil constitui uma grave violação ao direito fundamental à saúde e à convivência social.\n\nSob essa ótica, a desinformação fomenta a estigmatização de pessoas em sofrimento mental, que muitas vezes ocultam seus sintomas por receio da rejeição profissional e familiar.\n\nAlém disso, a rede de atenção psicossocial apresenta infraestrutura defasada e número insuficiente de profissionais qualificados em diversas capitais.\n\nAssim, cabe ao Ministério da Saúde modernizar os Centros de Atenção Psicossocial (CAPS) e realizar campanhas contínuas de conscientização, por meio das mídias de grande circulação, desmistificando o tratamento psiquiátrico.",
+      "nota_adjudicada": {
+        "tipo": "banca_adjudicadora_consenso",
+        "competencias": { "c1": 160, "c2": 160, "c3": 120, "c4": 120, "c5": 160 },
+        "nota_total": 720
+      },
+      "correcao_ia": {
+        "modelo": "simulado-ia-desvio-c3",
+        "competencias": { "c1": 160, "c2": 160, "c3": 160, "c4": 120, "c5": 160 },
+        "nota_total": 760
+      }
+    },
+    {
+      "id": "demo-caso-04-terceiro-avaliador-desempate",
+      "tema": "Caminhos para combater a intolerância religiosa no Brasil",
+      "texto": "A pluralidade de crenças no Brasil é historicamente ameaçada pela intolerância e por episódios de violência simbólica e material contra templos religiosos.\n\nHistoricamente, cultos de matriz africana sofrem perseguições sistemáticas decorrentes do racismo estrutural. O desconhecimento da herança cultural afro-brasileira alimenta discursos de ódio em diferentes esferas cotidianas.\n\nPor conseguinte, a Secretaria de Políticas de Promoção da Igualdade Racial deve instituir canais específicos de denúncia e capacitar agentes de segurança pública para atendimento qualificado a casos de intolerância.",
+      "avaliacoes_humanas": [
+        {
+          "avaliador_id": "avaliador-humano-sintetico-1",
+          "competencias": { "c1": 120, "c2": 120, "c3": 80, "c4": 120, "c5": 80 },
+          "nota_total": 520
+        },
+        {
+          "avaliador_id": "avaliador-humano-sintetico-2",
+          "competencias": { "c1": 160, "c2": 160, "c3": 160, "c4": 160, "c5": 120 },
+          "nota_total": 760
+        },
+        {
+          "avaliador_id": "avaliador-humano-sintetico-3-desempate",
+          "competencias": { "c1": 160, "c2": 160, "c3": 120, "c4": 160, "c5": 120 },
+          "nota_total": 720
+        }
+      ],
+      "correcao_ia": {
+        "modelo": "simulado-ia-conservadora",
+        "competencias": { "c1": 160, "c2": 120, "c3": 120, "c4": 160, "c5": 120 },
+        "nota_total": 680
+      }
+    },
+    {
+      "id": "demo-caso-05-desvio-c3-c5",
+      "tema": "Democratização do acesso ao cinema no Brasil",
+      "texto": "A concentração das salas de cinema nos centros comerciais elitizados restringe a fruição cultural das camadas de menor renda no Brasil.\n\nDe acordo com Pierre Bourdieu, o capital cultural é desigualmente distribuído, reforçando as desigualdades socioeconômicas. Sem políticas de descentralização, a sétima arte permanece inacessível à maioria da população periférica.\n\nPara atenuar essa barreira, a Agência Nacional do Cinema (Ancine) deve subsidiar exibições itinerantes em praças públicas municipais.",
+      "avaliacoes_humanas": [
+        {
+          "avaliador_id": "avaliador-humano-sintetico-A",
+          "competencias": { "c1": 160, "c2": 160, "c3": 120, "c4": 160, "c5": 80 },
+          "nota_total": 680
+        },
+        {
+          "avaliador_id": "avaliador-humano-sintetico-B",
+          "competencias": { "c1": 160, "c2": 160, "c3": 120, "c4": 160, "c5": 80 },
+          "nota_total": 680
+        }
+      ],
+      "correcao_ia": {
+        "modelo": "simulado-ia-superestima-c5",
+        "competencias": { "c1": 160, "c2": 160, "c3": 160, "c4": 160, "c5": 160 },
+        "nota_total": 800
+      }
+    }
+  ]
+}
