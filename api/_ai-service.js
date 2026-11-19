@@ -1311,19 +1311,28 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
     // coerente de falta de argumentos/ponto de vista) NÃO geram alerta.
     if (isEnem && numeroComp === 3) {
       const justC3 = justificativa.toLowerCase();
-      const afirmaTeseAusente =
-        justC3.includes('tese não está') ||
+
+      // Negação explícita da ausência de tese (ex: "a tese não está ausente", "não há ausência de tese")
+      // Dizer que a tese NÃO está ausente significa que ela existe, portanto não deve afirmar ausência.
+      const negaAusenciaTese =
+        /(?:(?:a\s+)?tese\s+não\s+(?:está|é|se\s+encontra)\s+ausente|não\s+(?:se\s+trata\s+de|há|existe)\s+(?:ausência\s+de\s+tese|tese\s+ausente)|sem\s+ausência\s+de\s+tese)/.test(justC3);
+
+      // Afirmação explícita de que a tese está ausente ou não foi formulada/identificada.
+      // NOTA: "tese implícita" NÃO significa ausência de tese (a tese existe, embora subentendida),
+      // e "a tese não está ausente" nega a ausência, portanto não devem ser classificadas como ausência.
+      const afirmaTeseAusente = !negaAusenciaTese && (
         justC3.includes('tese não foi') ||
         justC3.includes('tese não identificada') ||
         justC3.includes('tese não explicitada') ||
+        /(?:tese\s+não\s+está\s+(?!ausente)\w+)/.test(justC3) ||
         justC3.includes('ausência de tese') ||
         justC3.includes('sem tese') ||
         justC3.includes('tese ausente') ||
         justC3.includes('tese está ausente') ||
         justC3.includes('não apresenta tese') ||
-        justC3.includes('tese implícita') ||
         justC3.includes('falta de tese') ||
-        /(?:ausência|falta)\s+de\s+tese|sem\s+tese|não\s+apresenta\s+tese|tese\s+(?:está\s+|é\s+)?(?:ausente|implícita)/.test(justC3);
+        /(?:ausência|falta)\s+de\s+tese|sem\s+tese|não\s+apresenta\s+tese|tese\s+(?:está\s+|é\s+)?ausente/.test(justC3)
+      );
 
       if (afirmaTeseAusente) {
         // Distingue afirmação positiva de negação:

@@ -21,6 +21,8 @@
  *   C3-C — Justificativa coerente de ausência de tese → sem nota_suspeita
  *   C3-D — Justificativa afirma tese ausente por não haver argumentos identificáveis → sem nota_suspeita
  *   C3-E — Justificativa nega tese mas afirma positivamente dois argumentos bem desenvolvidos → nota_suspeita
+ *   C3-F — Justificativa com "tese implícita" com argumentos desenvolvidos → sem nota_suspeita
+ *   C3-G — Frase "a tese não está ausente" nega ausência → sem nota_suspeita
  *   C5-A — detalhamento: 'insuficiente' + nota 200 → ajustado para 160
  *   C5-B — detalhamento: 'ausente' + nota 200 → ajustado para 160
  *   C5-C — Elementos completos + sugestão de refinamento futuro → mantém nota 200
@@ -403,6 +405,52 @@ try {
     'aviso_contradicao deve mencionar C3');
   pass('C3-E: Tese ausente mas com dois argumentos bem desenvolvidos → nota_suspeita = true');
 } catch (err) { fail('C3-E: Contradição C3 preservada com afirmação positiva de dois argumentos', err); }
+
+totalTestes++;
+try {
+  // C3-F: Justificativa com "tese implícita" e argumentos desenvolvidos
+  // Dizer que a tese é implícita significa que ela existe (não está ausente).
+  // Portanto, NÃO deve gerar nota_suspeita como se fosse contradição.
+  const payload = montarPayload({
+    competencias: [{
+      numero: 3,
+      nota: 160,
+      justificativa: 'A tese é implícita, mas há dois argumentos bem desenvolvidos ao longo do texto.',
+      problemas: [],
+      analise: { criterios_atendidos: ['Argumentação desenvolvida'], criterios_parciais: ['Tese implícita'], criterios_ausentes: [] }
+    }]
+  });
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
+  const c3 = res.competencias[2];
+  assert.ok(!c3.nota_suspeita,
+    'Justificativa com "tese implícita" não deve gerar nota_suspeita');
+  assert.notEqual(c3.nota_suspeita, true,
+    'nota_suspeita não deve ser true para tese implícita');
+  pass('C3-F: Tese implícita com argumentos desenvolvidos → sem nota_suspeita');
+} catch (err) { fail('C3-F: Tese implícita sem nota_suspeita', err); }
+
+totalTestes++;
+try {
+  // C3-G: Justificativa com a frase "a tese não está ausente" e presença de argumentos
+  // A frase nega a ausência de tese (ou seja, tese está presente), portanto NÃO deve ser
+  // classificada como afirmação de ausência nem gerar nota_suspeita.
+  const payload = montarPayload({
+    competencias: [{
+      numero: 3,
+      nota: 160,
+      justificativa: 'A tese não está ausente; o texto desenvolve dois argumentos bem fundamentados nos parágrafos dissertativos.',
+      problemas: [],
+      analise: { criterios_atendidos: ['Tese identificada', 'Dois argumentos'], criterios_parciais: [], criterios_ausentes: [] }
+    }]
+  });
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
+  const c3 = res.competencias[2];
+  assert.ok(!c3.nota_suspeita,
+    'Frase "a tese não está ausente" não deve gerar nota_suspeita');
+  assert.notEqual(c3.nota_suspeita, true,
+    'nota_suspeita não deve ser true quando ausência de tese é negada');
+  pass('C3-G: Frase "a tese não está ausente" não afirma ausência → sem nota_suspeita');
+} catch (err) { fail('C3-G: Negação de ausência de tese sem nota_suspeita', err); }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GRUPO 3 — C5: Coerência entre status dos elementos e nota
