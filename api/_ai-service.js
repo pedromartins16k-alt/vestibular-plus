@@ -276,7 +276,7 @@ ESCALA OFICIAL INEP:
 
 CONTAGEM REAL E PROIBIÇÃO DE FALSA RECORRÊNCIA:
 - É EXPRESSAMENTE PROIBIDO afirmar que conectivos ou operadores (como "Além disso", "Portanto", "Ademais", etc.) são "repetidos", "recorrentes" ou "excessivos" sem antes contar quantas vezes eles realmente aparecem na redação.
-- Se cada termo citado aparece apenas UMA VEZ no texto, É FACTUALMENTE INCORRETO qualificá-lo como "recorrente" ou "repetido". NUNCA utilize essa justificativa quando os termos tiverem ocorrência única.
+- Se o termo citado aparecer apenas uma ou duas vezes no texto, É FACTUALMENTE INCORRETO qualificá-lo como repetição excessiva ou recorrente. Duas ocorrências não justificam, por si sós, essa crítica. NUNCA utilize essa justificativa quando os termos tiverem apenas uma ou duas ocorrências.
 - Se a redação apresentar variedade de conectivos adequados (por exemplo, uso conjunto de operadores distintos como "Além disso", "Portanto", "Mesmo assim", "Assim", "Com isso", "embora"), o repertório coesivo é diversificado e não deve ser criticado por repetição. Só aponte repetição quando o mesmo termo for reutilizado de modo excessivo (3 ou mais vezes) sem necessidade estilística.`;
 
 const RUBRICA_C5 = `
@@ -543,7 +543,7 @@ REGRAS FUNDAMENTAIS (obrigatórias):
    - Presumir intenção sem evidência textual.
    - Penalizar por coisas que poderiam ser "mais bonitas" mas não são erros.
    - Nomes de disciplinas, matérias e áreas do saber com inicial maiúscula (ex: "História", "História da África", "Matemática") são grafias legítimas facultadas pelo Acordo Ortográfico; NÃO classifique como ERRO nem penalize em C1.
-   - É PROIBIDO afirmar que conectivos são "recorrentes" ou "repetidos" se eles aparecerem apenas uma vez no texto. Conte as ocorrências reais antes de alegar repetição coesiva em C4.
+   - É PROIBIDO afirmar que conectivos são "recorrentes" ou "repetidos" se eles aparecerem apenas uma ou duas vezes no texto (duas ocorrências não constituem repetição excessiva). Conte as ocorrências reais antes de alegar repetição coesiva em C4; só aponte repetição quando houver ao menos 3 ocorrências reais do conectivo no texto.
 
 2. SEPARAR OBRIGATORIAMENTE:
    - ERRO: algo que realmente prejudica a competência avaliada.
@@ -1451,115 +1451,155 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
     }
 
     // ── AJUSTE C4: Verificação factual de conectivos repetidos/recorrentes ────
-    // Antes de apontar que conectivos são "repetidos" ou "recorrentes", conta as
-    // ocorrências reais no texto. Não permite essa justificativa se cada termo citado
-    // aparecer apenas uma vez ou se a redação apresentar variedade de outros mecanismos coesivos.
+    // A rubrica (RUBRICA_C4) só permite crítica de repetição quando o mesmo
+    // conectivo aparece 3 ou mais vezes no texto. 1 ou 2 ocorrências não
+    // constituem repetição excessiva — a alegação nesses casos é factualmente
+    // incorreta e deve ser removida.
+    //
+    // ESCOPO CIRÚRGICO: só removemos o problema (ou sanamos a justificativa)
+    // para os conectivos cujas contagens foram verificadas. Problemas
+    // independentes (ex: repetição vocabular de outra natureza) são preservados.
     if (isEnem && numeroComp === 4 && typeof texto === 'string' && texto.trim().length > 0) {
-      const justC4Lower = (justificativa || '').toLowerCase();
-      const temAlegacaoRecorrencia =
-        /(?:termos?|conectivos?|operadores?|recursos?)\s+.*?(?:recorrentes?|repetid[oa]s?|repetitiv[oa]s?)/i.test(justificativa) ||
-        /(?:recorrentes?|repetid[oa]s?|repetitiv[oa]s?)\s+.*?(?:termos?|conectivos?|operadores?)/i.test(justificativa) ||
-        /(?:são\s+(?:termos\s+)?recorrentes?|termos?\s+recorrentes?|conectivos?\s+recorrentes?)/i.test(justificativa) ||
-        problemasNormalizados.some(p => /(?:recorrente|repetid|repetiç)/i.test(p.descricao || ''));
+      const extrairTermosAspas = (str) => {
+        if (!str) return [];
+        return [...str.matchAll(/[""«'']([^""»'']+)[""»'']/g)].map(m => m[1].trim());
+      };
 
-      if (temAlegacaoRecorrencia) {
-        const extrairTermosAspas = (str) => {
-          if (!str) return [];
-          return [...str.matchAll(/["“«'‘]([^"”»'’]+)["”»'’]/g)].map(m => m[1].trim());
-        };
+      const catalogoConectivos = [
+        'além disso', 'portanto', 'ademais', 'outrossim', 'assim', 'contudo',
+        'todavia', 'entretanto', 'no entanto', 'por conseguinte', 'dessa forma',
+        'desse modo', 'nesse sentido', 'por outro lado', 'mesmo assim', 'com isso',
+        'embora', 'por fim', 'em suma', 'em síntese'
+      ];
 
-        const termosCitados = [
-          ...extrairTermosAspas(justificativa),
-          ...problemasNormalizados.flatMap(p => [
-            ...(p.trecho_original ? [p.trecho_original.trim()] : []),
-            ...extrairTermosAspas(p.descricao)
-          ])
-        ];
+      // Percorre cada problema que menciona recorrência/repetição de conectivos
+      // e verifica se o conectivo citado realmente justifica a crítica (>= 3 ocorrências).
+      // Problemas sem conectivo identificável são preservados sem alteração.
+      const problemasAposC4 = [];
+      let algumConectivoCitadoFalhou = false;   // algum conectivo citado < 3 ocorrências
+      const conectivosComFalhaDeContagem = new Set(); // conectivos com < 3 ocorrências
 
-        const catalogoConectivos = [
-          'além disso', 'portanto', 'ademais', 'outrossim', 'assim', 'contudo',
-          'todavia', 'entretanto', 'no entanto', 'por conseguinte', 'dessa forma',
-          'desse modo', 'nesse sentido', 'por outro lado', 'mesmo assim', 'com isso',
-          'embora', 'por fim', 'em suma', 'em síntese'
-        ];
+      for (const prob of problemasNormalizados) {
+        const descLower = (prob.descricao || '').toLowerCase();
+        const mencionaRecorrencia = /(?:recorrente|repetid[ao]|repetiç)/i.test(prob.descricao || '');
 
-        const termosUnicos = [];
-        const termosVistos = new Set();
-        for (const t of termosCitados) {
-          const lower = t.toLowerCase();
-          if (!termosVistos.has(lower) && lower.length > 1) {
-            termosVistos.add(lower);
-            termosUnicos.push(t);
-          }
+        if (!mencionaRecorrencia) {
+          // Problema não diz respeito a recorrência de conectivos → preserva sempre
+          problemasAposC4.push(prob);
+          continue;
         }
+
+        // Extrai conectivos citados neste problema específico
+        const candidatos = new Set();
+        if (prob.trecho_original) candidatos.add(prob.trecho_original.trim().toLowerCase());
+        for (const t of extrairTermosAspas(prob.descricao)) candidatos.add(t.toLowerCase());
+        // Também detecta conectivos do catálogo mencionados diretamente na descrição
         for (const c of catalogoConectivos) {
-          if (justC4Lower.includes(c) && !termosVistos.has(c)) {
-            termosVistos.add(c);
-            termosUnicos.push(c);
-          }
+          if (descLower.includes(c)) candidatos.add(c);
         }
 
-        // Se foram identificados termos coesivos citados
-        if (termosUnicos.length > 0) {
-          const contagens = termosUnicos.map(t => ({
-            termo: t,
-            contagem: _contarOcorrenciasTermo(t, texto)
-          }));
-
-          const algumRepetido = contagens.some(c => c.contagem > 1);
-          const conectivosNoTexto = catalogoConectivos.filter(c => _contarOcorrenciasTermo(c, texto) >= 1);
-          const temMecanismosAdequados = conectivosNoTexto.length >= 2;
-
-          // Se nenhum dos termos citados ocorre mais de uma vez (ou seja, cada um aparece apenas uma vez)
-          // ou se a redação apresenta mecanismos coesivos adequados diversificados
-          if (!algumRepetido || (temMecanismosAdequados && contagens.filter(c => c.contagem > 1).length === 0)) {
-            // 1. Remove problemas que alegavam falsa recorrência de termos com ocorrência única
-            problemasNormalizados = problemasNormalizados.filter(p => {
-              const descLower = (p.descricao || '').toLowerCase();
-              return !descLower.includes('recorrente') &&
-                     !descLower.includes('repetid') &&
-                     !descLower.includes('repetição');
-            });
-            tipoApontamento = _inferirTipoApontamento(problemasNormalizados);
-
-            // 2. Não use essa justificativa se cada termo citado aparece apenas uma vez
-            // Remove formulações de "termos recorrentes" / "são recorrentes" da justificativa
-            let justAjustada = justificativa
-              .replace(/(?:são\s+)?termos\s+recorrentes/gi, 'conectivos com ocorrência pontual (sem repetição excessiva)')
-              .replace(/(?:são\s+)?conectivos\s+recorrentes/gi, 'conectivos com ocorrência pontual (sem repetição excessiva)')
-              .replace(/são\s+recorrentes/gi, 'apresentam ocorrência pontual')
-              .replace(/conectivos\s+(?:excessivamente\s+)?repetidos/gi, 'conectivos empregados sem repetição excessiva')
-              .replace(/repetição\s+(?:excessiva|frequente|recorrente)\s+de\s+conectivos/gi, 'emprego de conectivos inter e intraparágrafos');
-
-            if (/recorrente/i.test(justAjustada)) {
-              justAjustada = justAjustada.replace(/[^.!?;\n]*recorrente[^.!?;\n]*[.!?]?/gi, ' ');
-            }
-            justAjustada = justAjustada.replace(/\s{2,}/g, ' ').trim();
-            if (!justAjustada || justAjustada.length < 20) {
-              justAjustada = 'Estrutura coesiva com emprego de conectivos inter e intraparágrafos com ocorrência pontual, sem repetição mecânica ou excessiva.';
-            }
-            justificativa = justAjustada;
-
-            // 3. Atualiza critérios em analise se existirem
-            if (analise && Array.isArray(analise.criterios_parciais)) {
-              analise.criterios_parciais = analise.criterios_parciais.filter(
-                c => !/(?:recorrente|repetiç|repetid)/i.test(String(c))
-              );
-            }
-            if (analise && Array.isArray(analise.criterios_ausentes)) {
-              analise.criterios_ausentes = analise.criterios_ausentes.filter(
-                c => !/(?:recorrente|repetiç|repetid)/i.test(String(c))
-              );
-            }
-            if (analise && Array.isArray(analise.criterios_atendidos)) {
-              if (!analise.criterios_atendidos.some(c => /coes/i.test(String(c)) || /conectiv/i.test(String(c)))) {
-                analise.criterios_atendidos.push('Emprego diversificado de conectivos sem repetição excessiva');
-              }
-            }
-
-            console.warn(`[_ai-service] Ajuste C4: alegação de conectivos recorrentes removida pois termos citados ocorrem apenas uma vez no texto`);
-          }
+        if (candidatos.size === 0) {
+          // Menciona recorrência mas não identifica o conectivo →
+          // Não podemos verificar a contagem, não alteramos o problema nem a justificativa.
+          problemasAposC4.push(prob);
+          continue;
         }
+
+        // Verifica se ao menos um dos conectivos citados aparece >= 3 vezes
+        const algumComTresOuMais = [...candidatos].some(
+          c => _contarOcorrenciasTermo(c, texto) >= 3
+        );
+
+        if (algumComTresOuMais) {
+          // Crítica factualmente sustentada: preserva o problema
+          problemasAposC4.push(prob);
+        } else {
+          // Nenhum dos conectivos citados atinge 3 ocorrências → alegação sem base
+          algumConectivoCitadoFalhou = true;
+          for (const c of candidatos) conectivosComFalhaDeContagem.add(c);
+          // Problema removido (não adicionado a problemasAposC4)
+        }
+      }
+
+      problemasNormalizados = problemasAposC4;
+      tipoApontamento = _inferirTipoApontamento(problemasNormalizados);
+
+      // Sana a justificativa apenas se havia algum conectivo verificado como
+      // insuficiente (< 3 ocorrências) e a justificativa menciona recorrência
+      // especificamente para esses conectivos identificados.
+      if (algumConectivoCitadoFalhou) {
+        const justC4Lower = (justificativa || '').toLowerCase();
+        // Verifica se a justificativa menciona algum dos conectivos que falharam
+        const justMenciona = [...conectivosComFalhaDeContagem].some(c => justC4Lower.includes(c));
+
+        if (justMenciona) {
+          let justAjustada = justificativa
+            .replace(/(?:são\s+)?termos\s+recorrentes/gi, 'conectivos com ocorrência não excessiva')
+            .replace(/(?:são\s+)?conectivos\s+recorrentes/gi, 'conectivos com ocorrência não excessiva')
+            .replace(/são\s+recorrentes/gi, 'apresentam ocorrência não excessiva')
+            .replace(/conectivos\s+(?:excessivamente\s+)?repetidos/gi, 'conectivos sem repetição excessiva')
+            .replace(/repetição\s+(?:excessiva|frequente|recorrente)\s+de\s+conectivos/gi, 'emprego de conectivos inter e intraparágrafos');
+
+          // Remove frases residuais com "recorrente" que referenciem os conectivos falhados
+          if (/recorrente/i.test(justAjustada)) {
+            for (const c of conectivosComFalhaDeContagem) {
+              const escapado = c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+              // Remove o trecho da sentença que menciona o conectivo + recorrente
+              justAjustada = justAjustada.replace(
+                new RegExp(`[^.!?;\\n]*${escapado}[^.!?;\\n]*recorrente[^.!?;\\n]*[.!?]?`, 'gi'),
+                ' '
+              );
+              justAjustada = justAjustada.replace(
+                new RegExp(`[^.!?;\\n]*recorrente[^.!?;\\n]*${escapado}[^.!?;\\n]*[.!?]?`, 'gi'),
+                ' '
+              );
+            }
+          }
+          justAjustada = justAjustada.replace(/\s{2,}/g, ' ').trim();
+          if (!justAjustada || justAjustada.length < 20) {
+            justAjustada = 'Estrutura coesiva com emprego de conectivos inter e intraparágrafos sem repetição mecânica excessiva.';
+          }
+          justificativa = justAjustada;
+        }
+
+        // Atualiza critérios em analise removendo critérios sobre falsa recorrência.
+        // Um critério é removido se:
+        //   (a) menciona "recorrente/repetição" E
+        //   (b) não menciona nenhum conectivo que tenha atingido 3+ ocorrências.
+        // Critérios sobre repetição de outra natureza (sem conectivos do catálogo) são
+        // preservados desde que não estejam associados à falsa alegação verificada.
+        if (analise && Array.isArray(analise.criterios_parciais)) {
+          // Monta o conjunto de conectivos que passaram no limiar (≥ 3 ocorrências)
+          // para não remover critérios que se refiram a eles legitimamente.
+          const conectivosComSucessoDeContagem = new Set(
+            [...conectivosComFalhaDeContagem].length > 0
+              ? [] // será preenchido abaixo com os que NÃO falharam
+              : []
+          );
+          // Reutilizamos candidatos implicitamente: se algum conectivo falhou,
+          // nenhum deles atingiu 3+, portanto não há conectivos de sucesso neste bloco.
+          // Se houvesse algum com 3+, `algumConectivoCitadoFalhou` poderia ainda ser true
+          // (outros conectivos falharam). Precisamos identificar os que passaram:
+          // para fazer isso corretamente, coletamos todos os candidatos vistos nos problemas removidos.
+          // Por simplicidade (e segurança), tratamos: se o critério menciona "recorrente/repetid"
+          // e menciona um dos conectivos FALHADOS, remove. Se menciona "recorrente/repetid" mas
+          // NÃO menciona nenhum conectivo do catálogo (critério genérico como "Termos recorrentes"),
+          // também remove — porque a falsa alegação foi confirmada. Preserva apenas se mencionar
+          // um conectivo NÃO presente em conectivosComFalhaDeContagem (ou seja, não verificado).
+          analise.criterios_parciais = analise.criterios_parciais.filter(c => {
+            const cStr = String(c).toLowerCase();
+            if (!/(?:recorrente|repetiç|repetid)/i.test(cStr)) return true; // sem menção → preserva
+            // Verifica se o critério menciona algum conectivo do catálogo que NÃO falhou
+            const mencionaConectivoSalvo = catalogoConectivos.some(cv =>
+              cStr.includes(cv) && !conectivosComFalhaDeContagem.has(cv)
+            );
+            if (mencionaConectivoSalvo) return true; // critério salvo por conectivo legítimo
+            // Critério genérico ou que menciona apenas conectivos falhados → remove
+            return false;
+          });
+        }
+
+        console.warn(`[_ai-service] Ajuste C4: alegação de recorrência removida para conectivos com < 3 ocorrências: ${[...conectivosComFalhaDeContagem].join(', ')}`);
       }
     }
 

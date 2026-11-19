@@ -26,6 +26,9 @@
  *   C3-G — Frase "a tese não está ausente" nega ausência → sem nota_suspeita
  *   C4-A — Conectivos usados uma vez ("Além disso", "Portanto") não são descritos como recorrentes
  *   C4-B — Conectivo genuinamente repetido (3x) → crítica de repetição preservada
+ *   C4-C — Conectivo citado 2× no texto → crítica de repetição excessiva removida
+ *   C4-D — Problema independente de repetição vocabular preservado junto com remoção de falsa recorrência de conectivo
+ *   C4-E — Alegação genérica de "conectivos recorrentes" sem conectivo identificável → sem invenção de contagem
  *   C5-A — detalhamento: 'insuficiente' + nota 200 → ajustado para 160
  *   C5-B — detalhamento: 'ausente' + nota 200 → ajustado para 160
  *   C5-C — Elementos completos + sugestão de refinamento futuro → mantém nota 200
@@ -582,6 +585,139 @@ Além disso, a infraestrutura escolar precária amplia a desigualdade educaciona
 
   pass('C4-B: Conectivo genuinamente repetido (3x) tem crítica de repetição preservada');
 } catch (err) { fail('C4-B: Conectivo genuinamente repetido preservado', err); }
+
+totalTestes++;
+try {
+  // C4-C: Conectivo citado 2 vezes no texto — abaixo do limiar de 3 ocorrências.
+  // A rubrica diz: "duas ocorrências não justificam, por si sós, essa crítica."
+  // O validador deve remover o problema e sanear a justificativa.
+  const textoC4Dois = `A educação inclusiva ainda enfrenta grandes desafios.
+Além disso, faltam políticas públicas robustas.
+Além disso, a formação docente é precária em muitos municípios.
+Por outro lado, algumas iniciativas locais são promissoras.`;
+
+  const payload = montarPayload({
+    competencias: [{
+      numero: 4,
+      nota: 160,
+      justificativa: '"Além disso" é termo recorrente e aparece repetido ao longo do texto.',
+      problemas: [{
+        tipo: 'PONTO_DE_ATENCAO',
+        descricao: 'Repetição: "Além disso" é conectivo recorrente no texto',
+        trecho_original: 'Além disso',
+        sugestao_reescrita: 'Outrossim'
+      }],
+      analise: {
+        criterios_atendidos: ['Conectores interparágrafos'],
+        criterios_parciais: ['Uso recorrente de "Além disso"'],
+        criterios_ausentes: []
+      }
+    }]
+  });
+
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoC4Dois);
+  const c4 = res.competencias[3];
+
+  // O conectivo aparece 2 vezes — abaixo do limiar de 3 → crítica deve ser removida
+  assert.equal(c4.problemas.filter(p => /recorrente|repetid/i.test(p.descricao || '')).length, 0,
+    'Problema de recorrência para conectivo com 2 ocorrências deve ser removido');
+  assert.ok(!c4.justificativa.toLowerCase().includes('recorrente'),
+    `Justificativa não deve descrever como recorrente um conectivo com apenas 2 ocorrências; obteve: "${c4.justificativa}"`);
+
+  pass('C4-C: Conectivo citado 2× no texto tem crítica de repetição excessiva removida');
+} catch (err) { fail('C4-C: Conectivo citado 2× no texto → crítica removida', err); }
+
+totalTestes++;
+try {
+  // C4-D: Um problema de repetição vocabular (não conectivo) coexiste com falsa alegação de
+  // recorrência de conectivo. A remoção deve ser cirúrgica: remove só a falsa alegação de
+  // "Portanto" recorrente (que aparece 1×), preserva o problema de repetição vocabular.
+  const textoC4Misto = `A educação enfrenta barreiras estruturais no país.
+A educação precisa de mais investimento para superar essas barreiras.
+Portanto, é fundamental que o Estado priorize políticas públicas.
+A educação de qualidade é um direito de todos.`;
+
+  const payload = montarPayload({
+    competencias: [{
+      numero: 4,
+      nota: 120,
+      justificativa: 'Uso recorrente de "Portanto" e repetição vocabular de "educação" ao longo do texto.',
+      problemas: [
+        {
+          tipo: 'PONTO_DE_ATENCAO',
+          descricao: 'Conectivo recorrente: "Portanto" é termo repetido',
+          trecho_original: 'Portanto',
+          sugestao_reescrita: 'Por conseguinte'
+        },
+        {
+          tipo: 'PONTO_DE_ATENCAO',
+          descricao: 'Repetição vocabular: a palavra "educação" é repetida com frequência excessiva',
+          trecho_original: 'educação',
+          sugestao_reescrita: 'ensino / formação'
+        }
+      ],
+      analise: {
+        criterios_atendidos: [],
+        criterios_parciais: ['Repetição de "Portanto"', 'Repetição vocabular de "educação"'],
+        criterios_ausentes: []
+      }
+    }]
+  });
+
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoC4Misto);
+  const c4 = res.competencias[3];
+
+  // O problema de "Portanto" recorrente deve ser removido (aparece 1×)
+  assert.equal(c4.problemas.filter(p => /portanto/i.test(p.descricao || '')).length, 0,
+    'Problema de "Portanto" recorrente (1 ocorrência) deve ser removido');
+  // O problema de repetição vocabular de "educação" deve ser PRESERVADO
+  assert.ok(c4.problemas.some(p => /educação/i.test(p.descricao || '') && /vocabular|palavra/i.test(p.descricao || '')),
+    'Problema independente de repetição vocabular de "educação" deve ser preservado');
+
+  pass('C4-D: Problema independente de repetição vocabular preservado ao lado de remoção de falsa recorrência de conectivo');
+} catch (err) { fail('C4-D: Problema de repetição vocabular preservado ao remover falsa recorrência', err); }
+
+totalTestes++;
+try {
+  // C4-E: Justificativa genérica "usa conectivos recorrentes" sem citar nenhum conectivo específico.
+  // Sem conectivo identificável, o validador não pode verificar contagem e não deve alterar nada.
+  const textoC4Generico = `O texto desenvolve um argumento progressivo sobre desigualdade social.
+No entanto, a proposta de intervenção carece de agente e detalhamento.
+Por outro lado, o repertório sociocultural é bem empregado.
+Em suma, a redação demonstra capacidade argumentativa.`;
+
+  const payload = montarPayload({
+    competencias: [{
+      numero: 4,
+      nota: 120,
+      justificativa: 'O texto usa conectivos recorrentes, o que prejudica a diversidade coesiva.',
+      problemas: [{
+        tipo: 'PONTO_DE_ATENCAO',
+        descricao: 'Uso recorrente de conectivos ao longo do texto prejudica a variação coesiva',
+        trecho_original: '',   // sem conectivo específico citado
+        sugestao_reescrita: ''
+      }],
+      analise: {
+        criterios_atendidos: [],
+        criterios_parciais: ['Diversidade coesiva limitada'],
+        criterios_ausentes: []
+      }
+    }]
+  });
+
+  const problemasAntes = 1; // o payload declara exatamente 1 problema (veja acima)
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoC4Generico);
+  const c4 = res.competencias[3];
+
+  // Sem conectivo identificável, o validador não deve remover problemas nem inventar contagens
+  assert.equal(c4.problemas.length, problemasAntes,
+    'Sem conectivo identificável na alegação genérica, nenhum problema deve ser removido');
+  // Critério de diversidade coesiva deve ser preservado
+  assert.ok(c4.analise?.criterios_parciais?.some(c => /diversidade|coesiv/i.test(String(c))),
+    'Critério de diversidade coesiva não deve ser apagado em alegação genérica sem conectivo');
+
+  pass('C4-E: Alegação genérica de conectivos recorrentes sem conectivo identificável não altera problemas');
+} catch (err) { fail('C4-E: Alegação genérica sem conectivo identificável → sem remoção', err); }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GRUPO 4 — C5: Coerência entre status dos elementos e nota
