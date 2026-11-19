@@ -10,6 +10,7 @@ O benchmark foi projetado para operar **100% offline**, garantindo:
 - **Reprodutibilidade:** Os cálculos de proximidade e métricas são determinísticos e matematicamente rigorosos.
 - **Privacidade absoluta:** Nenhuma redação, dado de usuário ou segredo trafega pela rede ou consome tokens de IA durante a execução.
 - **Isolamento de calibração:** As notas da IA nunca são adulteradas artificialmente para "atingir" a referência; o benchmark é uma ferramenta de auditoria da proximidade real.
+- **Integridade da Referência Humana:** Casos com divergências humanas não resolvidas são formalmente classificados como **pendentes** e excluídos das métricas de desempenho para não distorcer a avaliação do corretor com médias fictícias.
 
 ---
 
@@ -74,39 +75,47 @@ O benchmark aceita um arquivo `.json` contendo um objeto ou array de casos. A es
   - **C3:** Seleção, organização e interpretação de argumentos (0 a 200).
   - **C4:** Recursos coesivos (0 a 200).
   - **C5:** Proposta de intervenção social (0 a 200).
-- **Incrementos Oficiais:** As notas individuais de corretores humanos e da IA devem obrigatoriamente pertencer aos níveis oficiais de 40 pontos:  
+- **Incrementos Oficiais:** As notas individuais de todos os corretores humanos (1º, 2º, 3º e demais) e da IA devem pertencer estritamente aos incrementos de 40 pontos:  
   `[0, 40, 80, 120, 160, 200]`.
-- **Nota Total:** É a soma estrita das 5 competências (`0 a 1000 pontos`). Notas que divirjam da soma ou valores negativos/fracionários são rejeitados com aviso de inconsistência.
-- **Valores Intermediários (Médias):** Notas com valores médios (ex.: 140, 100) são aceitas exclusivamente para notas de referência derivadas de médias entre múltiplos avaliadores.
+- **Nota Total:** É a soma estrita das 5 competências (`0 a 1000 pontos`). A nota total informada para adjudicações ou correções deve obrigatoriamente coincidir com a soma das competências. Valores inconsistentes ou fora do intervalo são rejeitados na validação.
+- **Valores Intermediários (Médias):** Notas com valores intermediários (ex.: 140, 100) são aceitas exclusivamente como resultado de médias de corretores concordantes.
 
 ---
 
 ## 4. Metodologia de Resolução de Divergências entre Avaliadores
 
-O benchmark implementa fielmente as normas de correção do INEP (Ministério da Educação):
+O benchmark implementa as normas oficiais de correção do ENEM (INEP), distinguindo rigorosamente **casos resolvidos** de **casos pendentes**:
 
 ```mermaid
 flowchart TD
-    A["Entrada: 2 Avaliadores Humanos"] --> B{"Diferença Total > 100 pts OU<br>Diferença em alguma Comp > 80 pts?"}
-    B -- "Não (Sem divergência)" --> C["Média aritmética simples oficial"]
-    B -- "Sim (Discrepância detectada)" --> D{"Há 3º Avaliador ou<br>Nota Adjudicada?"}
-    D -- "Nota Adjudicada presente" --> E["Adota a nota adjudicada diretamente"]
-    D -- "3º Avaliador presente" --> F["Média entre o 3º corretor e o mais próximo"]
-    D -- "Apenas 2 corretores sem 3º" --> G["Média provisória + Alerta de divergência pendente"]
+    A["Entrada: Avaliações Humanas"] --> B{"Há Nota Adjudicada / Consenso?"}
+    B -- "Sim" --> C["Valida soma estrita e adota Adjudicação (RESOLVIDO)"]
+    B -- "Não" --> D{"Quantidade de Avaliadores"}
+    
+    D -- "1 Avaliador" --> E["Adota avaliação única com aviso (RESOLVIDO)"]
+    D -- "2 Avaliadores" --> F{"Diferença Total > 100 pts OU<br>Diferença em alguma Comp > 80 pts?"}
+    
+    F -- "Não" --> G["Média aritmética simples (RESOLVIDO)"]
+    F -- "Sim" --> H["Classificado como PENDENTE de adjudicação<br>(EXCLUÍDO das métricas, sem nota inventada)"]
+    
+    D -- "3 Avaliadores" --> I{"1º e 2º divergiram?"}
+    I -- "Não" --> G
+    I -- "Sim" --> J{"Compatibilidade do 3º com 1º e 2º<br>(INEP: delta total ≤ 100 e delta comp ≤ 80)"}
+    
+    J -- "Compatível com apenas 1" --> K["Média entre o 3º e o compatível (RESOLVIDO)"]
+    J -- "Compatível com ambos" --> L["Média entre o 3º e o mais próximo no total (RESOLVIDO)"]
+    J -- "Divergente de ambos" --> M["Divergência persistente: PENDENTE de banca<br>(EXCLUÍDO das métricas, sem nota inventada)"]
 ```
 
-1. **Precedência da Adjudicação/Consenso:**  
-   Se o registro fornecer explicitamente `nota_adjudicada`, `nota_consenso` ou `referencia`, esse valor tem precedência imediata sobre avaliações individuais.
-2. **Dois Corretores Concordantes:**  
-   Se o delta na nota total for $\le 100$ e o delta em todas as competências for $\le 80$, a referência é a média aritmética simples de cada competência.
-3. **Três Corretores (Desempate):**  
-   Quando há discrepância e o 3º corretor é acionado, a nota final é a média entre o 3º corretor e o corretor cuja nota total estiver mais próxima da sua.
-4. **Divergência Pendente:**  
-   Se houver divergência grave entre 2 corretores e nenhum 3º corretor ou consenso estiver disponível, o benchmark calcula a média aritmética para fins estatísticos, mas emite um alerta explícito (`discrepancia_humana: true`) para revisão manual.
+### Casos Resolvidos vs. Casos Pendentes:
+1. **Casos Resolvidos:** Possuem referência humana legítima consolidada (média simples concordante, resolução pelo 3º corretor com o par compatível, ou adjudicação de consenso). São os **únicos** contabilizados no cálculo de proximidade e métricas do benchmark.
+2. **Casos Pendentes:**
+   - **Dois corretores divergentes sem 3º avaliador nem adjudicação:** Marcados como `status: 'pendente_adjudicacao'`. Não se inventa média provisória; o caso é excluído das métricas de acurácia da IA e listado para auditoria.
+   - **Três corretores com divergência persistente:** Quando o 3º corretor diverge de ambos os corretores anteriores, a norma do ENEM determina encaminhamento para banca examinadora presencial. O benchmark marca o caso como `status: 'pendente_banca'` e o exclui do cálculo de desempenho.
 
 ---
 
-## 5. Métricas Calculadas
+## 5. Métricas Calculadas e Esclarecimento Metodológico
 
 | Métrica | Descrição |
 |---|---|
@@ -114,10 +123,15 @@ flowchart TD
 | **MAE por Competência** | Erro Absoluto Médio individual para C1, C2, C3, C4 e C5 |
 | **Viés Médio (Bias)** | Média das diferenças com sinal: $\frac{1}{N}\sum (IA - Ref)$. Indica tendência sistemática de superestimação ($> 0$) ou subestimação ($< 0$) |
 | **Exatidão (%)** | Percentual de redações em que a nota da IA foi idêntica à referência |
-| **Faixa de ±40 pontos (%)** | Percentual de notas a uma distância máxima de 40 pontos da referência (tolerância de 1 nível de rubrica do ENEM) |
-| **Faixa de ±80 pontos (%)** | Percentual dentro da faixa de aceitabilidade do INEP |
+| **Faixa de ±40 pontos por Competência (%)** | Percentual de notas a uma distância máxima de 40 pontos da referência (corresponde exatamente a 1 nível da rubrica do ENEM) |
+| **Faixa de ±40 pontos na Nota Total (%)** | Métrica operacional de proximidade agregada adotada pelo benchmark (**ver esclarecimento abaixo**) |
+| **Faixa de ±80 pontos por Competência (%)** | Percentual dentro da faixa de tolerância de discrepância do INEP |
 | **Discrepâncias Críticas (%)** | Percentual de ocorrências com desvio $> 80$ pontos em uma competência |
 | **Ranking de Afastamento** | Ordenação decrescente das competências por MAE para orientar a calibração pedagógica prioritária |
+
+> [!NOTE]
+> **Esclarecimento sobre a métrica de ±40 pontos na nota total:**
+> Nas competências individuais, 40 pontos representam rigorosamente um salto de nível na rubrica oficial (ex: nível 3 para nível 4). Na **nota total (0 a 1000 pontos)**, a faixa de ±40 pontos foi escolhida como uma tolerância estatística operacional agregada para o benchmark. Ela **não** representa equivalência pedagógica estrita nem garantia de precisão idêntica da banca real, pois uma variação total de 40 pontos pode decorrer de um desconto isolado em uma única competência ou de compensações cruzadas entre múltiplos critérios.
 
 ---
 

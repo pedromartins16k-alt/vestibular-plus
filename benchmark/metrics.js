@@ -5,10 +5,12 @@
  *  - Calcula o erro absoluto médio (MAE) da nota total e de cada competência (C1..C5).
  *  - Calcula o viés médio (Mean Signed Error / tendência de superestimar ou subestimar).
  *  - Calcula o percentual de exatidão (notas idênticas à referência).
- *  - Calcula o percentual de notas dentro da faixa de tolerância de 40 pontos por competência.
+ *  - Calcula o percentual de notas dentro da faixa de tolerância de 40 pontos por competência (1 nível da rubrica).
+ *  - Calcula o percentual na faixa de ±40 pontos na nota total como métrica operacional do benchmark
+ *    (esclarecido que não constitui garantia de equivalência pedagógica estrita).
  *  - Calcula o percentual dentro da faixa de 80 pontos e a taxa de discrepâncias críticas.
  *  - Gera o ranking de afastamento das competências (da maior discrepância para a menor).
- *  - Diagnostica assimetrias e desvios para direcionar a calibração pedagógica.
+ *  - Filtra estritamente casos com referências humanas resolvidas, descartando casos pendentes.
  */
 
 /**
@@ -37,12 +39,28 @@ export const NOMES_COMPETENCIAS_ENEM = Object.freeze({
 
 /**
  * Calcula todas as métricas comparativas entre as correções da IA e as referências humanas.
+ * Garante que apenas casos com referências humanas efetivamente resolvidas sejam computados.
  *
- * @param {Array<object>} casosValidados - Array de casos retornados por validarCasoBenchmark
+ * @param {Array<object>} casosValidados - Array de casos retornados por validarDatasetBenchmark ou validarCasoBenchmark
  * @returns {object} Objeto estruturado com todas as métricas globais e por competência
  */
 export function calcularMetricasBenchmark(casosValidados) {
-  const n = Array.isArray(casosValidados) ? casosValidados.length : 0;
+  // Filtro de segurança: processa apenas casos com referência resolvida e íntegra
+  const casosResolvidos = (Array.isArray(casosValidados) ? casosValidados : []).filter(caso => {
+    return (
+      caso &&
+      caso.referencia &&
+      caso.referencia.resolvida !== false &&
+      caso.referencia.competencias &&
+      typeof caso.referencia.nota_total === 'number' &&
+      Number.isFinite(caso.referencia.nota_total) &&
+      caso.correcao_ia &&
+      caso.correcao_ia.competencias &&
+      typeof caso.correcao_ia.nota_total === 'number'
+    );
+  });
+
+  const n = casosResolvidos.length;
 
   if (n === 0) {
     return {
@@ -64,7 +82,7 @@ export function calcularMetricasBenchmark(casosValidados) {
         c5: _criarMetricaVazia('c5')
       },
       ranking_afastamento: [],
-      diagnostico_calibracao: 'Nenhum caso válido para cálculo de métricas.'
+      diagnostico_calibracao: 'Nenhum caso com referência humana resolvida disponível para cálculo de métricas.'
     };
   }
 
@@ -86,7 +104,7 @@ export function calcularMetricasBenchmark(casosValidados) {
     c5: _criarAcumulador()
   };
 
-  for (const caso of casosValidados) {
+  for (const caso of casosResolvidos) {
     const notaIaTotal = caso.correcao_ia.nota_total;
     const notaRefTotal = caso.referencia.nota_total;
     const diffTotal = notaIaTotal - notaRefTotal;

@@ -6,6 +6,8 @@
  *  - Gera relatório estruturado em formato Markdown.
  *  - Destaca o ranking de competências onde a IA mais se afasta da referência humana.
  *  - Apresenta alertas para casos rejeitados ou dados inválidos.
+ *  - Apresenta seção explícita para casos pendentes de adjudicação/banca humana.
+ *  - Esclarece o papel da métrica operacional de ±40 pontos na nota total.
  */
 
 import { NOMES_COMPETENCIAS_ENEM } from './metrics.js';
@@ -34,15 +36,28 @@ export function gerarRelatorioConsole({ resultadoValidacao, metricas, origem = '
     linhas.push('  ⚠️  ATENÇÃO: CONJUNTO DE DEMONSTRAÇÃO TÉCNICA / SINTÉTICO');
     linhas.push('      Este teste utiliza dados sintéticos de validação e não avaliações reais.');
   }
+
+  const qtdValidos = metricas.quantidade_casos;
+  const qtdPendentes = resultadoValidacao?.casosPendentes?.length || 0;
+  const qtdRejeitados = resultadoValidacao?.casosRejeitados?.length || 0;
+  const totalAnalisados = qtdValidos + qtdPendentes + qtdRejeitados;
+
   linhas.push(`  Origem dos dados: ${origem}`);
-  linhas.push(`  Total de registros analisados: ${(resultadoValidacao?.casosValidos?.length || 0) + (resultadoValidacao?.casosRejeitados?.length || 0)}`);
-  linhas.push(`  Casos válidos comparados: ${metricas.quantidade_casos}`);
-  linhas.push(`  Casos rejeitados/inválidos: ${resultadoValidacao?.casosRejeitados?.length || 0}`);
+  linhas.push(`  Total de registros analisados: ${totalAnalisados}`);
+  linhas.push(`  Casos válidos (resolvidos): ${qtdValidos}`);
+  linhas.push(`  Casos pendentes de banca/adjudicação: ${qtdPendentes}`);
+  linhas.push(`  Casos rejeitados/inválidos: ${qtdRejeitados}`);
   linhas.push(subDiv);
 
-  if (metricas.quantidade_casos === 0) {
-    linhas.push('  ❌ Nenhum caso válido foi encontrado para cálculo das métricas.');
-    if (resultadoValidacao?.casosRejeitados?.length > 0) {
+  if (qtdValidos === 0) {
+    linhas.push('  ❌ Nenhum caso com referência humana resolvida foi encontrado para o cálculo.');
+    if (qtdPendentes > 0) {
+      linhas.push('\n  Casos pendentes de adjudicação/banca examinadora:');
+      resultadoValidacao.casosPendentes.forEach(pen => {
+        linhas.push(`    • [${pen.id}] (${pen.status}): ${pen.motivos?.join(' | ') || pen.avisos?.join(' | ') || pen.metodo_resolucao}`);
+      });
+    }
+    if (qtdRejeitados > 0) {
       linhas.push('\n  Diagnóstico dos registros rejeitados:');
       resultadoValidacao.casosRejeitados.forEach(rej => {
         linhas.push(`    • [${rej.id}]: ${rej.erros.join(' | ')}`);
@@ -57,8 +72,10 @@ export function gerarRelatorioConsole({ resultadoValidacao, metricas, origem = '
   linhas.push('  📌 DESEMPENHO NA NOTA TOTAL (0 a 1000 pontos):');
   linhas.push(`     • Erro Absoluto Médio (MAE Total):   ${glob.mae_total.toFixed(2)} pts`);
   linhas.push(`     • Viés Médio (Tendência):            ${glob.vies_total > 0 ? '+' : ''}${glob.vies_total.toFixed(2)} pts (${glob.tendencia_geral})`);
-  linhas.push(`     • Exatidão (Nota IA == Humana):      ${glob.exatidao_total_pct.toFixed(1)}% (${glob.casos_exatos}/${metricas.quantidade_casos} casos)`);
-  linhas.push(`     • Na faixa de ±40 pontos (tolerância):${glob.faixa_40_total_pct.toFixed(1)}% (${glob.casos_faixa_40}/${metricas.quantidade_casos} casos)`);
+  linhas.push(`     • Exatidão (Nota IA == Humana):      ${glob.exatidao_total_pct.toFixed(1)}% (${glob.casos_exatos}/${qtdValidos} casos)`);
+  linhas.push(`     • Na faixa de ±40 pontos (tolerância):${glob.faixa_40_total_pct.toFixed(1)}% (${glob.casos_faixa_40}/${qtdValidos} casos)`);
+  linhas.push('       ↳ Nota metodológica: A faixa de ±40 pontos na nota total é uma métrica operacional');
+  linhas.push('         de proximidade escolhida para o benchmark; não representa equivalência pedagógica estrita.');
   linhas.push(`     • Maior desvio positivo (IA > Ref):  +${glob.maior_desvio_positivo} pts`);
   linhas.push(`     • Maior desvio negativo (IA < Ref):  ${glob.maior_desvio_negativo} pts`);
   linhas.push(subDiv);
@@ -95,8 +112,22 @@ export function gerarRelatorioConsole({ resultadoValidacao, metricas, origem = '
   linhas.push(`     ${metricas.diagnostico_calibracao}`);
   linhas.push(subDiv);
 
-  // 5. Casos Rejeitados (se houver)
-  if (resultadoValidacao?.casosRejeitados?.length > 0) {
+  // 5. Casos Pendentes de Adjudicação / Banca (se houver)
+  if (qtdPendentes > 0) {
+    linhas.push('  ⏳ REGISTROS PENDENTES DE BANCA / ADJUDICAÇÃO (Excluídos do cálculo):');
+    resultadoValidacao.casosPendentes.forEach(pen => {
+      linhas.push(`     • [${pen.id}] (${pen.status}):`);
+      if (pen.motivos && pen.motivos.length > 0) {
+        pen.motivos.forEach(m => linhas.push(`       - ${m}`));
+      } else if (pen.avisos && pen.avisos.length > 0) {
+        pen.avisos.forEach(a => linhas.push(`       - ${a}`));
+      }
+    });
+    linhas.push(subDiv);
+  }
+
+  // 6. Casos Rejeitados (se houver)
+  if (qtdRejeitados > 0) {
     linhas.push('  ⚠️  REGISTROS REJEITADOS NESTA EXECUÇÃO:');
     resultadoValidacao.casosRejeitados.forEach(rej => {
       linhas.push(`     • [${rej.id}]:`);
@@ -126,6 +157,11 @@ export function gerarRelatorioMarkdown({ resultadoValidacao, metricas, origem = 
   const glob = metricas.metricas_globais;
   const meta = resultadoValidacao?.metadados || {};
 
+  const qtdValidos = metricas.quantidade_casos;
+  const qtdPendentes = resultadoValidacao?.casosPendentes?.length || 0;
+  const qtdRejeitados = resultadoValidacao?.casosRejeitados?.length || 0;
+  const totalAnalisados = qtdValidos + qtdPendentes + qtdRejeitados;
+
   linhas.push('# Relatório de Benchmark: Corretor IA vs. Avaliações Humanas (ENEM)\n');
 
   if (meta.eh_demonstracao) {
@@ -136,13 +172,14 @@ export function gerarRelatorioMarkdown({ resultadoValidacao, metricas, origem = 
   linhas.push('## Metadados da Execução\n');
   linhas.push(`- **Data e Hora:** ${new Date().toISOString()}`);
   linhas.push(`- **Origem dos Dados:** \`${origem}\``);
-  linhas.push(`- **Total de Registros Analisados:** ${(resultadoValidacao?.casosValidos?.length || 0) + (resultadoValidacao?.casosRejeitados?.length || 0)}`);
-  linhas.push(`- **Casos Válidos Comparados:** ${metricas.quantidade_casos}`);
-  linhas.push(`- **Casos Rejeitados:** ${resultadoValidacao?.casosRejeitados?.length || 0}`);
+  linhas.push(`- **Total de Registros Analisados:** ${totalAnalisados}`);
+  linhas.push(`- **Casos Válidos (Resolvidos):** ${qtdValidos}`);
+  linhas.push(`- **Casos Pendentes de Banca/Adjudicação:** ${qtdPendentes}`);
+  linhas.push(`- **Casos Rejeitados:** ${qtdRejeitados}`);
   linhas.push(`- **Modo:** 100% Offline (sem chamadas a provedores de IA ou segredos)\n`);
 
-  if (metricas.quantidade_casos === 0) {
-    linhas.push('> [!CAUTION]\n> Nenhum registro válido disponível para comparação.\n');
+  if (qtdValidos === 0) {
+    linhas.push('> [!CAUTION]\n> Nenhum registro com referência humana resolvida disponível para comparação.\n');
     return linhas.join('\n');
   }
 
@@ -151,8 +188,8 @@ export function gerarRelatorioMarkdown({ resultadoValidacao, metricas, origem = 
   linhas.push('|---|---|---|');
   linhas.push(`| **Erro Absoluto Médio (MAE Total)** | **${glob.mae_total.toFixed(2)} pts** | Média de distância absoluta em relação à referência |`);
   linhas.push(`| **Viés Médio Total** | **${glob.vies_total > 0 ? '+' : ''}${glob.vies_total.toFixed(2)} pts** | Tendência geral de ${glob.tendencia_geral} |`);
-  linhas.push(`| **Exatidão Exata (IA == Humano)** | **${glob.exatidao_total_pct.toFixed(1)}%** | ${glob.casos_exatos} de ${metricas.quantidade_casos} redações |`);
-  linhas.push(`| **Na Faixa de ±40 pontos** | **${glob.faixa_40_total_pct.toFixed(1)}%** | ${glob.casos_faixa_40} de ${metricas.quantidade_casos} redações |`);
+  linhas.push(`| **Exatidão Exata (IA == Humano)** | **${glob.exatidao_total_pct.toFixed(1)}%** | ${glob.casos_exatos} de ${qtdValidos} redações |`);
+  linhas.push(`| **Na Faixa de ±40 pontos (Tolerância)** | **${glob.faixa_40_total_pct.toFixed(1)}%** | ${glob.casos_faixa_40} de ${qtdValidos} redações (métrica operacional; não garante equivalência pedagógica) |`);
   linhas.push(`| **Maior Desvio Positivo** | **+${glob.maior_desvio_positivo} pts** | Caso com maior sobrestimação |`);
   linhas.push(`| **Maior Desvio Negativo** | **${glob.maior_desvio_negativo} pts** | Caso com maior subestimação |\n`);
 
@@ -180,7 +217,20 @@ export function gerarRelatorioMarkdown({ resultadoValidacao, metricas, origem = 
   linhas.push('## Síntese Diagnóstica\n');
   linhas.push(`> [!NOTE]\n> ${metricas.diagnostico_calibracao}\n`);
 
-  if (resultadoValidacao?.casosRejeitados?.length > 0) {
+  if (qtdPendentes > 0) {
+    linhas.push('## Casos Pendentes de Banca / Adjudicação (Excluídos do Cálculo)\n');
+    resultadoValidacao.casosPendentes.forEach(pen => {
+      linhas.push(`- **Caso \`${pen.id}\`** (${pen.status}):`);
+      if (pen.motivos && pen.motivos.length > 0) {
+        pen.motivos.forEach(m => linhas.push(`  - ${m}`));
+      } else if (pen.avisos && pen.avisos.length > 0) {
+        pen.avisos.forEach(a => linhas.push(`  - ${a}`));
+      }
+    });
+    linhas.push('');
+  }
+
+  if (qtdRejeitados > 0) {
     linhas.push('## Casos Rejeitados na Validação\n');
     resultadoValidacao.casosRejeitados.forEach(rej => {
       linhas.push(`- **Caso \`${rej.id}\`** (linha ${rej.indice + 1}):`);

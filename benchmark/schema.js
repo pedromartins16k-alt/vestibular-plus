@@ -4,9 +4,16 @@
  * Responsabilidades:
  *  - Valida a estrutura dos dados de entrada do benchmark (redações, avaliações humanas e correções da IA).
  *  - Valida conformidade estrita com a escala oficial do ENEM (0, 40, 80, 120, 160, 200 por competência).
+ *  - Valida todos os avaliadores individuais (1º, 2º, 3º e demais) na escala do ENEM.
  *  - Implementa a resolução técnica de divergências entre múltiplos avaliadores humanos
- *    segundo as regras oficiais do INEP (média simples, 3º corretor, e precedência da nota adjudicada/consenso).
- *  - Rejeita registros corrompidos ou incompletos com mensagens claras e diagnósticas.
+ *    segundo as regras oficiais do INEP:
+ *      * 2 avaliadores sem discrepância -> média simples;
+ *      * 2 avaliadores com discrepância sem 3º avaliador -> pendente de adjudicação (não inventa nota);
+ *      * 3 avaliadores compatível com 1 anterior -> média com o compatível;
+ *      * 3 avaliadores compatível com ambos -> média com o mais próximo;
+ *      * 3 avaliadores divergente de ambos -> divergência persistente, pendente de banca presencial;
+ *      * Nota adjudicada/consenso -> validação estrita de soma e precedência soberana.
+ *  - Garante a separação estrita entre casos resolvidos, casos pendentes de banca e casos rejeitados.
  *  - Execução 100% offline, pura e determinística.
  */
 
@@ -155,20 +162,31 @@ export function verificarDiscrepanciaEntreAvaliadores(cA, cB) {
  * Resolve a nota humana de referência a partir dos dados do caso.
  *
  * Hierarquia de resolução:
- * 1. Se `referencia` explícita ou `nota_adjudicada`/`nota_consenso` for informada, utiliza-a diretamente.
- * 2. Se houver 1 único avaliador, utiliza suas notas como referência (com flag de avaliador único).
- * 3. Se houver 2 avaliadores:
- *    - Se não houver discrepância (delta total <= 100 e delta comp <= 80): calcula a média aritmética.
- *    - Se houver discrepância: se houver 3º avaliador, aplica a regra do INEP (média entre o 3º e o mais próximo).
- *    - Se não houver 3º avaliador nem consenso: sinaliza divergência pendente de adjudicação e usa média provisória.
- * 4. Se houver mais de 2 avaliadores sem indicação formal, calcula a média com aviso.
+ * 1. Se `referencia` explícita ou `nota_adjudicada`/`nota_consenso` for informada:
+ *    - Validação estrita: nota_total deve ser finita, estar entre 0 e 1000 e ser idêntica à soma das 5 competências.
+ * 2. Se houver avaliações humanas listadas (`avaliacoes_humanas`):
+ *    - Validação estrita: TODOS os avaliadores têm suas notas validadas na escala ENEM (0, 40, 80, 120, 160, 200).
+ *    - 1 avaliador: adotado com aviso.
+ *    - 2 avaliadores:
+ *        * Se não houver discrepância (delta total <= 100 e delta comp <= 80): calcula média simples.
+ *        * Se houver discrepância: classificado como PENDENTE de 3º avaliador / adjudicação. NÃO inventa nota final.
+ *    - 3 avaliadores:
+ *        * Se 1º e 2º não divergiram: adota média entre 1º e 2º.
+ *        * Se 1º e 2º divergiram: avalia compatibilidade do 3º com o 1º e com o 2º segundo critérios INEP.
+ *          - Compatível com apenas um: média entre o 3º e o compatível.
+ *          - Compatível com ambos: média entre o 3º e o mais próximo em nota total.
+ *          - Divergente de ambos: classificado como PENDENTE de banca presencial (divergência persistente). NÃO inventa nota final.
+ *    - Mais de 3 avaliadores sem adjudicação formal: classificado como PENDENTE de adjudicação de banca.
  *
  * @param {object} caso
  * @returns {{
- *   competencias: { c1: number, c2: number, c3: number, c4: number, c5: number },
- *   nota_total: number,
+ *   resolvida: boolean,
+ *   status: 'resolvida' | 'pendente_adjudicacao' | 'pendente_banca',
+ *   competencias: { c1: number, c2: number, c3: number, c4: number, c5: number } | null,
+ *   nota_total: number | null,
  *   metodo_resolucao: string,
  *   discrepancia_detectada: boolean,
+ *   motivos_discrepancia?: string[],
  *   avisos: string[]
  * }}
  */
@@ -182,15 +200,31 @@ export function resolverReferenciaHumana(caso) {
     const comps = normalizarCompetencias(rawComps);
     const validacao = validarNotasEnem(comps, true);
     if (!validacao.valido) {
-      throw new Error(`Referência explícita inválida: ${validacao.erros.join('; ')}`);
+      throw new Error(`Referência explícita possui notas de competência inválidas: ${validacao.erros.join('; ')}`);
     }
-    const notaTotal = typeof refExplicita.nota_total === 'number'
-      ? refExplicita.nota_total
-      : (comps.c1 + comps.c2 + comps.c3 + comps.c4 + comps.c5);
+    const somaComps = comps.c1 + comps.c2 + comps.c3 + comps.c4 + comps.c5;
+
+    // Validação estrita da nota total da referência explícita
+    if (refExplicita.nota_total !== undefined && refExplicita.nota_total !== null) {
+      const notaTotal = refExplicita.nota_total;
+      if (typeof notaTotal !== 'number' || !Number.isFinite(notaTotal)) {
+        throw new Error(`Nota total da referência explícita não é numérica ou finita (${notaTotal}).`);
+      }
+      if (notaTotal < 0 || notaTotal > PONTUACAO_MAXIMA_ENEM) {
+        throw new Error(`Nota total da referência explícita fora do intervalo oficial [0, 1000]: ${notaTotal}.`);
+      }
+      if (Math.abs(notaTotal - somaComps) > 0.01) {
+        throw new Error(
+          `Inconsistência na referência explícita: nota_total informada (${notaTotal}) não corresponde à soma das 5 competências (${somaComps}).`
+        );
+      }
+    }
 
     return {
+      resolvida: true,
+      status: 'resolvida',
       competencias: comps,
-      nota_total: notaTotal,
+      nota_total: somaComps,
       metodo_resolucao: refExplicita.tipo || (caso.nota_adjudicada ? 'adjudicada' : 'consenso_declarado'),
       discrepancia_detectada: false,
       avisos
@@ -203,17 +237,40 @@ export function resolverReferenciaHumana(caso) {
     throw new Error('Nenhuma avaliação humana ou nota de referência foi fornecida para esta redação.');
   }
 
-  // Avaliador único
-  if (avaliacoes.length === 1) {
-    const comps = normalizarCompetencias(avaliacoes[0].competencias);
+  // Validação estrita de TODOS os avaliadores individuais na escala ENEM (0, 40, 80, 120, 160, 200)
+  const avaliacoesNormalizadas = [];
+  for (let idx = 0; idx < avaliacoes.length; idx++) {
+    const aval = avaliacoes[idx];
+    if (!aval || typeof aval !== 'object') {
+      throw new Error(`Avaliador #${idx + 1} inválido (deve ser um objeto).`);
+    }
+    const comps = normalizarCompetencias(aval.competencias);
     const val = validarNotasEnem(comps, false);
     if (!val.valido) {
-      throw new Error(`Avaliador único possui notas inválidas: ${val.erros.join('; ')}`);
+      throw new Error(`Avaliador #${idx + 1} (${aval.avaliador_id || `avaliador_${idx + 1}`}) possui notas inválidas: ${val.erros.join('; ')}`);
     }
-    avisos.push('Apenas 1 avaliador humano disponível. Recomenda-se no mínimo 2 para validação ENEM.');
-    return {
+    const somaComps = comps.c1 + comps.c2 + comps.c3 + comps.c4 + comps.c5;
+    if (aval.nota_total !== undefined && aval.nota_total !== null) {
+      if (typeof aval.nota_total !== 'number' || !Number.isFinite(aval.nota_total) || Math.abs(aval.nota_total - somaComps) > 0.01) {
+        throw new Error(`Avaliador #${idx + 1} (${aval.avaliador_id || `avaliador_${idx + 1}`}) possui nota_total (${aval.nota_total}) divergente da soma das competências (${somaComps}).`);
+      }
+    }
+    avaliacoesNormalizadas.push({
+      ...aval,
       competencias: comps,
-      nota_total: comps.c1 + comps.c2 + comps.c3 + comps.c4 + comps.c5,
+      nota_total: somaComps
+    });
+  }
+
+  // Avaliador único
+  if (avaliacoesNormalizadas.length === 1) {
+    avisos.push('Apenas 1 avaliador humano disponível. Recomenda-se no mínimo 2 para validação ENEM.');
+    const comps = avaliacoesNormalizadas[0].competencias;
+    return {
+      resolvida: true,
+      status: 'resolvida',
+      competencias: comps,
+      nota_total: avaliacoesNormalizadas[0].nota_total,
       metodo_resolucao: 'avaliador_unico',
       discrepancia_detectada: false,
       avisos
@@ -221,14 +278,9 @@ export function resolverReferenciaHumana(caso) {
   }
 
   // Dois avaliadores
-  if (avaliacoes.length === 2) {
-    const c1 = normalizarCompetencias(avaliacoes[0].competencias);
-    const c2 = normalizarCompetencias(avaliacoes[1].competencias);
-    const val1 = validarNotasEnem(c1, false);
-    const val2 = validarNotasEnem(c2, false);
-    if (!val1.valido) throw new Error(`Avaliador 1 possui notas inválidas: ${val1.erros.join('; ')}`);
-    if (!val2.valido) throw new Error(`Avaliador 2 possui notas inválidas: ${val2.erros.join('; ')}`);
-
+  if (avaliacoesNormalizadas.length === 2) {
+    const c1 = avaliacoesNormalizadas[0].competencias;
+    const c2 = avaliacoesNormalizadas[1].competencias;
     const disc = verificarDiscrepanciaEntreAvaliadores(c1, c2);
 
     if (!disc.discrepante) {
@@ -240,6 +292,8 @@ export function resolverReferenciaHumana(caso) {
         c5: (c1.c5 + c2.c5) / 2
       };
       return {
+        resolvida: true,
+        status: 'resolvida',
         competencias: compsMedia,
         nota_total: compsMedia.c1 + compsMedia.c2 + compsMedia.c3 + compsMedia.c4 + compsMedia.c5,
         metodo_resolucao: 'media_dois_avaliadores_concordantes',
@@ -248,75 +302,155 @@ export function resolverReferenciaHumana(caso) {
       };
     }
 
-    avisos.push(`Divergência entre avaliadores humanos detectada: ${disc.motivos.join('; ')}. Requer adjudicação.`);
-    const compsMedia = {
-      c1: (c1.c1 + c2.c1) / 2,
-      c2: (c1.c2 + c2.c2) / 2,
-      c3: (c1.c3 + c2.c3) / 2,
-      c4: (c1.c4 + c2.c4) / 2,
-      c5: (c1.c5 + c2.c5) / 2
-    };
+    // Divergência detectada entre os 2 avaliadores sem 3º avaliador
+    avisos.push(`Divergência entre avaliadores humanos detectada: ${disc.motivos.join('; ')}. Requer 3º avaliador ou adjudicação formal.`);
     return {
-      competencias: compsMedia,
-      nota_total: compsMedia.c1 + compsMedia.c2 + compsMedia.c3 + compsMedia.c4 + compsMedia.c5,
-      metodo_resolucao: 'media_provisoria_com_divergencia_pendente',
+      resolvida: false,
+      status: 'pendente_adjudicacao',
+      competencias: null,
+      nota_total: null,
+      metodo_resolucao: 'divergencia_pendente_adjudicacao',
       discrepancia_detectada: true,
+      motivos_discrepancia: disc.motivos,
       avisos
     };
   }
 
   // Três avaliadores (1º, 2º e 3º avaliador de desempate)
-  if (avaliacoes.length === 3) {
-    const c1 = normalizarCompetencias(avaliacoes[0].competencias);
-    const c2 = normalizarCompetencias(avaliacoes[1].competencias);
-    const c3 = normalizarCompetencias(avaliacoes[2].competencias);
+  if (avaliacoesNormalizadas.length === 3) {
+    const c1 = avaliacoesNormalizadas[0].competencias;
+    const c2 = avaliacoesNormalizadas[1].competencias;
+    const c3 = avaliacoesNormalizadas[2].competencias;
 
-    const total1 = c1.c1 + c1.c2 + c1.c3 + c1.c4 + c1.c5;
-    const total2 = c2.c1 + c2.c2 + c2.c3 + c2.c4 + c2.c5;
-    const total3 = c3.c1 + c3.c2 + c3.c3 + c3.c4 + c3.c5;
+    const disc12 = verificarDiscrepanciaEntreAvaliadores(c1, c2);
 
-    const diff13 = Math.abs(total1 - total3);
-    const diff23 = Math.abs(total2 - total3);
+    // Se 1º e 2º já eram concordantes entre si
+    if (!disc12.discrepante) {
+      const compsMedia = {
+        c1: (c1.c1 + c2.c1) / 2,
+        c2: (c1.c2 + c2.c2) / 2,
+        c3: (c1.c3 + c2.c3) / 2,
+        c4: (c1.c4 + c2.c4) / 2,
+        c5: (c1.c5 + c2.c5) / 2
+      };
+      return {
+        resolvida: true,
+        status: 'resolvida',
+        competencias: compsMedia,
+        nota_total: compsMedia.c1 + compsMedia.c2 + compsMedia.c3 + compsMedia.c4 + compsMedia.c5,
+        metodo_resolucao: 'media_dois_primeiros_concordantes',
+        discrepancia_detectada: false,
+        avisos
+      };
+    }
 
-    const maisProximo = diff13 <= diff23 ? c1 : c2;
-    const nomeMaisProximo = diff13 <= diff23 ? 'avaliador_1' : 'avaliador_2';
+    // 1º e 2º divergiram. Avalia compatibilidade do 3º com o 1º e com o 2º segundo o INEP:
+    const disc13 = verificarDiscrepanciaEntreAvaliadores(c1, c3);
+    const disc23 = verificarDiscrepanciaEntreAvaliadores(c2, c3);
 
-    const compsMedia = {
-      c1: (c3.c1 + maisProximo.c1) / 2,
-      c2: (c3.c2 + maisProximo.c2) / 2,
-      c3: (c3.c3 + maisProximo.c3) / 2,
-      c4: (c3.c4 + maisProximo.c4) / 2,
-      c5: (c3.c5 + maisProximo.c5) / 2
-    };
+    const compativelCom1 = !disc13.discrepante;
+    const compativelCom2 = !disc23.discrepante;
 
+    // Caso A: 3º avaliador compatível com ambos os avaliadores anteriores
+    if (compativelCom1 && compativelCom2) {
+      const total1 = avaliacoesNormalizadas[0].nota_total;
+      const total2 = avaliacoesNormalizadas[1].nota_total;
+      const total3 = avaliacoesNormalizadas[2].nota_total;
+
+      const diff13 = Math.abs(total1 - total3);
+      const diff23 = Math.abs(total2 - total3);
+
+      const maisProximo = diff13 <= diff23 ? c1 : c2;
+      const nomeMaisProximo = diff13 <= diff23 ? 'avaliador_1' : 'avaliador_2';
+
+      const compsMedia = {
+        c1: (c3.c1 + maisProximo.c1) / 2,
+        c2: (c3.c2 + maisProximo.c2) / 2,
+        c3: (c3.c3 + maisProximo.c3) / 2,
+        c4: (c3.c4 + maisProximo.c4) / 2,
+        c5: (c3.c5 + maisProximo.c5) / 2
+      };
+
+      return {
+        resolvida: true,
+        status: 'resolvida',
+        competencias: compsMedia,
+        nota_total: compsMedia.c1 + compsMedia.c2 + compsMedia.c3 + compsMedia.c4 + compsMedia.c5,
+        metodo_resolucao: `terceiro_avaliador_com_${nomeMaisProximo}`,
+        discrepancia_detectada: true,
+        avisos
+      };
+    }
+
+    // Caso B: 3º avaliador compatível apenas com o 1º avaliador
+    if (compativelCom1 && !compativelCom2) {
+      const compsMedia = {
+        c1: (c3.c1 + c1.c1) / 2,
+        c2: (c3.c2 + c1.c2) / 2,
+        c3: (c3.c3 + c1.c3) / 2,
+        c4: (c3.c4 + c1.c4) / 2,
+        c5: (c3.c5 + c1.c5) / 2
+      };
+      return {
+        resolvida: true,
+        status: 'resolvida',
+        competencias: compsMedia,
+        nota_total: compsMedia.c1 + compsMedia.c2 + compsMedia.c3 + compsMedia.c4 + compsMedia.c5,
+        metodo_resolucao: 'terceiro_avaliador_com_avaliador_1',
+        discrepancia_detectada: true,
+        avisos
+      };
+    }
+
+    // Caso C: 3º avaliador compatível apenas com o 2º avaliador
+    if (!compativelCom1 && compativelCom2) {
+      const compsMedia = {
+        c1: (c3.c1 + c2.c1) / 2,
+        c2: (c3.c2 + c2.c2) / 2,
+        c3: (c3.c3 + c2.c3) / 2,
+        c4: (c3.c4 + c2.c4) / 2,
+        c5: (c3.c5 + c2.c5) / 2
+      };
+      return {
+        resolvida: true,
+        status: 'resolvida',
+        competencias: compsMedia,
+        nota_total: compsMedia.c1 + compsMedia.c2 + compsMedia.c3 + compsMedia.c4 + compsMedia.c5,
+        metodo_resolucao: 'terceiro_avaliador_com_avaliador_2',
+        discrepancia_detectada: true,
+        avisos
+      };
+    }
+
+    // Caso D: 3º avaliador DIVERGE DE AMBOS (!compativelCom1 && !compativelCom2)
+    // Regra do INEP: divergência persistente, caso pendente de banca examinadora presencial.
+    avisos.push(
+      `Divergência persistente no ENEM: o 3º avaliador divergiu de ambos os avaliadores anteriores (com Avaliador 1: ${disc13.motivos.join('; ')}; com Avaliador 2: ${disc23.motivos.join('; ')}). O caso requer banca examinadora presencial / adjudicação formal.`
+    );
     return {
-      competencias: compsMedia,
-      nota_total: compsMedia.c1 + compsMedia.c2 + compsMedia.c3 + compsMedia.c4 + compsMedia.c5,
-      metodo_resolucao: `terceiro_avaliador_com_${nomeMaisProximo}`,
+      resolvida: false,
+      status: 'pendente_banca',
+      competencias: null,
+      nota_total: null,
+      metodo_resolucao: 'divergencia_persistente_requer_banca',
       discrepancia_detectada: true,
+      motivos_discrepancia: [
+        ...disc13.motivos.map(m => `(vs Avaliador 1) ${m}`),
+        ...disc23.motivos.map(m => `(vs Avaliador 2) ${m}`)
+      ],
       avisos
     };
   }
 
-  avisos.push(`Mais de 3 avaliadores informados (${avaliacoes.length}). Calculada média geral aritmética.`);
-  const compsSoma = { c1: 0, c2: 0, c3: 0, c4: 0, c5: 0 };
-  for (const a of avaliacoes) {
-    const c = normalizarCompetencias(a.competencias);
-    for (let i = 1; i <= 5; i++) compsSoma[`c${i}`] += c[`c${i}`];
-  }
-  const n = avaliacoes.length;
-  const compsMedia = {
-    c1: compsSoma.c1 / n,
-    c2: compsSoma.c2 / n,
-    c3: compsSoma.c3 / n,
-    c4: compsSoma.c4 / n,
-    c5: compsSoma.c5 / n
-  };
+  // Mais de 3 avaliadores sem adjudicação formal
+  avisos.push(`Mais de 3 avaliadores informados (${avaliacoesNormalizadas.length}) sem nota adjudicada explícita. Requer adjudicação formal de banca.`);
   return {
-    competencias: compsMedia,
-    nota_total: compsMedia.c1 + compsMedia.c2 + compsMedia.c3 + compsMedia.c4 + compsMedia.c5,
-    metodo_resolucao: 'media_multiplos_avaliadores',
-    discrepancia_detectada: false,
+    resolvida: false,
+    status: 'pendente_banca',
+    competencias: null,
+    nota_total: null,
+    metodo_resolucao: 'multiplos_avaliadores_requer_adjudicacao',
+    discrepancia_detectada: true,
     avisos
   };
 }
@@ -372,8 +506,9 @@ export function validarCorrecaoIA(caso) {
  *     id: string,
  *     tema: string,
  *     texto: string,
- *     referencia: { competencias: object, nota_total: number, metodo_resolucao: string },
- *     correcao_ia: { competencias: object, nota_total: number, modelo: string },
+ *     referencia: object,
+ *     correcao_ia: object,
+ *     resolvido: boolean,
  *     discrepancia_humana: boolean,
  *     avisos: string[]
  *   },
@@ -422,6 +557,7 @@ export function validarCasoBenchmark(item, indice = 0) {
       texto,
       referencia: ref,
       correcao_ia: ia,
+      resolvido: Boolean(ref && ref.resolvida),
       discrepancia_humana: ref.discrepancia_detectada,
       avisos: ref.avisos
     }
@@ -430,12 +566,14 @@ export function validarCasoBenchmark(item, indice = 0) {
 
 /**
  * Valida um dataset completo (array ou objeto com propriedade casos/redacoes).
+ * Separa estritamente casos válidos (resolvidos), casos pendentes de banca/adjudicação e casos rejeitados.
  *
  * @param {object|Array} datasetRaw
  * @returns {{
  *   valido: boolean,
  *   metadados: object,
  *   casosValidos: Array<object>,
+ *   casosPendentes: Array<{ indice: number, id: string, status: string, metodo_resolucao: string, motivos: string[], avisos: string[], caso: object }>,
  *   casosRejeitados: Array<{ indice: number, id: string, erros: string[] }>,
  *   errosGlobais: string[]
  * }}
@@ -448,6 +586,7 @@ export function validarDatasetBenchmark(datasetRaw) {
       valido: false,
       metadados: {},
       casosValidos: [],
+      casosPendentes: [],
       casosRejeitados: [],
       errosGlobais: ['Dataset vazio ou nulo.']
     };
@@ -469,6 +608,7 @@ export function validarDatasetBenchmark(datasetRaw) {
       valido: false,
       metadados: {},
       casosValidos: [],
+      casosPendentes: [],
       casosRejeitados: [],
       errosGlobais: ['Dataset deve ser um array JSON ou objeto contendo array de casos.']
     };
@@ -476,22 +616,33 @@ export function validarDatasetBenchmark(datasetRaw) {
 
   if (!Array.isArray(itens)) {
     errosGlobais.push('A lista de casos não é um array iterável.');
-    return { valido: false, metadados, casosValidos: [], casosRejeitados: [], errosGlobais };
+    return { valido: false, metadados, casosValidos: [], casosPendentes: [], casosRejeitados: [], errosGlobais };
   }
 
   const casosValidos = [];
+  const casosPendentes = [];
   const casosRejeitados = [];
 
   itens.forEach((item, idx) => {
     const res = validarCasoBenchmark(item, idx);
-    if (res.valido) {
-      casosValidos.push(res.caso);
-    } else {
+    if (!res.valido) {
       casosRejeitados.push({
         indice: idx,
         id: item?.id || `indice-${idx}`,
         erros: res.erros
       });
+    } else if (!res.caso.resolvido) {
+      casosPendentes.push({
+        indice: idx,
+        id: res.caso.id,
+        status: res.caso.referencia.status,
+        metodo_resolucao: res.caso.referencia.metodo_resolucao,
+        motivos: res.caso.referencia.motivos_discrepancia || [],
+        avisos: res.caso.avisos,
+        caso: res.caso
+      });
+    } else {
+      casosValidos.push(res.caso);
     }
   });
 
@@ -499,6 +650,7 @@ export function validarDatasetBenchmark(datasetRaw) {
     valido: casosValidos.length > 0,
     metadados,
     casosValidos,
+    casosPendentes,
     casosRejeitados,
     errosGlobais
   };
