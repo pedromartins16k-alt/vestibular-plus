@@ -12,18 +12,19 @@
  * NÃO é uma avaliação humana validada. Não usar como referência de calibração.
  *
  * Cobertura:
- *   C1-A — ERRO sem trecho_original → rebaixado para PONTO_DE_ATENCAO
- *   C1-B — ERRO com trecho_original → mantido como ERRO
- *   C1-C — ERRO com trecho embutido na descrição (formato legado) → mantido como ERRO
+ *   C1-A — ERRO sem trecho_original nem citação → rebaixado para PONTO_DE_ATENCAO
+ *   C1-B — ERRO com trecho_original (casos separados para existente vs inexistente na redação)
+ *   C1-C — ERRO formato legado (casos separados para existente vs inexistente na redação)
  *   C1-D — Sugestão de estilo sem trecho → permanece SUGESTAO
- *   C3-A — Justificativa nega tese mas descreve argumentos → nota_suspeita
+ *   C3-A — Justificativa nega tese mas descreve argumentos presentes → nota_suspeita
  *   C3-B — Justificativa coerente (tese presente, sem negação) → sem nota_suspeita
- *   C3-C — Justificativa nega tese sem descrever argumentos → sem nota_suspeita (ausência real)
+ *   C3-C — Justificativa coerente de ausência de tese → sem nota_suspeita
  *   C5-A — detalhamento: 'insuficiente' + nota 200 → ajustado para 160
  *   C5-B — detalhamento: 'ausente' + nota 200 → ajustado para 160
- *   C5-C — justificativa recomenda detalhar mais + nota 200 → ajustado para 160
+ *   C5-C — Elementos completos + sugestão de refinamento futuro → mantém nota 200
  *   C5-D — detalhamento: 'presente' + nota 200, sem recomendação → mantido 200
  *   C5-E — detalhamento: 'insuficiente' + nota 160 → não altera (já 160)
+ *   C5-F — crítica substantiva de detalhamento insuficiente + nota 200 → ajustado para 160
  *   INTEGRACAO — Avaliação com C1/C3/C5 incoerentes ao mesmo tempo: todos corrigidos
  */
 
@@ -139,7 +140,7 @@ try {
 
 totalTestes++;
 try {
-  // C1-B: ERRO com trecho_original preenchido → mantido como ERRO (legítimo)
+  // C1-B1: ERRO com trecho_original existente na redação → mantido como ERRO (legítimo)
   const payload = montarPayload({
     competencias: [{
       numero: 1,
@@ -148,8 +149,8 @@ try {
       problemas: [{
         tipo: 'ERRO',
         descricao: 'Concordância nominal incorreta',
-        trecho_original: 'usando a televisão e a internet',  // trecho presente
-        sugestao_reescrita: 'usando a televisão e a internet (a construção está correta)'
+        trecho_original: 'pouco espaço nas escolas',  // trecho existe no textoSintetico
+        sugestao_reescrita: 'pouco espaço nas escolas (revisar concordância)'
       }],
       analise: { criterios_atendidos: [], criterios_parciais: [], criterios_ausentes: [] }
     }]
@@ -157,20 +158,45 @@ try {
   const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
   const problema = res.competencias[0].problemas[0];
   assert.equal(problema.tipo, 'ERRO',
-    'ERRO com trecho_original deve ser mantido como ERRO');
+    'ERRO com trecho_original existente deve ser mantido como ERRO');
   assert.ok(!problema._aviso_sem_trecho,
-    'Não deve ter flag _aviso_sem_trecho quando há trecho real');
-  pass('C1-B: ERRO com trecho_original mantido como ERRO');
-} catch (err) { fail('C1-B: ERRO com trecho mantido', err); }
+    'Não deve ter flag _aviso_sem_trecho quando há trecho real existente');
+  pass('C1-B (existente): ERRO com trecho_original existente na redação mantido como ERRO');
+} catch (err) { fail('C1-B (existente): ERRO com trecho existente mantido', err); }
 
 totalTestes++;
 try {
-  // C1-C: ERRO em formato legado (string) com trecho embutido na descrição → mantido como ERRO
-  // Formato legado: a string inclui o trecho entre aspas duplas (ex: 'erro em "as alunos"')
+  // C1-B2: ERRO com trecho_original inexistente na redação → rebaixado para PONTO_DE_ATENCAO
+  const payload = montarPayload({
+    competencias: [{
+      numero: 1,
+      nota: 120,
+      justificativa: 'Desvio de concordância nominal apontado sem respaldo textual.',
+      problemas: [{
+        tipo: 'ERRO',
+        descricao: 'Concordância nominal incorreta',
+        trecho_original: 'usando a televisão e a internet',  // NÃO existe no textoSintetico
+        sugestao_reescrita: 'usando a televisão e a internet (a construção está correta)'
+      }],
+      analise: { criterios_atendidos: [], criterios_parciais: [], criterios_ausentes: [] }
+    }]
+  });
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
+  const problema = res.competencias[0].problemas[0];
+  assert.equal(problema.tipo, 'PONTO_DE_ATENCAO',
+    'ERRO com trecho_original inexistente na redação deve ser rebaixado para PONTO_DE_ATENCAO');
+  assert.ok(problema._aviso_sem_trecho,
+    'Deve conter sinalização _aviso_sem_trecho quando trecho não existe na redação');
+  pass('C1-B (inexistente): ERRO com trecho_original ausente da redação rebaixado para PONTO_DE_ATENCAO');
+} catch (err) { fail('C1-B (inexistente): ERRO com trecho inexistente rebaixado', err); }
+
+totalTestes++;
+try {
+  // C1-C1: ERRO em formato legado (string) com trecho existente na redação → mantido como ERRO
   const rawLegado = JSON.stringify({
     nota_total: 800, nota_maxima: 1000,
     competencias: [
-      { numero: 1, nota: 120, justificativa: 'Desvio de concordância identificado.', problemas: ['Erro de concordância nominal em "as alunos foram"'], evidencias: [] },
+      { numero: 1, nota: 120, justificativa: 'Desvio de concordância identificado.', problemas: ['Erro de concordância nominal em "pouco espaço nas escolas"'], evidencias: [] },
       { numero: 2, nota: 160, justificativa: 'Repertório pertinente.', problemas: [], evidencias: [] },
       { numero: 3, nota: 160, justificativa: 'Argumentação clara.', problemas: [], evidencias: [] },
       { numero: 4, nota: 160, justificativa: 'Coesão adequada.', problemas: [], evidencias: [] },
@@ -182,11 +208,35 @@ try {
   const res = validarENormalizarResposta(rawLegado, matrizEnem, 'mock-ia', textoSintetico);
   const problema = res.competencias[0].problemas[0];
   assert.equal(problema.tipo, 'ERRO',
-    'Formato legado com trecho embutido na descrição deve manter tipo ERRO');
+    'Formato legado com trecho existente na redação deve manter tipo ERRO');
   assert.ok(problema.descricao.includes('concordância'),
     'Descrição deve preservar o conteúdo original');
-  pass('C1-C: Formato legado com trecho embutido na descrição mantido como ERRO');
-} catch (err) { fail('C1-C: Legado com trecho embutido', err); }
+  pass('C1-C (legado existente): Formato legado com trecho existente na redação mantido como ERRO');
+} catch (err) { fail('C1-C (legado existente): Legado com trecho existente', err); }
+
+totalTestes++;
+try {
+  // C1-C2: ERRO em formato legado (string) com trecho inexistente na redação → rebaixado para PONTO_DE_ATENCAO
+  const rawLegadoInexistente = JSON.stringify({
+    nota_total: 800, nota_maxima: 1000,
+    competencias: [
+      { numero: 1, nota: 120, justificativa: 'Desvio de concordância identificado.', problemas: ['Erro de concordância nominal em "as alunos foram"'], evidencias: [] },
+      { numero: 2, nota: 160, justificativa: 'Repertório pertinente.', problemas: [], evidencias: [] },
+      { numero: 3, nota: 160, justificativa: 'Argumentação clara.', problemas: [], evidencias: [] },
+      { numero: 4, nota: 160, justificativa: 'Coesão adequada.', problemas: [], evidencias: [] },
+      { numero: 5, nota: 200, justificativa: 'Proposta completa com cinco elementos.', problemas: [], analise: { elementos_proposta: { agente: 'presente', acao: 'presente', meio: 'presente', finalidade: 'presente', detalhamento: 'presente' } }, evidencias: [] }
+    ],
+    pontos_fortes: [], pontos_melhoria: [], exemplos_trechos: [], sugestoes: [], prioridades_estudo: [],
+    feedback_geral: 'Avaliação de teste.', aviso_educacional: 'Aviso teste.'
+  });
+  const res = validarENormalizarResposta(rawLegadoInexistente, matrizEnem, 'mock-ia', textoSintetico);
+  const problema = res.competencias[0].problemas[0];
+  assert.equal(problema.tipo, 'PONTO_DE_ATENCAO',
+    'Formato legado com trecho inexistente na redação deve ser rebaixado para PONTO_DE_ATENCAO');
+  assert.ok(problema._aviso_sem_trecho,
+    'Deve conter sinalização _aviso_sem_trecho');
+  pass('C1-C (legado inexistente): Formato legado com trecho ausente da redação rebaixado para PONTO_DE_ATENCAO');
+} catch (err) { fail('C1-C (legado inexistente): Legado com trecho inexistente rebaixado', err); }
 
 totalTestes++;
 try {
@@ -274,13 +324,15 @@ try {
   });
   const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
   const c3 = res.competencias[2];
-  // A justificativa nega tese e descreve genuína ausência — a lógica de detecção
-  // pode ou não disparar (depende dos sinais), mas se disparar, o aviso é informativo.
-  // O importante é que a nota NÃO seja alterada automaticamente pelo ajuste C3.
+  // Análise coerente de ausência real de tese: não deve gerar nota_suspeita nem alterar a nota
+  assert.ok(!c3.nota_suspeita,
+    'Justificativa coerente de ausência de tese não deve gerar nota_suspeita');
+  assert.notEqual(c3.nota_suspeita, true,
+    'Justificativa coerente de ausência de tese não deve gerar nota_suspeita');
   assert.equal(c3.nota, 40,
-    'Ajuste C3 não deve alterar a nota automaticamente (apenas sinaliza)');
-  pass('C3-C: Ajuste C3 não altera nota automaticamente — apenas sinaliza nota_suspeita');
-} catch (err) { fail('C3-C: Ajuste C3 não altera nota', err); }
+    'Ajuste C3 não deve alterar a nota automaticamente');
+  pass('C3-C: Justificativa coerente de ausência de tese não gera nota_suspeita');
+} catch (err) { fail('C3-C: Ausência coerente de tese sem nota_suspeita', err); }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GRUPO 3 — C5: Coerência entre status dos elementos e nota
@@ -355,7 +407,7 @@ try {
 
 totalTestes++;
 try {
-  // C5-C: Justificativa recomenda "detalhar mais" com nota 200 → ajustado para 160
+  // C5-C: Elementos completos + sugestão de refinamento futuro → mantém nota 200
   const payload = montarPayload({
     competencias: [{
       numero: 5,
@@ -371,7 +423,7 @@ try {
           acao: 'presente',
           meio: 'presente',
           finalidade: 'presente',
-          detalhamento: 'presente',  // marcado como presente, mas justificativa recomenda detalhar mais
+          detalhamento: 'presente',  // todos elementos completos
           relacao_com_problema: 'forte'
         }
       }
@@ -379,10 +431,33 @@ try {
   });
   const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
   const c5 = res.competencias[4];
+  assert.equal(c5.nota, 200,
+    `Justificativa com sugestão de refinamento futuro e elementos completos deve manter nota 200; obteve ${c5.nota}`);
+  pass('C5-C: Elementos completos + sugestão de refinamento futuro mantém nota 200');
+} catch (err) { fail('C5-C: Sugestão opcional futura mantém nota 200', err); }
+
+totalTestes++;
+try {
+  // C5-F: Crítica substantiva e concreta de detalhamento insuficiente + nota 200 → ajustado para 160
+  const payload = montarPayload({
+    competencias: [{
+      numero: 5,
+      nota: 200,
+      justificativa: 'Proposta com quatro elementos identificados, porém o detalhamento é insuficiente para alcançar o nível máximo.',
+      problemas: [],
+      analise: {
+        criterios_atendidos: ['Agente', 'Ação', 'Meio', 'Finalidade'],
+        criterios_parciais: [],
+        criterios_ausentes: []
+      }
+    }]
+  });
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoSintetico);
+  const c5 = res.competencias[4];
   assert.equal(c5.nota, 160,
-    `Justificativa que recomenda "detalhar mais" + nota 200 deve ser ajustada para 160; obteve ${c5.nota}`);
-  pass('C5-C: Justificativa recomenda "detalhar mais" + nota 200 → ajustado para 160');
-} catch (err) { fail('C5-C: Ajuste C5 recomendação de detalhar mais', err); }
+    `Crítica substantiva de detalhamento insuficiente com nota 200 deve ser ajustada para 160; obteve ${c5.nota}`);
+  pass('C5-F: Crítica substantiva de detalhamento insuficiente + nota 200 → ajustado para 160');
+} catch (err) { fail('C5-F: Crítica substantiva de detalhamento insuficiente ajustada para 160', err); }
 
 totalTestes++;
 try {

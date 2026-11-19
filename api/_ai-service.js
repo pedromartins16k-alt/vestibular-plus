@@ -969,6 +969,42 @@ const FRASES_NEGATIVAS = [
 ];
 
 /**
+ * Verifica se um trecho citado existe na redação recebida,
+ * tolerando apenas diferenças seguras de espaços e pontuação.
+ *
+ * @param {string} trecho - Trecho citado pela IA ou no formato legado
+ * @param {string} texto - Redação submetida pelo estudante
+ * @returns {boolean} True se o trecho for encontrado na redação
+ */
+function _trechoExisteNaRedacao(trecho, texto) {
+  if (!trecho || typeof trecho !== 'string' || !trecho.trim()) return false;
+  if (!texto || typeof texto !== 'string' || !texto.trim()) return false;
+
+  const t = trecho.trim();
+  if (texto.includes(t)) return true;
+
+  // Tolerância apenas a diferenças seguras de espaços e pontuação
+  const normalizar = (str) => {
+    return str
+      .replace(/[\u2018\u2019\u201A\u201B']/g, "'")
+      .replace(/[\u201C\u201D\u201E\u201F"]/g, '"')
+      .replace(/[\u2013\u2014]/g, '-')
+      .replace(/[.,;:!?…()\[\]{}"'«»‹›/\\-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const trechoNorm = normalizar(t);
+  if (!trechoNorm) return false;
+  const textoNorm = normalizar(texto);
+
+  if (textoNorm.includes(trechoNorm)) return true;
+  if (textoNorm.toLowerCase().includes(trechoNorm.toLowerCase())) return true;
+
+  return false;
+}
+
+/**
  * Valida e normaliza a resposta da IA.
  *
  * Regras críticas:
@@ -1214,18 +1250,40 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
     let notaSuspeita = false;
     let avisoContradicao = null;
 
-    // ── AJUSTE C1: Erros gramaticais exigem trecho real ─────────────────────
-    // Um problema marcado como ERRO em C1 sem trecho_original é provavelmente
-    // uma sugestão de estilo apresentada erroneamente como erro gramatical.
-    // Nesse caso, o tipo é rebaixado para PONTO_DE_ATENCAO, sem alterar a nota.
-    // Excepção: o formato legado embute o trecho na própria descrição (entre aspas
-    // ou marcadores como «...»); nesses casos o erro é considerado fundamentado.
+    // ── AJUSTE C1: Erros gramaticais exigem trecho real existente na redação ──
+    // Um problema marcado como ERRO em C1 sem trecho_original (ou citação legada)
+    // ou cujo trecho citado NÃO aparece no texto da redação recebida (com tolerância
+    // apenas a diferenças seguras de espaços e pontuação), não pode ser apresentado
+    // como erro confirmado. Nesse caso, é rebaixado para PONTO_DE_ATENCAO.
     if (isEnem && numeroComp === 1) {
       problemasNormalizados = problemasNormalizados.map(prob => {
-        const temTrechoNoCampo = prob.trecho_original.trim().length > 0;
-        // Aceita descrições legadas com trecho embutido entre aspas duplas ou simples
-        const temTrechoNaDescricao = /["«»"'›‹]/.test(prob.descricao) || prob.descricao.includes(' em "') || prob.descricao.includes(" em '");
-        if (prob.tipo === 'ERRO' && !temTrechoNoCampo && !temTrechoNaDescricao) {
+        if (prob.tipo !== 'ERRO') return prob;
+
+        // Extrai trecho do campo trecho_original ou de citação na descrição (formato legado)
+        let trecho = (prob.trecho_original && typeof prob.trecho_original === 'string')
+          ? prob.trecho_original.trim()
+          : '';
+
+        if (!trecho && prob.descricao) {
+          const matchAspas = prob.descricao.match(/["“«'‘]([^"”»'’]+)["”»'’]/);
+          if (matchAspas && matchAspas[1].trim().length > 0) {
+            trecho = matchAspas[1].trim();
+          }
+        }
+
+        // Se não há trecho citado em lugar nenhum, não pode ser ERRO confirmado
+        if (!trecho) {
+          return {
+            ...prob,
+            tipo: 'PONTO_DE_ATENCAO',
+            descricao: prob.descricao,
+            _aviso_sem_trecho: true
+          };
+        }
+
+        // Se a redação foi fornecida (parâmetro texto), valida se o trecho existe nela
+        const temTextoRedacao = typeof texto === 'string' && texto.trim().length > 0;
+        if (temTextoRedacao && !_trechoExisteNaRedacao(trecho, texto)) {
           return {
             ...prob,
             tipo: 'PONTO_DE_ATENCAO',
@@ -1245,13 +1303,15 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
     }
 
     // ── AJUSTE C3: Coerência entre presença de tese e afirmação de ausência ─
-    // Se a justificativa afirmar que a tese não está identificada/explicitada,
-    // mas o próprio texto da justificativa citar causas, argumentos ou defender
-    // um ponto de vista identificável, a afirmação de ausência é incoerente.
-    // Nesse caso, adiciona nota_suspeita (sem alterar nota automaticamente).
+    // Se a justificativa afirmar ausência de tese (ex: "tese não está explicitada",
+    // "ausência de tese"), mas ao mesmo tempo descrever positivamente a presença
+    // de argumentos, causas identificadas ou defesa articulada de ponto de vista,
+    // a análise é contraditória e deve gerar nota_suspeita (sem alterar nota automaticamente).
+    // Análises coerentes de textos sem tese (afirmação de ausência com constatação
+    // coerente de falta de argumentos/ponto de vista) NÃO geram alerta.
     if (isEnem && numeroComp === 3) {
       const justC3 = justificativa.toLowerCase();
-      const afirmaTesAusente =
+      const afirmaTeseAusente =
         justC3.includes('tese não está') ||
         justC3.includes('tese não foi') ||
         justC3.includes('tese não identificada') ||
@@ -1262,61 +1322,87 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
         justC3.includes('não apresenta tese') ||
         justC3.includes('tese implícita') ||
         justC3.includes('falta de tese');
-      const sinaisDeTesePresente =
-        justC3.includes('causa') ||
-        justC3.includes('argumento') ||
-        justC3.includes('defende') ||
-        justC3.includes('ponto de vista') ||
-        justC3.includes('tese') ||
-        justC3.includes('introdução') ||
-        justC3.includes('apresenta') ||
-        justC3.includes('identifica') ||
-        justC3.includes('problema') ||
-        justC3.includes('dois') ||
-        justC3.includes('duas');
-      if (afirmaTesAusente && sinaisDeTesePresente) {
-        // A justificativa é contraditória: nega a tese mas descreve sua estrutura.
-        // Registra nota_suspeita sem forçar nota específica.
-        if (!notaSuspeita) {
-          notaSuspeita = true;
-          avisoContradicao = `C3: a justificativa afirma ausência de tese mas ao mesmo tempo descreve causas, argumentos ou estrutura dissertativa presentes. A análise pode ser incoerente.`;
-          console.warn(`[_ai-service] Contradição C3: justificativa nega tese mas descreve argumentos presentes`);
+
+      if (afirmaTeseAusente) {
+        // Distingue afirmação positiva de negação:
+        // Remove negações conhecidas para evitar falsos positivos
+        const textoSemNegacoes = justC3
+          .replace(/(?:sem|não|ausência de|falta de|nenhuma?)\s+(?:defesa de\s+|qualquer\s+)?(?:ponto de vista|argumentos?|causas?|tese)/g, ' ')
+          .replace(/apresenta apenas (?:citações|dados|fatos|alusões)/g, ' ')
+          .replace(/apenas (?:citações|dados|fatos|alusões)/g, ' ')
+          .replace(/sem encadeamento/g, ' ')
+          .replace(/não há encadeamento/g, ' ');
+
+        // Sinais positivos reais de estrutura argumentativa/tese presente
+        // (NÃO inclui a palavra isolada "tese", nem palavras soltas como "dois", "problema", "apresenta")
+        const sinaisPositivosTesePresente =
+          /(?:identifica|apresenta|desenvolve|traz|estrutura)\s+(?:duas?|dois|\d+)?\s*(?:causas?|argumentos?)/.test(textoSemNegacoes) ||
+          /(?:duas?|dois|\d+)\s+argumentos?/.test(textoSemNegacoes) ||
+          /(?:duas?|dois|\d+)\s+causas?/.test(textoSemNegacoes) ||
+          /(?:argumentos?|causas?)\s+.*?\s*(?:sejam|são|estão|foram)\s+apresentados?/.test(textoSemNegacoes) ||
+          /(?:parágrafos? de desenvolvimento|desenvolvimento)\s+.*?\s*(?:apresenta|desenvolve|traz|estrutura)/.test(textoSemNegacoes) ||
+          /(?:defende|defesa de)\s+(?:um\s+)?ponto de vista/.test(textoSemNegacoes) ||
+          /(?:argumentação|projeto de texto)\s+(?:consistente|estratégico|claro|estruturado)/.test(textoSemNegacoes);
+
+        if (sinaisPositivosTesePresente) {
+          // A justificativa é contraditória: nega a tese mas descreve sua estrutura positiva.
+          if (!notaSuspeita) {
+            notaSuspeita = true;
+            avisoContradicao = `C3: a justificativa afirma ausência de tese mas ao mesmo tempo descreve causas, argumentos ou estrutura dissertativa presentes. A análise pode ser incoerente.`;
+            console.warn(`[_ai-service] Contradição C3: justificativa nega tese mas descreve argumentos presentes`);
+          }
         }
       }
     }
 
     // ── AJUSTE C5: Coerência entre status dos elementos e nota ───────────────
-    // Se elementos_proposta indica detalhamento como 'insuficiente' ou 'ausente'
-    // mas a nota é 200, ajusta para 160 (rubrica: detalhamento frágil = 160 pts).
-    // Se a justificativa recomenda detalhar mais com nota 200, idem.
+    // Se elementos_proposta indica detalhamento como 'insuficiente' ou 'ausente',
+    // ou se a análise contiver crítica substantiva e concreta apontando deficiência
+    // no detalhamento da redação, mas a nota for 200, ajusta para 160 (rubrica INEP:
+    // proposta com detalhamento insuficiente = nível 4, máx 160 pts).
+    // Recomendações pedagógicas opcionais ou de refinamento futuro (ex: "detalhar mais em revisões futuras")
+    // NÃO reduzem a nota se os elementos estiverem completos e não houver crítica concreta.
     if (isEnem && numeroComp === 5 && notaClamped === 200) {
       const ep = analise.elementos_proposta;
       const detalhamentoInsuficiente = ep && (
         ep.detalhamento === 'insuficiente' ||
         ep.detalhamento === 'ausente'
       );
+
       const justC5 = justificativa.toLowerCase();
-      const recomendaDetalhar =
-        justC5.includes('detalhar mais') ||
-        justC5.includes('mais detalhamento') ||
-        justC5.includes('falta de detalhamento') ||
+
+      // Crítica explícita e substantiva à ausência ou insuficiência concreta do detalhamento na redação
+      const criticaSubstantivaDetalhamento =
         justC5.includes('detalhamento insuficiente') ||
-        justC5.includes('detalhamento vago') ||
-        justC5.includes('detalhamento genérico') ||
+        justC5.includes('detalhamento é insuficiente') ||
+        justC5.includes('falta de detalhamento') ||
+        justC5.includes('ausência de detalhamento') ||
         justC5.includes('detalhamento ausente') ||
-        justC5.includes('mais específico') ||
-        justC5.includes('mais detalhe') ||
-        justC5.includes('especificar mais') ||
-        justC5.includes('enriquecer o detalhamento') ||
-        justC5.includes('detalhar a proposta');
-      if (detalhamentoInsuficiente || recomendaDetalhar) {
+        justC5.includes('sem detalhamento');
+
+      // Expressões típicas de recomendação pedagógica opcional / estilo / revisões futuras
+      const isSugestaoOpcionalOuFutura =
+        justC5.includes('revisões futuras') ||
+        justC5.includes('próximas redações') ||
+        justC5.includes('próximos textos') ||
+        justC5.includes('em outros temas') ||
+        justC5.includes('como sugestão') ||
+        justC5.includes('sugestão pedagógica') ||
+        justC5.includes('sugestão futura') ||
+        justC5.includes('refinamento futuro') ||
+        justC5.includes('aperfeiçoamento futuro') ||
+        justC5.includes('para enriquecer');
+
+      const deveAjustarC5 = detalhamentoInsuficiente || (criticaSubstantivaDetalhamento && !isSugestaoOpcionalOuFutura);
+
+      if (deveAjustarC5) {
         notaClamped = 160;
         nivel = _inferirNivel(notaClamped, pesoMax);
         prioridade = _inferirPrioridade(notaClamped, pesoMax);
         tipoApontamento = 'PONTO_DE_ATENCAO';
         const motivo = detalhamentoInsuficiente
           ? `Elemento "detalhamento" da proposta marcado como "${ep.detalhamento}". Rubrica INEP: detalhamento insuficiente = 160 pts.`
-          : `Justificativa recomenda detalhar mais a proposta. Rubrica INEP: proposta com detalhamento frágil = 160 pts.`;
+          : `Análise identifica deficiência substantiva no detalhamento da proposta. Rubrica INEP: proposta com detalhamento insuficiente = 160 pts.`;
         problemasNormalizados.push({
           tipo: 'PONTO_DE_ATENCAO',
           descricao: `C5: nota ajustada de 200 para 160 para manter coerência com a análise. ${motivo}`,
