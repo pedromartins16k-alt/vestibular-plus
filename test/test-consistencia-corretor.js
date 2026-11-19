@@ -16,6 +16,7 @@
  *   C1-B — ERRO com trecho_original (casos separados para existente vs inexistente na redação)
  *   C1-C — ERRO formato legado (casos separados para existente vs inexistente na redação)
  *   C1-D — Sugestão de estilo sem trecho → permanece SUGESTAO
+ *   C1-E — "História da África" com maiúscula marcado como ERRO → reclassificado para SUGESTAO de estilo
  *   C3-A — Justificativa nega tese mas descreve argumentos presentes → nota_suspeita
  *   C3-B — Justificativa coerente (tese presente, sem negação) → sem nota_suspeita
  *   C3-C — Justificativa coerente de ausência de tese → sem nota_suspeita
@@ -23,6 +24,8 @@
  *   C3-E — Justificativa nega tese mas afirma positivamente dois argumentos bem desenvolvidos → nota_suspeita
  *   C3-F — Justificativa com "tese implícita" com argumentos desenvolvidos → sem nota_suspeita
  *   C3-G — Frase "a tese não está ausente" nega ausência → sem nota_suspeita
+ *   C4-A — Conectivos usados uma vez ("Além disso", "Portanto") não são descritos como recorrentes
+ *   C4-B — Conectivo genuinamente repetido (3x) → crítica de repetição preservada
  *   C5-A — detalhamento: 'insuficiente' + nota 200 → ajustado para 160
  *   C5-B — detalhamento: 'ausente' + nota 200 → ajustado para 160
  *   C5-C — Elementos completos + sugestão de refinamento futuro → mantém nota 200
@@ -270,6 +273,39 @@ try {
   pass('C1-D: SUGESTAO sem trecho não alterada (apenas ERRO é rebaixado)');
 } catch (err) { fail('C1-D: SUGESTAO sem trecho não alterada', err); }
 
+totalTestes++;
+try {
+  // C1-E: "História da África" com maiúscula marcado como ERRO → reclassificado para SUGESTAO
+  // Conforme Acordo Ortográfico (Base XIX, 2º, a), nomes de disciplinas e áreas do saber
+  // têm inicial maiúscula facultativa e NÃO constituem erro gramatical obrigatório.
+  const textoC1Disciplina = 'Nas escolas, a História da África costuma aparecer em poucos momentos do ano.';
+  const payload = montarPayload({
+    competencias: [{
+      numero: 1,
+      nota: 160,
+      tipo_apontamento: 'ERRO',
+      justificativa: 'Bom domínio da norma culta, com ressalva quanto ao uso de maiúscula.',
+      problemas: [{
+        tipo: 'ERRO',
+        descricao: 'Uso indevido de letra maiúscula em "História da África"',
+        trecho_original: 'História da África',
+        sugestao_reescrita: 'história da África'
+      }],
+      analise: { criterios_atendidos: ['Sintaxe', 'Concordância'], criterios_parciais: [], criterios_ausentes: [] }
+    }]
+  });
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoC1Disciplina);
+  const c1 = res.competencias[0];
+  const problema = c1.problemas[0];
+  assert.equal(problema.tipo, 'SUGESTAO',
+    `Capitalização de disciplina deve ser reclassificada para SUGESTAO, obteve: ${problema.tipo}`);
+  assert.ok(problema._aviso_capitalizacao_opcional === true,
+    'Deve possuir a flag _aviso_capitalizacao_opcional');
+  assert.notEqual(c1.tipo_apontamento, 'ERRO',
+    'tipo_apontamento de C1 não deve permanecer ERRO quando o único apontamento é capitalização de disciplina');
+  pass('C1-E: "História da África" com maiúscula marcado como ERRO reclassificado para SUGESTAO de estilo');
+} catch (err) { fail('C1-E: Capitalização opcional de disciplina como SUGESTAO', err); }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // GRUPO 2 — C3: Coerência entre tese e justificativa
 // ─────────────────────────────────────────────────────────────────────────────
@@ -453,7 +489,102 @@ try {
 } catch (err) { fail('C3-G: Negação de ausência de tese sem nota_suspeita', err); }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GRUPO 3 — C5: Coerência entre status dos elementos e nota
+// GRUPO 3 — C4: Contagem real de conectivos antes de alegar recorrência
+// ─────────────────────────────────────────────────────────────────────────────
+
+totalTestes++;
+try {
+  // C4-A: Conectivos citados ("Além disso" e "Portanto") ocorrem uma única vez no texto
+  // e a redação utiliza outros mecanismos coesivos adequados ("Mesmo assim", "Assim", "Com isso", "embora").
+  // O validador não deve permitir alegar que são termos recorrentes nem manter problema de recorrência.
+  const textoC4Variado = `Nas escolas, a História da África costuma aparecer em poucos momentos do ano.
+Além disso, faltam materiais pedagógicos adequados para aprofundar o debate.
+Mesmo assim, docentes buscam alternativas criativas no cotidiano escolar.
+Assim, iniciativas pontuais ganham relevância formativa.
+Com isso, os estudantes ampliam a consciência crítica, embora persistam desafios estruturais.
+Portanto, são necessárias políticas públicas permanentes para essa área do saber.`;
+
+  const payload = montarPayload({
+    competencias: [{
+      numero: 4,
+      nota: 160,
+      justificativa: 'Estrutura coesiva com emprego de conectivos, porém "Além disso" e "Portanto" são termos recorrentes.',
+      problemas: [{
+        tipo: 'PONTO_DE_ATENCAO',
+        descricao: 'Termos recorrentes: "Além disso" e "Portanto" são conectivos recorrentes na redação',
+        trecho_original: 'Além disso',
+        sugestao_reescrita: ''
+      }],
+      analise: {
+        criterios_atendidos: ['Conectores interparágrafos'],
+        criterios_parciais: ['Termos recorrentes'],
+        criterios_ausentes: []
+      }
+    }]
+  });
+
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoC4Variado);
+  const c4 = res.competencias[3];
+
+  // 1. A justificativa não deve conter alegação de termos recorrentes
+  assert.ok(!c4.justificativa.toLowerCase().includes('recorrente'),
+    `Justificativa de C4 não deve descrever termos de ocorrência única como recorrentes; obteve: "${c4.justificativa}"`);
+  // 2. Problemas que apontavam falsa recorrência devem ter sido removidos
+  const probRecorrentes = c4.problemas.filter(p => /(?:recorrente|repetid)/i.test(p.descricao || ''));
+  assert.equal(probRecorrentes.length, 0,
+    'Problemas com alegação de falsa recorrência de conectivos únicos devem ser removidos');
+  // 3. Critérios parciais não devem conter alegação de termos recorrentes
+  if (c4.analise?.criterios_parciais) {
+    const critRecorrentes = c4.analise.criterios_parciais.filter(c => /(?:recorrente|repetid)/i.test(String(c)));
+    assert.equal(critRecorrentes.length, 0,
+      'Critérios parciais não devem conter alegação de termos recorrentes');
+  }
+
+  pass('C4-A: Conectivos com ocorrência única ("Além disso", "Portanto") não são descritos como recorrentes');
+} catch (err) { fail('C4-A: Conectivos com ocorrência única não descritos como recorrentes', err); }
+
+totalTestes++;
+try {
+  // C4-B: Conectivo genuinamente repetido 3 vezes na redação ("Além disso")
+  // A constatação factual de repetição deve ser preservada.
+  const textoC4Repetido = `Em primeiro plano, a educação inclusiva enfrenta barreiras orçamentárias.
+Além disso, a capacitação de professores permanece deficiente em diversas regiões.
+Além disso, a falta de material pedagógico dificulta as atividades.
+Além disso, a infraestrutura escolar precária amplia a desigualdade educacional.`;
+
+  const payload = montarPayload({
+    competencias: [{
+      numero: 4,
+      nota: 120,
+      justificativa: 'Emprego excessivamente repetido de conectivo: "Além disso" é termo recorrente ao longo do texto.',
+      problemas: [{
+        tipo: 'PONTO_DE_ATENCAO',
+        descricao: 'Repetição mecânica: "Além disso" é conectivo recorrente',
+        trecho_original: 'Além disso',
+        sugestao_reescrita: 'Ademais / Outrossim'
+      }],
+      analise: {
+        criterios_atendidos: ['Conectores interparágrafos'],
+        criterios_parciais: ['Repetição de conectivos'],
+        criterios_ausentes: []
+      }
+    }]
+  });
+
+  const res = validarENormalizarResposta(payload, matrizEnem, 'mock-ia', textoC4Repetido);
+  const c4 = res.competencias[3];
+
+  // Como "Além disso" de fato aparece 3 vezes, a crítica factual deve ser mantida
+  assert.ok(c4.problemas.length > 0,
+    'Crítica de conectivo genuinamente repetido deve ser preservada na lista de problemas');
+  assert.ok(c4.justificativa.toLowerCase().includes('recorrente') || c4.justificativa.toLowerCase().includes('repeti'),
+    'Justificativa de repetição genuína deve ser preservada');
+
+  pass('C4-B: Conectivo genuinamente repetido (3x) tem crítica de repetição preservada');
+} catch (err) { fail('C4-B: Conectivo genuinamente repetido preservado', err); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GRUPO 4 — C5: Coerência entre status dos elementos e nota
 // ─────────────────────────────────────────────────────────────────────────────
 
 totalTestes++;
@@ -701,7 +832,7 @@ try {
 } catch (err) { fail('C5-H: Crítica afirmativa de falta de detalhamento ajustada para 160', err); }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GRUPO 4 — Integração: C1 + C3 + C5 incoerentes ao mesmo tempo
+// GRUPO 5 — Integração: Múltiplas inconsistências simultâneas
 // ─────────────────────────────────────────────────────────────────────────────
 
 totalTestes++;

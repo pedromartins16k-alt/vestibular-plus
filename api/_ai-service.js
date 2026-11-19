@@ -195,7 +195,10 @@ IMPORTANTE:
 - Cite cada desvio real com o trecho exato onde ocorre.
 - Se atribuir 200 pts, a justificativa deve atestar formalmente excelência e não apontar falhas lexicais.
 - Sugestão pedagógica de refinamento estilístico opcional NÃO é erro gramatical nem impede nota 200 se a estrutura sintática for exemplar.
-- OBRIGATÓRIO: todo problema marcado como "ERRO" em C1 deve ter "trecho_original" preenchido com o trecho exato do texto onde o desvio gramatical ocorre. Se não houver trecho real para citar, classifique o apontamento como "PONTO_DE_ATENCAO" ou "SUGESTAO", nunca como "ERRO".`;
+- OBRIGATÓRIO: todo problema marcado como "ERRO" em C1 deve ter "trecho_original" preenchido com o trecho exato do texto onde o desvio gramatical ocorre. Se não houver trecho real para citar, classifique o apontamento como "PONTO_DE_ATENCAO" ou "SUGESTAO", nunca como "ERRO".
+- CAPITALIZAÇÃO DE DISCIPLINAS E ÁREAS DO SABER (ACORDO ORTOGRÁFICO — BASE XIX):
+  Conforme o Acordo Ortográfico da Língua Portuguesa, é FACULTATIVO/OPCIONAL o uso de letra inicial maiúscula ou minúscula em nomes que designam domínios do saber, disciplinas escolares, matérias e áreas do conhecimento (ex.: "História" ou "história", "História da África" ou "história da África", "Matemática", "Filosofia", "Sociologia", "Geografia", "Literatura", "Física", "Química", "Biologia", etc.).
+  Portanto, NUNCA classifique o uso de maiúscula ou minúscula nesses termos como "ERRO" e NUNCA reduza a nota de C1 por essa razão. Sugestões de padronização podem ser apresentadas exclusivamente como estilo ("SUGESTAO"), sem reduzir a nota nem categorizar como desvio gramatical.`;
 
 const RUBRICA_C2 = `
 COMPETÊNCIA 2 — Compreensão da Proposta e Aplicação de Repertório Sociocultural
@@ -269,7 +272,12 @@ ESCALA OFICIAL INEP:
 • 120 pts → Uso de mecanismos coesivos regular, mas com repetições visíveis ou inadequações não dominantes.
 • 80 pts → Conectivos insuficientes ou empregados de forma equivocada em trechos importantes do texto.
 • 40 pts → Coesão precária; frases justapostas sem articulação lógica.
-• 0 pts → Ausência de conectivos ou coesão totalmente caótica.`;
+• 0 pts → Ausência de conectivos ou coesão totalmente caótica.
+
+CONTAGEM REAL E PROIBIÇÃO DE FALSA RECORRÊNCIA:
+- É EXPRESSAMENTE PROIBIDO afirmar que conectivos ou operadores (como "Além disso", "Portanto", "Ademais", etc.) são "repetidos", "recorrentes" ou "excessivos" sem antes contar quantas vezes eles realmente aparecem na redação.
+- Se cada termo citado aparece apenas UMA VEZ no texto, É FACTUALMENTE INCORRETO qualificá-lo como "recorrente" ou "repetido". NUNCA utilize essa justificativa quando os termos tiverem ocorrência única.
+- Se a redação apresentar variedade de conectivos adequados (por exemplo, uso conjunto de operadores distintos como "Além disso", "Portanto", "Mesmo assim", "Assim", "Com isso", "embora"), o repertório coesivo é diversificado e não deve ser criticado por repetição. Só aponte repetição quando o mesmo termo for reutilizado de modo excessivo (3 ou mais vezes) sem necessidade estilística.`;
 
 const RUBRICA_C5 = `
 COMPETÊNCIA 5 — Proposta de Intervenção Social
@@ -534,6 +542,8 @@ REGRAS FUNDAMENTAIS (obrigatórias):
    - Afirmar que o candidato escreveu algo que não está no texto.
    - Presumir intenção sem evidência textual.
    - Penalizar por coisas que poderiam ser "mais bonitas" mas não são erros.
+   - Nomes de disciplinas, matérias e áreas do saber com inicial maiúscula (ex: "História", "História da África", "Matemática") são grafias legítimas facultadas pelo Acordo Ortográfico; NÃO classifique como ERRO nem penalize em C1.
+   - É PROIBIDO afirmar que conectivos são "recorrentes" ou "repetidos" se eles aparecerem apenas uma vez no texto. Conte as ocorrências reais antes de alegar repetição coesiva em C4.
 
 2. SEPARAR OBRIGATORIAMENTE:
    - ERRO: algo que realmente prejudica a competência avaliada.
@@ -1005,6 +1015,61 @@ function _trechoExisteNaRedacao(trecho, texto) {
 }
 
 /**
+ * Verifica se um apontamento em C1 refere-se à capitalização (inicial maiúscula ou minúscula)
+ * de nomes de disciplinas, matérias ou áreas do conhecimento.
+ * Pelo Acordo Ortográfico (Base XIX, 2º, a), essa grafia é facultativa e NÃO constitui erro gramatical obrigatório.
+ */
+function _isCapitalizacaoOpcionalDisciplina(prob, trecho) {
+  if (!prob) return false;
+  const t = (trecho || prob.trecho_original || '').trim().toLowerCase();
+  const desc = (prob.descricao || '').trim().toLowerCase();
+
+  const regexDisciplinas = /\b(?:história(?:\s+da\s+áfrica|\s+do\s+brasil)?|geografia|filosofia|sociologia|matemática|biologia|física|química|literatura|artes?|ciências(?:\s+humanas|\s+da\s+natureza)?|língua\s+portuguesa|português|inglês|espanhol)\b/i;
+
+  const mencionaMaiuscula =
+    desc.includes('maiúscul') ||
+    desc.includes('minúscul') ||
+    desc.includes('capitaliza') ||
+    desc.includes('caixa alta') ||
+    desc.includes('letra maiúscula');
+
+  // Caso 1: Trecho citado é uma disciplina/área do saber e a descrição aborda maiúscula/minúscula (ou o trecho é a disciplina)
+  if (regexDisciplinas.test(t) && (mencionaMaiuscula || !desc)) {
+    return true;
+  }
+
+  // Caso 2: A descrição menciona disciplina/área do saber e maiúscula
+  if (mencionaMaiuscula && (
+    desc.includes('disciplina') ||
+    desc.includes('área do saber') ||
+    desc.includes('área do conhecimento') ||
+    desc.includes('matéria') ||
+    regexDisciplinas.test(desc)
+  )) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Conta as ocorrências reais de um termo ou conectivo dentro do texto da redação,
+ * respeitando limites de palavra e pontuações para evitar falsas correspondências parciais.
+ */
+function _contarOcorrenciasTermo(termo, texto) {
+  if (!termo || typeof termo !== 'string' || !termo.trim()) return 0;
+  if (!texto || typeof texto !== 'string' || !texto.trim()) return 0;
+
+  const termoNorm = termo.trim().toLowerCase();
+  if (termoNorm.length === 0) return 0;
+
+  const regexEscapado = termoNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(?:^|[\\s.,;:!?"'“”(«)\\[\\]])${regexEscapado}(?=[\\s.,;:!?"'“”)»\\]]|$)`, 'gi');
+  const matches = texto.match(regex);
+  return matches ? matches.length : 0;
+}
+
+/**
  * Valida e normaliza a resposta da IA.
  *
  * Regras críticas:
@@ -1154,7 +1219,7 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
       notaClamped = Math.max(0, Math.min(pesoMax, Math.round(notaBruta)));
     }
 
-    const justificativa = String(comp.justificativa || '').trim();
+    let justificativa = String(comp.justificativa || '').trim();
     if (justificativa.length < 20) {
       console.warn(`[_ai-service] Competência ${idx + 1} sem justificativa adequada (${justificativa.length} chars).`);
     }
@@ -1271,6 +1336,21 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
           }
         }
 
+        // 1. Capitalização opcional de disciplinas e áreas do saber (Acordo Ortográfico, Base XIX)
+        // Maiúscula em nomes de disciplinas (ex: "História", "História da África", "Matemática")
+        // é facultativa pelo Acordo Ortográfico e NÃO é erro gramatical obrigatório.
+        // Se a IA marcou como ERRO, reclassifica para SUGESTAO de estilo sem penalizar.
+        if (_isCapitalizacaoOpcionalDisciplina(prob, trecho)) {
+          return {
+            ...prob,
+            tipo: 'SUGESTAO',
+            descricao: prob.descricao.includes('Acordo Ortográfico')
+              ? prob.descricao
+              : `${prob.descricao} (Acordo Ortográfico: maiúscula facultativa para nomes de disciplinas/áreas do saber — sugestão de estilo).`,
+            _aviso_capitalizacao_opcional: true
+          };
+        }
+
         // Se não há trecho citado em lugar nenhum, não pode ser ERRO confirmado
         if (!trecho) {
           return {
@@ -1365,6 +1445,119 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
             notaSuspeita = true;
             avisoContradicao = `C3: a justificativa afirma ausência de tese mas ao mesmo tempo descreve causas, argumentos ou estrutura dissertativa presentes. A análise pode ser incoerente.`;
             console.warn(`[_ai-service] Contradição C3: justificativa nega tese mas descreve argumentos presentes`);
+          }
+        }
+      }
+    }
+
+    // ── AJUSTE C4: Verificação factual de conectivos repetidos/recorrentes ────
+    // Antes de apontar que conectivos são "repetidos" ou "recorrentes", conta as
+    // ocorrências reais no texto. Não permite essa justificativa se cada termo citado
+    // aparecer apenas uma vez ou se a redação apresentar variedade de outros mecanismos coesivos.
+    if (isEnem && numeroComp === 4 && typeof texto === 'string' && texto.trim().length > 0) {
+      const justC4Lower = (justificativa || '').toLowerCase();
+      const temAlegacaoRecorrencia =
+        /(?:termos?|conectivos?|operadores?|recursos?)\s+.*?(?:recorrentes?|repetid[oa]s?|repetitiv[oa]s?)/i.test(justificativa) ||
+        /(?:recorrentes?|repetid[oa]s?|repetitiv[oa]s?)\s+.*?(?:termos?|conectivos?|operadores?)/i.test(justificativa) ||
+        /(?:são\s+(?:termos\s+)?recorrentes?|termos?\s+recorrentes?|conectivos?\s+recorrentes?)/i.test(justificativa) ||
+        problemasNormalizados.some(p => /(?:recorrente|repetid|repetiç)/i.test(p.descricao || ''));
+
+      if (temAlegacaoRecorrencia) {
+        const extrairTermosAspas = (str) => {
+          if (!str) return [];
+          return [...str.matchAll(/["“«'‘]([^"”»'’]+)["”»'’]/g)].map(m => m[1].trim());
+        };
+
+        const termosCitados = [
+          ...extrairTermosAspas(justificativa),
+          ...problemasNormalizados.flatMap(p => [
+            ...(p.trecho_original ? [p.trecho_original.trim()] : []),
+            ...extrairTermosAspas(p.descricao)
+          ])
+        ];
+
+        const catalogoConectivos = [
+          'além disso', 'portanto', 'ademais', 'outrossim', 'assim', 'contudo',
+          'todavia', 'entretanto', 'no entanto', 'por conseguinte', 'dessa forma',
+          'desse modo', 'nesse sentido', 'por outro lado', 'mesmo assim', 'com isso',
+          'embora', 'por fim', 'em suma', 'em síntese'
+        ];
+
+        const termosUnicos = [];
+        const termosVistos = new Set();
+        for (const t of termosCitados) {
+          const lower = t.toLowerCase();
+          if (!termosVistos.has(lower) && lower.length > 1) {
+            termosVistos.add(lower);
+            termosUnicos.push(t);
+          }
+        }
+        for (const c of catalogoConectivos) {
+          if (justC4Lower.includes(c) && !termosVistos.has(c)) {
+            termosVistos.add(c);
+            termosUnicos.push(c);
+          }
+        }
+
+        // Se foram identificados termos coesivos citados
+        if (termosUnicos.length > 0) {
+          const contagens = termosUnicos.map(t => ({
+            termo: t,
+            contagem: _contarOcorrenciasTermo(t, texto)
+          }));
+
+          const algumRepetido = contagens.some(c => c.contagem > 1);
+          const conectivosNoTexto = catalogoConectivos.filter(c => _contarOcorrenciasTermo(c, texto) >= 1);
+          const temMecanismosAdequados = conectivosNoTexto.length >= 2;
+
+          // Se nenhum dos termos citados ocorre mais de uma vez (ou seja, cada um aparece apenas uma vez)
+          // ou se a redação apresenta mecanismos coesivos adequados diversificados
+          if (!algumRepetido || (temMecanismosAdequados && contagens.filter(c => c.contagem > 1).length === 0)) {
+            // 1. Remove problemas que alegavam falsa recorrência de termos com ocorrência única
+            problemasNormalizados = problemasNormalizados.filter(p => {
+              const descLower = (p.descricao || '').toLowerCase();
+              return !descLower.includes('recorrente') &&
+                     !descLower.includes('repetid') &&
+                     !descLower.includes('repetição');
+            });
+            tipoApontamento = _inferirTipoApontamento(problemasNormalizados);
+
+            // 2. Não use essa justificativa se cada termo citado aparece apenas uma vez
+            // Remove formulações de "termos recorrentes" / "são recorrentes" da justificativa
+            let justAjustada = justificativa
+              .replace(/(?:são\s+)?termos\s+recorrentes/gi, 'conectivos com ocorrência pontual (sem repetição excessiva)')
+              .replace(/(?:são\s+)?conectivos\s+recorrentes/gi, 'conectivos com ocorrência pontual (sem repetição excessiva)')
+              .replace(/são\s+recorrentes/gi, 'apresentam ocorrência pontual')
+              .replace(/conectivos\s+(?:excessivamente\s+)?repetidos/gi, 'conectivos empregados sem repetição excessiva')
+              .replace(/repetição\s+(?:excessiva|frequente|recorrente)\s+de\s+conectivos/gi, 'emprego de conectivos inter e intraparágrafos');
+
+            if (/recorrente/i.test(justAjustada)) {
+              justAjustada = justAjustada.replace(/[^.!?;\n]*recorrente[^.!?;\n]*[.!?]?/gi, ' ');
+            }
+            justAjustada = justAjustada.replace(/\s{2,}/g, ' ').trim();
+            if (!justAjustada || justAjustada.length < 20) {
+              justAjustada = 'Estrutura coesiva com emprego de conectivos inter e intraparágrafos com ocorrência pontual, sem repetição mecânica ou excessiva.';
+            }
+            justificativa = justAjustada;
+
+            // 3. Atualiza critérios em analise se existirem
+            if (analise && Array.isArray(analise.criterios_parciais)) {
+              analise.criterios_parciais = analise.criterios_parciais.filter(
+                c => !/(?:recorrente|repetiç|repetid)/i.test(String(c))
+              );
+            }
+            if (analise && Array.isArray(analise.criterios_ausentes)) {
+              analise.criterios_ausentes = analise.criterios_ausentes.filter(
+                c => !/(?:recorrente|repetiç|repetid)/i.test(String(c))
+              );
+            }
+            if (analise && Array.isArray(analise.criterios_atendidos)) {
+              if (!analise.criterios_atendidos.some(c => /coes/i.test(String(c)) || /conectiv/i.test(String(c)))) {
+                analise.criterios_atendidos.push('Emprego diversificado de conectivos sem repetição excessiva');
+              }
+            }
+
+            console.warn(`[_ai-service] Ajuste C4: alegação de conectivos recorrentes removida pois termos citados ocorrem apenas uma vez no texto`);
           }
         }
       }
