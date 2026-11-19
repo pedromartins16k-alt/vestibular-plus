@@ -1,0 +1,64 @@
+{
+  "versao_schema": "1.0.0",
+  "eh_demonstracao": false,
+  "aviso_privacidade": "INSTRUÇÃO DE PRIVACIDADE: Este arquivo é um modelo vazio. Ao preenchê-lo com dados reais, certifique-se de que a coleta de redações possui autorização expressa dos autores e que quaisquer dados pessoais identificáveis (PII como nomes de estudantes, e-mails ou CPF) foram completamente desidentificados antes do uso.",
+  "banca": "enem",
+  "descricao": "Conjunto de redações com avaliações humanas de referência para calibração do corretor de IA.",
+  "casos": [
+    {
+      "id": "redacao-001-exemplo",
+      "tema": "Tema oficial da proposta",
+      "texto": "Cole aqui o texto completo da redação desidentificada (sem nomes, assinaturas ou marcas pessoais).",
+      "avaliacoes_humanas": [
+        {
+          "avaliador_id": "avaliador-1",
+          "tipo": "corretor_oficial",
+          "competencias": {
+            "c1": 160,
+            "c2": 160,
+            "c3": 160,
+            "c4": 160,
+            "c5": 160
+          },
+          "nota_total": 800,
+          "comentarios": "Opcional: apontamentos do corretor 1"
+        },
+        {
+          "avaliador_id": "avaliador-2",
+          "tipo": "corretor_oficial",
+          "competencias": {
+            "c1": 160,
+            "c2": 160,
+            "c3": 160,
+            "c4": 160,
+            "c5": 160
+          },
+          "nota_total": 800,
+          "comentarios": "Opcional: apontamentos do corretor 2"
+        }
+      ],
+      "nota_adjudicada": {
+        "tipo": "opcional_adjudicada_ou_consenso",
+        "competencias": {
+          "c1": 160,
+          "c2": 160,
+          "c3": 160,
+          "c4": 160,
+          "c5": 160
+        },
+        "nota_total": 800
+      },
+      "correcao_ia": {
+        "modelo": "modelo-usado-na-avaliacao",
+        "competencias": {
+          "c1": 160,
+          "c2": 160,
+          "c3": 160,
+          "c4": 160,
+          "c5": 160
+        },
+        "nota_total": 800
+      }
+    }
+  ]
+}
