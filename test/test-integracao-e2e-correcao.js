@@ -150,7 +150,7 @@ async function executar() {
     const payloadInsert = {
       user_id: userIdEfetivo,
       proposta_id: REDACAO_FICTICIA_TESTE.proposta_id,
-      titulo: REDACAO_FICTICIA_TESTE.titulo,
+      titulo: `[E2E_CORRECAO_TESTE:${process.env.GITHUB_RUN_ID || Date.now()}] ${REDACAO_FICTICIA_TESTE.titulo}`,
       vestibular_id: REDACAO_FICTICIA_TESTE.vestibular_id,
       conteudo: REDACAO_FICTICIA_TESTE.conteudo,
       total_palavras: REDACAO_FICTICIA_TESTE.total_palavras,
@@ -309,29 +309,31 @@ async function executar() {
   // ── ETAPA 8: Limpeza Isolada de Dados Criados no Teste ─────────────────────
   console.log('\n📌 ETAPA 8 — Limpeza dos Dados de Teste');
   if (redacaoCriadaId) {
-    const errosLimpeza = [];
+    try {
+      const respLimpeza = await fetch(`${API_BASE_URL}/api/e2e-cleanup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokenEfetivo}`
+        },
+        body: JSON.stringify({ redacaoId: redacaoCriadaId })
+      });
+      const resultadoLimpeza = await respLimpeza.json().catch(() => ({}));
 
-    // Só haverá avaliação persistida quando a API confirmar explicitamente a gravação.
-    if (respostaApi?.persistido_no_banco === true) {
-      const { error: errDeleteAvaliacao } = await supabaseUser
-        .from('redacao_avaliacoes')
-        .delete()
-        .eq('redacao_id', redacaoCriadaId);
-      if (errDeleteAvaliacao) errosLimpeza.push(`redacao_avaliacoes: ${errDeleteAvaliacao.message}`);
-    }
+      if (!respLimpeza.ok || resultadoLimpeza.sucesso !== true) {
+        throw new Error(resultadoLimpeza.error || `Endpoint de limpeza retornou HTTP ${respLimpeza.status}`);
+      }
 
-    // Sempre tentar remover a redação, mesmo se a exclusão da avaliação falhar.
-    const { error: errDeleteRedacao } = await supabaseUser
-      .from('redacoes')
-      .delete()
-      .eq('id', redacaoCriadaId);
-    if (errDeleteRedacao) errosLimpeza.push(`redacoes: ${errDeleteRedacao.message}`);
+      const removidos = resultadoLimpeza.removidos || {};
+      assert.equal(removidos.redacoes, 1, 'A redação criada nesta execução deve ser removida');
+      if (respostaApi?.persistido_no_banco === true) {
+        assert.equal(removidos.avaliacoes, 1, 'A avaliação criada nesta execução deve ser removida');
+      }
 
-    if (errosLimpeza.length) {
-      logFail('LIMPEZA', 'Falha ao remover dados criados pelo teste', new Error(errosLimpeza.join('; ')));
+      logPass('LIMPEZA', 'Somente os registros marcados e criados por esta execução foram removidos.');
+    } catch (errLimpeza) {
+      logFail('LIMPEZA', 'Falha ao remover dados criados pelo teste', errLimpeza);
       process.exitCode = 1;
-    } else {
-      logPass('LIMPEZA', `Dados de teste (Redação ${redacaoCriadaId}) removidos com segurança.`);
     }
   }
 
