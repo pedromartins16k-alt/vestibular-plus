@@ -194,7 +194,8 @@ IMPORTANTE:
 - A nota deve ser proporcional à quantidade, frequência e gravidade dos desvios encontrados.
 - Cite cada desvio real com o trecho exato onde ocorre.
 - Se atribuir 200 pts, a justificativa deve atestar formalmente excelência e não apontar falhas lexicais.
-- Sugestão pedagógica de refinamento estilístico opcional NÃO é erro gramatical nem impede nota 200 se a estrutura sintática for exemplar.`;
+- Sugestão pedagógica de refinamento estilístico opcional NÃO é erro gramatical nem impede nota 200 se a estrutura sintática for exemplar.
+- OBRIGATÓRIO: todo problema marcado como "ERRO" em C1 deve ter "trecho_original" preenchido com o trecho exato do texto onde o desvio gramatical ocorre. Se não houver trecho real para citar, classifique o apontamento como "PONTO_DE_ATENCAO" ou "SUGESTAO", nunca como "ERRO".`;
 
 const RUBRICA_C2 = `
 COMPETÊNCIA 2 — Compreensão da Proposta e Aplicação de Repertório Sociocultural
@@ -243,7 +244,11 @@ ESCALA OFICIAL INEP:
 • 120 pts → Argumentação previsível, com projeto de texto com falhas visíveis (apenas expõe ideias sem aprofundar a relação com a tese, ou argumentos repetitivos).
 • 80 pts → Argumentação desorganizada, contraditória ou com muitas lacunas; projeto de texto muito embrionário.
 • 40 pts → Ideias desconexas, sem projeto de texto estruturado.
-• 0 pts → Ausência de argumentação ou defesa de ponto de vista.`;
+• 0 pts → Ausência de argumentação ou defesa de ponto de vista.
+
+IMPORTANTE — COERÊNCIA INTERNA SOBRE A TESE:
+- Se a introdução identifica o problema, apresenta causas ou estabelece um ponto de vista a ser defendido, a tese existe (pode ser mais ou menos explícita, mas existe). Não afirme "ausência de tese" ou "tese não identificada" se ao mesmo tempo a própria justificativa descreve argumentos, causas ou estrutura dissertativa presentes.
+- A afirmação de ausência de tese deve ser reservada exclusivamente a textos que não apresentam ponto de vista algum e não constroem qualquer linha argumentativa.`;
 
 const RUBRICA_C4 = `
 COMPETÊNCIA 4 — Conhecimento dos Mecanismos Linguísticos (Coesão)
@@ -294,7 +299,9 @@ IMPORTANTE:
 - NÃO invente elementos que o estudante não escreveu.
 - O INEP exige exatamente 5 elementos (agente, ação, meio, finalidade e 1 detalhamento). NÃO exija cronograma, prazos ou orçamento financeiro para validar o detalhamento na C5, nem monitoramento contínuo, pois a matriz oficial do INEP não os exige.
 - NÃO zere a competência por pequena imperfeição num texto que claramente tentou apresentar proposta.
-- Respeitando direitos humanos: verifique se a proposta não viola direitos fundamentais (ex: tortura, linchamento, censura prévia). Se violar, zere apenas a C5 (critério INEP).`;
+- Respeitando direitos humanos: verifique se a proposta não viola direitos fundamentais (ex: tortura, linchamento, censura prévia). Se violar, zere apenas a C5 (critério INEP).
+- COERÊNCIA OBRIGATÓRIA ENTRE ELEMENTOS E NOTA: verifique se o "detalhamento" realmente está presente e é específico no texto, não apenas se o rótulo pode ser aplicado. Se classificar "detalhamento" como "insuficiente" ou "ausente" em "elementos_proposta", a nota DEVE ser 160 pts ou inferior, nunca 200. Não atribua 200 pts e ao mesmo tempo recomende detalhar mais a proposta.
+- O campo "elementos_proposta" deve refletir o que está efetivamente escrito, não o que poderia estar; se a proposta não especifica o "meio" ou o "detalhamento" de forma autônoma e inequívoca, marque-os como "insuficiente", não "presente".`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTRUÇÃO DO PROMPT
@@ -1203,12 +1210,128 @@ export function validarENormalizarResposta(rawText, matriz, modeloUsado, texto, 
       });
     }
 
+    // notaSuspeita e avisoContradicao são resolvidos nos blocos C1/C3/C5 e na detecção geral abaixo
+    let notaSuspeita = false;
+    let avisoContradicao = null;
+
+    // ── AJUSTE C1: Erros gramaticais exigem trecho real ─────────────────────
+    // Um problema marcado como ERRO em C1 sem trecho_original é provavelmente
+    // uma sugestão de estilo apresentada erroneamente como erro gramatical.
+    // Nesse caso, o tipo é rebaixado para PONTO_DE_ATENCAO, sem alterar a nota.
+    // Excepção: o formato legado embute o trecho na própria descrição (entre aspas
+    // ou marcadores como «...»); nesses casos o erro é considerado fundamentado.
+    if (isEnem && numeroComp === 1) {
+      problemasNormalizados = problemasNormalizados.map(prob => {
+        const temTrechoNoCampo = prob.trecho_original.trim().length > 0;
+        // Aceita descrições legadas com trecho embutido entre aspas duplas ou simples
+        const temTrechoNaDescricao = /["«»"'›‹]/.test(prob.descricao) || prob.descricao.includes(' em "') || prob.descricao.includes(" em '");
+        if (prob.tipo === 'ERRO' && !temTrechoNoCampo && !temTrechoNaDescricao) {
+          return {
+            ...prob,
+            tipo: 'PONTO_DE_ATENCAO',
+            descricao: prob.descricao,
+            _aviso_sem_trecho: true
+          };
+        }
+        return prob;
+      });
+      // Recalcula tipoApontamento após possível alteração dos tipos
+      const tipoRecalculado = _inferirTipoApontamento(problemasNormalizados);
+      // Só atualiza se o tipoApontamento não foi explicitamente declarado como ERRO pela IA
+      // e agora não há mais nenhum problema do tipo ERRO
+      if (!problemasNormalizados.some(p => p.tipo === 'ERRO') && tipoApontamento === 'ERRO') {
+        tipoApontamento = tipoRecalculado;
+      }
+    }
+
+    // ── AJUSTE C3: Coerência entre presença de tese e afirmação de ausência ─
+    // Se a justificativa afirmar que a tese não está identificada/explicitada,
+    // mas o próprio texto da justificativa citar causas, argumentos ou defender
+    // um ponto de vista identificável, a afirmação de ausência é incoerente.
+    // Nesse caso, adiciona nota_suspeita (sem alterar nota automaticamente).
+    if (isEnem && numeroComp === 3) {
+      const justC3 = justificativa.toLowerCase();
+      const afirmaTesAusente =
+        justC3.includes('tese não está') ||
+        justC3.includes('tese não foi') ||
+        justC3.includes('tese não identificada') ||
+        justC3.includes('tese não explicitada') ||
+        justC3.includes('ausência de tese') ||
+        justC3.includes('sem tese') ||
+        justC3.includes('tese ausente') ||
+        justC3.includes('não apresenta tese') ||
+        justC3.includes('tese implícita') ||
+        justC3.includes('falta de tese');
+      const sinaisDeTesePresente =
+        justC3.includes('causa') ||
+        justC3.includes('argumento') ||
+        justC3.includes('defende') ||
+        justC3.includes('ponto de vista') ||
+        justC3.includes('tese') ||
+        justC3.includes('introdução') ||
+        justC3.includes('apresenta') ||
+        justC3.includes('identifica') ||
+        justC3.includes('problema') ||
+        justC3.includes('dois') ||
+        justC3.includes('duas');
+      if (afirmaTesAusente && sinaisDeTesePresente) {
+        // A justificativa é contraditória: nega a tese mas descreve sua estrutura.
+        // Registra nota_suspeita sem forçar nota específica.
+        if (!notaSuspeita) {
+          notaSuspeita = true;
+          avisoContradicao = `C3: a justificativa afirma ausência de tese mas ao mesmo tempo descreve causas, argumentos ou estrutura dissertativa presentes. A análise pode ser incoerente.`;
+          console.warn(`[_ai-service] Contradição C3: justificativa nega tese mas descreve argumentos presentes`);
+        }
+      }
+    }
+
+    // ── AJUSTE C5: Coerência entre status dos elementos e nota ───────────────
+    // Se elementos_proposta indica detalhamento como 'insuficiente' ou 'ausente'
+    // mas a nota é 200, ajusta para 160 (rubrica: detalhamento frágil = 160 pts).
+    // Se a justificativa recomenda detalhar mais com nota 200, idem.
+    if (isEnem && numeroComp === 5 && notaClamped === 200) {
+      const ep = analise.elementos_proposta;
+      const detalhamentoInsuficiente = ep && (
+        ep.detalhamento === 'insuficiente' ||
+        ep.detalhamento === 'ausente'
+      );
+      const justC5 = justificativa.toLowerCase();
+      const recomendaDetalhar =
+        justC5.includes('detalhar mais') ||
+        justC5.includes('mais detalhamento') ||
+        justC5.includes('falta de detalhamento') ||
+        justC5.includes('detalhamento insuficiente') ||
+        justC5.includes('detalhamento vago') ||
+        justC5.includes('detalhamento genérico') ||
+        justC5.includes('detalhamento ausente') ||
+        justC5.includes('mais específico') ||
+        justC5.includes('mais detalhe') ||
+        justC5.includes('especificar mais') ||
+        justC5.includes('enriquecer o detalhamento') ||
+        justC5.includes('detalhar a proposta');
+      if (detalhamentoInsuficiente || recomendaDetalhar) {
+        notaClamped = 160;
+        nivel = _inferirNivel(notaClamped, pesoMax);
+        prioridade = _inferirPrioridade(notaClamped, pesoMax);
+        tipoApontamento = 'PONTO_DE_ATENCAO';
+        const motivo = detalhamentoInsuficiente
+          ? `Elemento "detalhamento" da proposta marcado como "${ep.detalhamento}". Rubrica INEP: detalhamento insuficiente = 160 pts.`
+          : `Justificativa recomenda detalhar mais a proposta. Rubrica INEP: proposta com detalhamento frágil = 160 pts.`;
+        problemasNormalizados.push({
+          tipo: 'PONTO_DE_ATENCAO',
+          descricao: `C5: nota ajustada de 200 para 160 para manter coerência com a análise. ${motivo}`,
+          trecho_original: '',
+          sugestao_reescrita: ''
+        });
+        console.warn(`[_ai-service] Ajuste C5: detalhamento insuficiente com nota 200 → ajustado para 160`);
+      }
+    }
+
     // ── Detecção de contradição nota/justificativa ───────────────────────────
     // Considera a competência relacionada, a gravidade da limitação e a rubrica oficial.
     // Sugestão pedagógica leve de refinamento estilístico NÃO gera contradição na nota 200.
     // Fragilidades estruturais relevantes apontadas na justificativa geram nota_suspeita.
-    let notaSuspeita = false;
-    let avisoContradicao = null;
+    // (notaSuspeita e avisoContradicao já declarados acima — usamos a mesma instância)
 
     if (notaClamped === 200) {
       const justLower = justificativa.toLowerCase();
