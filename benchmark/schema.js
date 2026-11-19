@@ -18,6 +18,7 @@
  */
 
 export const INCREMENTOS_ENEM = Object.freeze([0, 40, 80, 120, 160, 200]);
+export const INCREMENTOS_REFERENCIA_ENEM = Object.freeze([0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200]);
 export const PONTUACAO_MAXIMA_ENEM = 1000;
 export const PESO_COMPETENCIA_ENEM = 200;
 export const NUMERO_COMPETENCIAS_ENEM = 5;
@@ -111,8 +112,8 @@ export function validarNotasEnem(comps, permitirMedias = false) {
         erros.push(`C${i}: nota ${nota} não pertence aos incrementos de 40 pontos do ENEM (0, 40, 80, 120, 160, 200).`);
       }
     } else {
-      if (nota % 10 !== 0 && nota % 5 !== 0) {
-        erros.push(`C${i}: nota de média fracionária incomum (${nota}).`);
+      if (!INCREMENTOS_REFERENCIA_ENEM.includes(nota)) {
+        erros.push(`C${i}: nota de referência ${nota} não pertence aos incrementos válidos de 20 pontos do ENEM (0, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200).`);
       }
     }
   }

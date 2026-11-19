@@ -38,6 +38,78 @@ export const NOMES_COMPETENCIAS_ENEM = Object.freeze({
 });
 
 /**
+ * Valida estritamente se um caso possui todos os requisitos para ser computado nas métricas:
+ *  - Referência humana possui resolvida === true;
+ *  - Notas totais (referência e IA) são números finitos;
+ *  - As 5 competências (c1..c5) estão presentes e são números finitos em ambos;
+ *  - As notas totais correspondem exatamente à soma das 5 competências.
+ *
+ * @param {object} caso
+ * @returns {boolean}
+ */
+export function ehCasoValidoParaMetricas(caso) {
+  if (!caso || typeof caso !== 'object') return false;
+
+  // 1. Conte apenas casos cuja referência tenha resolvida === true
+  const ref = caso.referencia;
+  if (!ref || typeof ref !== 'object' || ref.resolvida !== true) {
+    return false;
+  }
+
+  // 2. Correção da IA deve existir e ser objeto
+  const ia = caso.correcao_ia;
+  if (!ia || typeof ia !== 'object') {
+    return false;
+  }
+
+  // 3. Rejeite casos com notas totais não finitas
+  if (
+    typeof ref.nota_total !== 'number' ||
+    !Number.isFinite(ref.nota_total) ||
+    typeof ia.nota_total !== 'number' ||
+    !Number.isFinite(ia.nota_total)
+  ) {
+    return false;
+  }
+
+  // 4. Valide que as competências necessárias estejam presentes e sejam números finitos
+  const refComps = ref.competencias;
+  const iaComps = ia.competencias;
+  if (!refComps || typeof refComps !== 'object' || !iaComps || typeof iaComps !== 'object') {
+    return false;
+  }
+
+  let somaRef = 0;
+  let somaIa = 0;
+
+  for (let i = 1; i <= 5; i++) {
+    const chave = `c${i}`;
+    const vRef = refComps[chave];
+    const vIa = iaComps[chave];
+
+    if (typeof vRef !== 'number' || !Number.isFinite(vRef)) {
+      return false;
+    }
+    if (typeof vIa !== 'number' || !Number.isFinite(vIa)) {
+      return false;
+    }
+
+    somaRef += vRef;
+    somaIa += vIa;
+  }
+
+  // 5. Garanta que as notas totais correspondam à soma das competências
+  if (Math.abs(ref.nota_total - somaRef) > 0.01) {
+    return false;
+  }
+  if (Math.abs(ia.nota_total - somaIa) > 0.01) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Calcula todas as métricas comparativas entre as correções da IA e as referências humanas.
  * Garante que apenas casos com referências humanas efetivamente resolvidas sejam computados.
  *
@@ -45,20 +117,8 @@ export const NOMES_COMPETENCIAS_ENEM = Object.freeze({
  * @returns {object} Objeto estruturado com todas as métricas globais e por competência
  */
 export function calcularMetricasBenchmark(casosValidados) {
-  // Filtro de segurança: processa apenas casos com referência resolvida e íntegra
-  const casosResolvidos = (Array.isArray(casosValidados) ? casosValidados : []).filter(caso => {
-    return (
-      caso &&
-      caso.referencia &&
-      caso.referencia.resolvida !== false &&
-      caso.referencia.competencias &&
-      typeof caso.referencia.nota_total === 'number' &&
-      Number.isFinite(caso.referencia.nota_total) &&
-      caso.correcao_ia &&
-      caso.correcao_ia.competencias &&
-      typeof caso.correcao_ia.nota_total === 'number'
-    );
-  });
+  // Filtro de segurança estrito: processa apenas casos com referência resolvida, finita e consistente
+  const casosResolvidos = (Array.isArray(casosValidados) ? casosValidados : []).filter(ehCasoValidoParaMetricas);
 
   const n = casosResolvidos.length;
 
