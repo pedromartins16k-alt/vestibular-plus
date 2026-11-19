@@ -19,8 +19,41 @@ export default async function handler(req, res) {
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
   if (!token) return responder(res, 401, { error: 'Não autorizado.' });
 
-  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim();
-  const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+  function obterConfiguracaoSupabase() {
+    const viteUrl = (process.env.VITE_SUPABASE_URL || '').trim();
+    const serverUrl = (process.env.SUPABASE_URL || '').trim();
+    const viteAnonKey = (process.env.VITE_SUPABASE_ANON_KEY || '').trim();
+    const serverAnonKey = (process.env.SUPABASE_ANON_KEY || '').trim();
+
+    const extrairRef = (key) => {
+      try {
+        if (!key || typeof key !== 'string' || !key.startsWith('eyJ')) return null;
+        const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8'));
+        return payload.ref || null;
+      } catch (_) { return null; }
+    };
+
+    const extrairHost = (url) => {
+      try { return url ? new URL(url).host : null; } catch (_) { return null; }
+    };
+
+    const viteRef = extrairRef(viteAnonKey);
+    const serverRef = extrairRef(serverAnonKey);
+    const viteHost = extrairHost(viteUrl);
+    const serverHost = extrairHost(serverUrl);
+
+    let supabaseUrl = serverUrl;
+    let supabaseAnonKey = serverAnonKey;
+    if (!supabaseUrl || (viteHost && serverHost && viteHost !== serverHost)) {
+      supabaseUrl = viteUrl || serverUrl;
+    }
+    if (!supabaseAnonKey || (viteRef && serverRef && viteRef !== serverRef) || (viteRef && !serverRef)) {
+      supabaseAnonKey = viteAnonKey || serverAnonKey;
+    }
+    return { supabaseUrl, supabaseAnonKey };
+  }
+
+  const { supabaseUrl, supabaseAnonKey } = obterConfiguracaoSupabase();
   const supabaseServiceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
   if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
